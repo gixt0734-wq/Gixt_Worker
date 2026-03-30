@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Pages/ServicioPage.dart';
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -47,12 +48,12 @@ class CardsServicios extends StatelessWidget {
           color: Theme.of(context).colorScheme.primary,
           child: InkWell(
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => ServicioPage(service_id: service_id),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ServicioPage(service_id: service_id),
+                ),
+              );
             },
 
             child: Column(

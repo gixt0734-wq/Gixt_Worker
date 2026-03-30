@@ -12,7 +12,11 @@ class Servicios {
   String worker_name;
   String worker_img;
   int worker_rating;
+  double worker_labor;
+  String worker_city;
+  double km_cost;
   String category;
+  int duration;
   double price;
   String image;
   int rating;
@@ -27,6 +31,10 @@ class Servicios {
     required this.worker_name,
     required this.worker_img,
     required this.worker_rating,
+    required this.worker_city,
+    required this.worker_labor,
+    required this.km_cost,
+    required this.duration,
     required this.category,
     required this.price,
     required this.image,
@@ -49,13 +57,15 @@ class Servicios {
       description: json['description'] ?? '',
       rating: json['rating'] ?? 0,
       favorite: json['favorite'] ?? false,
-
+      worker_city: workerJson['city'] ?? 0,
       // Datos del worker
-      worker_name: workerJson != null ? workerJson['username'] ?? '' : '',
-      worker_img: workerJson != null ? workerJson['image'] ?? '' : '',
-      worker_rating: workerJson != null ? workerJson['rating'] ?? 0 : 0,
-      des_trabajador: workerJson != null ? workerJson['description'] ?? '' : '',
-
+      worker_name: workerJson['username'] ?? '',
+      worker_img: workerJson['image'] ?? '',
+      worker_rating: workerJson['rating'] ?? 0,
+      worker_labor:  (workerJson['labor_price'] as num?)?.toDouble() ?? 0.0,
+      des_trabajador: workerJson['description'] ?? '',
+      duration: json['duration_hours'] ?? 0,
+      km_cost: workerJson['km_cost'] ?? 0,
       images: List<String>.from(json['images'] ?? []),
     );
   }
@@ -77,6 +87,7 @@ class ServiciosById_service {
     final token = prefs.getString('token');
 
     final headers = {'Authorization': 'Bearer $token'};
+
     int attempts = 0;
     const int maxAttempts = 3;
 
