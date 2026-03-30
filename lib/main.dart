@@ -10,6 +10,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/routes/root.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'config/theme.dart';
@@ -232,14 +233,11 @@ final context = navigatorKey.currentContext;
     if (!mounted) return;
 
     if (inicio == 'true') {
-      // Navigator.pushReplacement(
-      //   context,
-      //   MaterialPageRoute(builder: (context) => RootPage()),
-      // );
-       Navigator.pushReplacement(
+      Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => LoginPage()),
+        MaterialPageRoute(builder: (context) => RootPage()),
       );
+   
     } else {
       Navigator.pushReplacement(
         context,

@@ -5,6 +5,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/alert.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Pages/WelcomePage.dart';
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/inputs/Input.dart' hide OtpBoxclass;
 import 'package:gixt_worker/components/inputs/Input_Description.dart';
@@ -14,6 +15,7 @@ import 'package:gixt_worker/components/inputs/Input_Phone.dart';
 import 'package:gixt_worker/components/inputs/Input_Price.dart';
 import 'package:gixt_worker/components/inputs/OtpBox.dart';
 import 'package:gixt_worker/components/inputs/Pick_Image.dart';
+import 'package:gixt_worker/routes/root.dart';
 import 'package:gixt_worker/services/Auth/cuenta_service.dart';
 import 'package:gixt_worker/services/Auth/info_service.dart';
 import 'package:gixt_worker/services/Auth/validar.dart';
@@ -196,6 +198,10 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
           type: alert_type.exito,
         );
       }
+      );
+       Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => WelcomePage()),
       );
     } else {
       Future.microtask(() async {

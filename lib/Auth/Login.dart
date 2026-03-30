@@ -6,6 +6,7 @@ import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Components/alert.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Pages/WelcomePage.dart';
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/inputs/input.dart';
 import 'package:gixt_worker/components/inputs/Input_Password.dart';
@@ -104,10 +105,10 @@ return;
           message: message,
           type: alert_type.exito,
         );
-        // Navigator.pushReplacement(
-        //   context,
-        //   MaterialPageRoute(builder: (context) => RootPage()),
-        // );
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => WelcomePage()),
+        );
       });
     } else {
       mostrarAlerta(
