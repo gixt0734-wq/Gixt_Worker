@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/HomePage.dart';
+import 'package:gixt_worker/pages/PerfilPage.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppBottomNavigation extends StatefulWidget {
@@ -35,13 +36,8 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
         style: TextStyle(fontSize: 24, color: Colors.white),
       ),
     ),
-     Center(
-      child: Text(
-        'Trabajo',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
-    ),
-    // PerfilPage()
+
+    PerfilPage()
   ];
 
   @override

@@ -6,58 +6,64 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
 
-class ServiciosFav {
-  String service_id;
-  String service_name;
+class User {
+  String user_id;
+  String username;
   String first_name;
-  String userImage;
-  String category;
-  double price;
-  String image;
-  int rating;
-  String description;
+  String last_name;
+  String phone;
+  String image_url;
+  String email;
+  String birth_date;
+  String gender;
 
-  ServiciosFav({
-    required this.service_id,
-    required this.service_name,
+  User({
+    required this.user_id,
+    required this.username,
+    required this.image_url,
     required this.first_name,
-    required this.userImage,
-    required this.category,
-    required this.price,
-    required this.image,
-    required this.rating,
-    required this.description,
+    required this.last_name,
+    required this.phone,
+    required this.email,
+    required this.birth_date,
+    required this.gender,
   });
 
-  factory ServiciosFav.fromJson(Map<String, dynamic> json) {
-    return ServiciosFav(
-      service_id: json['service_id'],
-      service_name: json['service_name'],
+  factory User.fromJson(Map<String, dynamic> json) {
+    return User(
+      user_id: json['user_id'],
+      username: json['username'],
+      image_url: json['imagen'],
       first_name: json['first_name'],
-      userImage: json['userImage'],
-      category: json['category'],
-      price: (json['labor_price'] as num).toDouble(),
-      image: json['image'],
-      rating: json['rating'],
-      description: json['description'],
+      last_name: json['last_name'],
+      phone: json['phone'],
+      email: json['email'],
+      birth_date: json['birth_date'],
+      gender: json['gender'],
     );
+  }
+
+  @override
+  String toString() {
+    return 'Empresa(nombre: $username, url_img: $image_url)';
   }
 }
 
-class ServiciosFav_service {
-  List<ServiciosFav> servicios = []; // Lista de empresas
+class User_service {
+  List<User> user = []; // Lista de empresas
   bool isLoading = false;
   bool hasMore = true;
-  static const String _cacheKey = 'servicios_fav_cache';
-  static const String _cacheTimeKey = 'servicios_fav_cache_time';
+  static const String _cacheKey = 'user_cache';
+  static const String _cacheTimeKey = 'user_cache_time';
+
   set loading(bool loading) {}
 
   Future<void> updatedata() async {
-    print("📦 actualizando servicios");
+    print("📦 actualizando user");
     await fetchFromApi();
   }
 
-  Future<bool> fetchServicioData() async {
+  Future<bool> fetchUserData() async {
     final prefs = await SharedPreferences.getInstance();
 
     // config cache
@@ -74,27 +80,27 @@ class ServiciosFav_service {
         cachedTime != null &&
         now.difference(DateTime.fromMillisecondsSinceEpoch(cachedTime)) <
             cacheDuration) {
-      print("📦 Usando cache favoritos");
+      print("📦 Usando cache user");
 
-      final List<dynamic> jsonData = json.decode(cachedData);
-      servicios
+      final Map<String, dynamic> jsonData = json.decode(cachedData);
+      user
         ..clear()
-        ..addAll(jsonData.map((e) => ServiciosFav.fromJson(e)));
+        ..add(User.fromJson(jsonData));
 
       return true;
     }
 
-    print("🚫 Cache inválido → API Fav");
+    print("🚫 Cache inválido → API user");
     return await fetchFromApi();
   }
 
   Future<bool> fetchFromApi() async {
     final prefs = await SharedPreferences.getInstance();
 
-    print("🌐 Llamando API fav");
+    print("🌐 Llamando API user");
 
     final token = prefs.getString('token');
-    String? id = prefs.getString('id');
+    String? id_user = prefs.getString('id');
 
     final headers = {'Authorization': 'Bearer $token'};
     int attempts = 0;
@@ -106,16 +112,17 @@ class ServiciosFav_service {
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Favorites/id/$id'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Workers/id/${id_user}'),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
-          final List<dynamic> jsonResponse = json.decode(response.body);
-          servicios
+          final Map<String, dynamic> jsonResponse = json.decode(response.body);
+          print(jsonResponse);
+          user
             ..clear()
-            ..addAll(jsonResponse.map((e) => ServiciosFav.fromJson(e)));
+            ..add(User.fromJson(jsonResponse));
 
           await prefs.setString(_cacheKey, response.body);
           await prefs.setInt(

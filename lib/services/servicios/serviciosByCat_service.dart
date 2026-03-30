@@ -17,7 +17,6 @@ class ServiciosByCat {
   int rating;
   String description;
 
-
   ServiciosByCat({
     required this.service_id,
     required this.service_name,
@@ -65,40 +64,52 @@ class ServiciosByCat_service {
 
     final token = prefs.getString('token');
     final headers = {'Authorization': 'Bearer $token'};
+    int attempts = 0;
+    const int maxAttempts = 3;
 
-    try {
-      isLoading = true;
+    while (attempts < maxAttempts) {
+      try {
+        isLoading = true;
 
-      final response = await http
-          .get(
-            Uri.parse(
-              '${dotenv.env['API_URL']}/api/Services/category/${id}?pageNumber=${pageNumber}',
-            ),
-            headers: headers,
-          )
-          .timeout(const Duration(seconds: 15));
+        final response = await http
+            .get(
+              Uri.parse(
+                '${dotenv.env['API_URL']}/api/Services/category/${id}?pageNumber=${pageNumber}',
+              ),
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        final List<dynamic> data = jsonResponse['data'];
-        print(pageNumber);
-        servicios
-          ..addAll(data.map((item) => ServiciosByCat.fromJson(item)).toList());
-        return true;
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> jsonResponse = json.decode(response.body);
+          final List<dynamic> data = jsonResponse['data'];
+          print(pageNumber);
+          servicios..addAll(
+            data.map((item) => ServiciosByCat.fromJson(item)).toList(),
+          );
+          return true;
+        }
+        print("❌ Error HTTP: ${response.statusCode}");
+        return false;
+      } on TimeoutException {
+        print("⏱️ Timeout de la API");
+        return false;
+      } on SocketException {
+        print("🌐 Sin conexión a internet");
+        return false;
+      } catch (e) {
+        print("❌ Error inesperado: $e");
+        return false;
+      } finally {
+        isLoading = false;
       }
-      print("❌ Error HTTP: ${response.statusCode}");
-      return false;
-    } on TimeoutException {
-      print("⏱️ Timeout de la API");
-      return false;
-    } on SocketException {
-      print("🌐 Sin conexión a internet");
-      return false;
-    } catch (e) {
-      print("❌ Error inesperado: $e");
-      return false;
-    } finally {
-      isLoading = false;
     }
+    attempts++;
+
+    if (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    return false;
   }
 }
