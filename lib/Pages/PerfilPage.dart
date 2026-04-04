@@ -11,6 +11,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/GPS/gps_tracking_page.dart';
+import 'package:gixt_worker/Pages/PerfilworkerPage.dart';
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/alert.dart';
 import 'package:gixt_worker/components/inputs/Input.dart';
@@ -218,12 +220,12 @@ class _PerfilPageState extends State<PerfilPage> {
             icon: Icons.location_on_outlined,
             color: colorsecundario,
             onTap: () {
-              // Navigator.push(
-              //   context,
-              //   MaterialPageRoute(
-              //     builder: (context) => const GpsTrackingPage(),
-              //   ),
-              // );
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const PerfilWorkerPage(),
+                ),
+              );
             }
           ),
 

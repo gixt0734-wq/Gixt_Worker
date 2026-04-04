@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
+import 'package:gixt_worker/pages/ViewJobPage.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class CardsAgenda extends StatelessWidget {
@@ -118,12 +119,12 @@ class CardsAgenda extends StatelessWidget {
         color: Theme.of(context).colorScheme.primary,
         child: InkWell(
           onTap: () {
-            // Navigator.push(
-            //   context,
-            //   MaterialPageRoute(
-            //     builder: (context) => ViewJobPage(id_trabajo: job_id),
-            //   ),
-            // );
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ViewJobPage(id_trabajo: job_id),
+              ),
+            );
           },
           child: Row(
             mainAxisSize: MainAxisSize.max,

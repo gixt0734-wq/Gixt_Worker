@@ -1,0 +1,149 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http; // Importar el paquete http
+import 'dart:convert'; // Para trabajar con JSON
+
+class Worker {
+  String description;
+  String city;
+  double longitude;
+  double latitude;
+  int range_km;
+  double km_cost;
+
+  Worker({
+    required this.description,
+    required this.longitude,
+    required this.latitude,
+    required this.km_cost,
+    required this.range_km,
+    required this.city
+  });
+
+  factory Worker.fromJson(Map<String, dynamic> json) {
+    return Worker(
+   
+      description: json['description'],
+      km_cost: json['km_cost'],
+      range_km: json['range_km'],
+      city: json['city'],
+      latitude: json['latitude'],
+      longitude: json['longitude'],
+    );
+  }
+
+  @override
+  String toString() {
+    return 'Empresa(nombre: $description, url_img: $city)';
+  }
+}
+
+class Worker_service {
+  List<Worker> worker = []; // Lista de empresas
+  bool isLoading = false;
+  bool hasMore = true;
+  static const String _cacheKey = 'worker_cache';
+  static const String _cacheTimeKey = 'worker_cache_time';
+
+  set loading(bool loading) {}
+
+  Future<void> updatedata() async {
+    print("📦 actualizando user");
+    await fetchFromApi();
+  }
+
+  Future<bool> fetchUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // config cache
+    const cacheDuration = Duration(days: 1);
+
+    // leer cache
+    final cachedData = prefs.getString(_cacheKey);
+    final cachedTime = prefs.getInt(_cacheTimeKey);
+
+    final now = DateTime.now();
+
+    //  validar cache
+    if (cachedData != null &&
+        cachedTime != null &&
+        now.difference(DateTime.fromMillisecondsSinceEpoch(cachedTime)) <
+            cacheDuration) {
+      print("📦 Usando cache user");
+
+      final Map<String, dynamic> jsonData = json.decode(cachedData);
+      worker
+        ..clear()
+        ..add(Worker.fromJson(jsonData));
+
+      return true;
+    }
+
+    print("🚫 Cache inválido → API user");
+    return await fetchFromApi();
+  }
+
+  Future<bool> fetchFromApi() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    print("🌐 Llamando API user");
+
+    final token = prefs.getString('token');
+    String? id_user = prefs.getString('id');
+
+    final headers = {'Authorization': 'Bearer $token'};
+    int attempts = 0;
+    const int maxAttempts = 3;
+
+    while (attempts < maxAttempts) {
+      try {
+        isLoading = true;
+
+        final response = await http
+            .get(
+              Uri.parse('${dotenv.env['API_URL']}/api/Workers/info/${id_user}'),
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> jsonResponse = json.decode(response.body);
+          print(jsonResponse);
+          worker
+            ..clear()
+            ..add(Worker.fromJson(jsonResponse));
+
+          await prefs.setString(_cacheKey, response.body);
+          await prefs.setInt(
+            _cacheTimeKey,
+            DateTime.now().millisecondsSinceEpoch,
+          );
+          return true;
+        }
+        print("❌ Error HTTP: ${response.statusCode}");
+        return false;
+      } on TimeoutException {
+        print("⏱️ Timeout de la API");
+        return false;
+      } on SocketException {
+        print("🌐 Sin conexión a internet");
+        return false;
+      } catch (e) {
+        print("❌ Error inesperado: $e");
+        return false;
+      } finally {
+        isLoading = false;
+      }
+    }
+    attempts++;
+
+    if (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    return false;
+  }
+}

@@ -158,7 +158,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         posicionActual = LatLng(pos.latitude, pos.longitude);
        
-      });
+      }); 
     
 
     await GetStreet();

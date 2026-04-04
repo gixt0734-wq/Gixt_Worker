@@ -49,11 +49,9 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
    controller: widget.controller,
       readOnly: widget.readOnly,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: TextStyle(
-        color: colorBase,
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
+      style: GoogleFonts.poppins(
+        fontSize: 14,
+        color: Theme.of(context).colorScheme.surface,
       ),
       cursorColor: colorBase,
       inputFormatters: [
@@ -117,7 +115,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
         suffixIcon: Padding(
           padding: const EdgeInsets.only(right: 12),
           child: Icon(
-            Icons.attach_money_rounded,
+            widget.icon,
             size: 18,
             color: _isFocused
                 ? colorsecundario
@@ -130,10 +128,10 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
           color: Colors.red.withOpacity(0.8),
         ),
         // Hint con formato de ejemplo
-        hintText: '0.00',
+        hintText: '0',
         hintStyle: TextStyle(
           color: colorBase.withOpacity(0.35),
-          fontSize: 16,
+          fontSize: 13,
         ),
 
        
@@ -141,7 +139,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
 
         // Sufijo con la moneda (puedes cambiar MXN/USD según tu app)
         suffix: Text(
-          'Minutos',
+          'Horas',
           style: TextStyle(
             color: colorBase.withOpacity(0.5),
             fontSize: 12,

@@ -33,6 +33,7 @@ class Jobs {
   bool is_active;
   String job_status;
   double price;
+  
 
   Jobs({
     required this.job_id,
@@ -52,6 +53,7 @@ class Jobs {
     required this.is_active,
     required this.job_status,
     required this.price,
+
   });
 
   factory Jobs.fromJson(Map<String, dynamic> json) {
@@ -78,6 +80,7 @@ class Jobs {
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
+     
     );
   }
 }

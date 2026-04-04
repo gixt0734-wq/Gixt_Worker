@@ -9,7 +9,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Auth/Login.dart';
+import 'package:gixt_worker/Config/Notification.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/config/location.dart';
 import 'package:gixt_worker/routes/root.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -33,7 +35,7 @@ Future<void> main() async {
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   await dotenv.load(fileName: ".env");
-  // await LocationService.initialize();
+  await LocationService.initialize();
   /// 🔥 FIREBASE INIT
   await Firebase.initializeApp();
 
@@ -173,9 +175,9 @@ class _SplashScreenState extends State<SplashScreen> {
  
 final context = navigatorKey.currentContext;
 
-    // if (context != null) {
-    //   handleNotification(context, data, notification);
-    // }
+    if (context != null) {
+      handleNotification(context, data, notification);
+    }
 
     /// Mostrar notificación local solo si hay contenido
     if (notification != null) {

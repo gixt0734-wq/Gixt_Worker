@@ -46,11 +46,9 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldPrice> {
       controller: widget.controller,
       readOnly: widget.readOnly,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: TextStyle(
-        color: colorBase,
-        fontSize: 18,
-        fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
+      style: GoogleFonts.poppins(
+        fontSize: 14,
+        color: Theme.of(context).colorScheme.surface,
       ),
       cursorColor: colorBase,
       inputFormatters: [

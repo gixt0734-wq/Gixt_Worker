@@ -17,8 +17,9 @@
     <application
         android:label="gixt_worker"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
-
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
+        
         <!-- BACKGROUND SERVICE -->
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
@@ -26,7 +27,12 @@
             android:foregroundServiceType="location"
             android:exported="false"
             tools:replace="android:exported"/>
-
+            
+        <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+            
         <!-- GOOGLE MAPS -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"

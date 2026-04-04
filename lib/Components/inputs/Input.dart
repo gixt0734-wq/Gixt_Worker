@@ -9,6 +9,7 @@ class CustomTextFormField extends StatefulWidget {
   final bool readOnly;
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
+  final String hint;
 
   const CustomTextFormField({
     super.key,
@@ -17,6 +18,7 @@ class CustomTextFormField extends StatefulWidget {
     required this.icon,
     required this.readOnly,
     this.validator,
+    this.hint = '',
     this.keyboardType = TextInputType.text,
   });
 
@@ -55,6 +57,11 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
       cursorColor: Theme.of(context).colorScheme.surface,
       decoration: InputDecoration(
         labelText: widget.label,
+        hintText: widget.hint,
+        hintStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.25),
+        ),
 
         // 🔹 Label normal
         labelStyle: GoogleFonts.poppins(
@@ -72,7 +79,10 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
         ),
         filled: true,
         fillColor: Theme.of(context).colorScheme.primary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -97,20 +107,14 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
         ),
 
         // 🔹 Línea cuando hay error
-       errorBorder: OutlineInputBorder(
+        errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: Colors.red.withOpacity(0.5),
-            width: 1,
-          ),
+          borderSide: BorderSide(color: Colors.red.withOpacity(0.5), width: 1),
         ),
 
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
         ),
 
         // 🔹 Ícono

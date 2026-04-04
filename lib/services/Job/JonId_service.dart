@@ -10,7 +10,7 @@ class Job {
   // IDs
   String job_id;
   String client_id;
-
+  
   // client
   String client_first_name;
   String client_username;
@@ -40,6 +40,7 @@ class Job {
   String description;
   String problem;
   double price;
+  double km_cost;
   String payment_method;
   bool is_active;
   String job_status;
@@ -48,6 +49,7 @@ class Job {
   // images
   String? image_1;
   String? image_2;
+  List<String> images_evicence;
 
   Job({
     required this.job_id,
@@ -74,12 +76,14 @@ class Job {
     required this.description,
     required this.problem,
     required this.price,
+    required this.km_cost,
     required this.payment_method,
     required this.is_active,
     required this.job_status,
     required this.payment_status,
     this.image_1,
     this.image_2,
+       required this.images_evicence,
   });
 
   factory Job.fromJson(Map<String, dynamic> json) {
@@ -117,7 +121,8 @@ class Job {
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      price: (json['labor_cost'] as num?)?.toDouble() ?? 0.0,
+      km_cost: (json['km_cost'] as num?)?.toDouble() ?? 0.0,
       payment_method: json['payment_method'] ?? '',
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
@@ -125,6 +130,7 @@ class Job {
 
       image_1: json['image_1'],
       image_2: json['image_2'],
+       images_evicence: List<String>.from(json['evidence'] ?? []),
     );
   }
 }

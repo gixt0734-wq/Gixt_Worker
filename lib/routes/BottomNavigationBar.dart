@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/HomePage.dart';
+import 'package:gixt_worker/Pages/PerfilworkerPage.dart';
+import 'package:gixt_worker/pages/AgendaPage.dart';
 import 'package:gixt_worker/pages/PerfilPage.dart';
+import 'package:gixt_worker/Pages/AddService.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppBottomNavigation extends StatefulWidget {
@@ -16,28 +19,11 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
 
   final List<Widget> _pages = const [
     HomePage(),
-    // AgendaPage(),
-    // AddServicePage(),
-    Center(
-      child: Text(
-        'Trabajo',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
-    ),
-     Center(
-      child: Text(
-        'Trabajo',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
-    ),
-     Center(
-      child: Text(
-        'Trabajo',
-        style: TextStyle(fontSize: 24, color: Colors.white),
-      ),
-    ),
+    AgendaPage(),
+    AddServicePage(),
+    PerfilWorkerPage(),
 
-    PerfilPage()
+    PerfilPage(),
   ];
 
   @override
@@ -80,10 +66,15 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
             1,
             "Agenda",
           ),
-         
+
           // BOTÓN CENTRAL ESTILO "CHIC"
           _buildMiddleItem(Icons.add_circle, 2),
-          _buildNavItem(Icons.home_repair_service, Icons.home_repair_service, 3, "Trabajo"),
+          _buildNavItem(
+            Icons.home_repair_service,
+            Icons.home_repair_service,
+            3,
+            "Trabajo",
+          ),
           _buildNavItem(Icons.person_rounded, Icons.person, 4, "Perfil"),
         ],
       ),
@@ -108,18 +99,18 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-           Icon(
+          Icon(
             isSelected ? activeIcon : icon,
             color: isSelected ? colorsecundario : colorWhite.withOpacity(0.6),
             size: 28,
           ),
-         Text(
+          Text(
             label,
-           style: GoogleFonts.poppins(
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected ? colorsecundario : colorWhite.withOpacity(0.4),
-              ),
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              color: isSelected ? colorsecundario : colorWhite.withOpacity(0.4),
+            ),
           ),
         ],
       ),
@@ -136,7 +127,9 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
         height: 55,
         decoration: BoxDecoration(
           // Si está seleccionado brilla, si no, mantiene un color sólido
-          color: isSelected ? colorsecundario : colorsecundario.withOpacity(0.6),
+          color: isSelected
+              ? colorsecundario
+              : colorsecundario.withOpacity(0.6),
           shape: BoxShape.circle,
           boxShadow: isSelected
               ? [
@@ -150,14 +143,14 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
         ),
         child: Icon(
           isSelected ? Icons.add_circle : Icons.add_circle,
-          color: isSelected ?  colorWhite: Colors.white,
+          color: isSelected ? colorWhite : Colors.white,
           size: 30,
         ),
       ),
     );
   }
 
- Future<bool> _confirmarSalirExpress() async {
+  Future<bool> _confirmarSalirExpress() async {
     return await showModalBottomSheet<bool>(
           context: context,
           backgroundColor: colorprimario,
@@ -172,7 +165,8 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
               children: [
                 Center(
                   child: Container(
-                    width: 36, height: 4,
+                    width: 36,
+                    height: 4,
                     decoration: BoxDecoration(
                       color: colorWhite.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(2),
@@ -180,14 +174,23 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Text('¿Salir de Add Service',
-                    style: GoogleFonts.poppins(
-                        fontSize: 16, fontWeight: FontWeight.w600, color: colorWhite)),
+                Text(
+                  '¿Salir de Add Service',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: colorWhite,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text('Perderás el progreso de tu servicio.',
-                    style: GoogleFonts.poppins(
-                        fontSize: 13, height: 1.5,
-                        color: colorWhite.withOpacity(0.45))),
+                Text(
+                  'Perderás el progreso de tu servicio.',
+                  style: GoogleFonts.poppins(
+                    fontSize: 13,
+                    height: 1.5,
+                    color: colorWhite.withOpacity(0.45),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 Row(
                   children: [
@@ -196,11 +199,18 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                         onPressed: () => Navigator.pop(context, false),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                           side: BorderSide(color: colorWhite.withOpacity(0.12)),
                         ),
-                        child: Text('Cancelar',
-                            style: GoogleFonts.poppins(fontSize: 14, color: colorWhite.withOpacity(0.55))),
+                        child: Text(
+                          'Cancelar',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            color: colorWhite.withOpacity(0.55),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -213,12 +223,19 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
-                            side: BorderSide(color: Colors.red.withOpacity(0.3)),
+                            side: BorderSide(
+                              color: Colors.red.withOpacity(0.3),
+                            ),
                           ),
                         ),
-                        child: Text('Salir',
-                            style: GoogleFonts.poppins(
-                                fontSize: 14, fontWeight: FontWeight.w600, color: Colors.red)),
+                        child: Text(
+                          'Salir',
+                          style: GoogleFonts.poppins(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.red,
+                          ),
+                        ),
                       ),
                     ),
                   ],
