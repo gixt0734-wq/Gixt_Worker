@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:gixt_worker/Components/Indicador.dart';
 import 'package:gixt_worker/Components/alert.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
+import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
+import 'package:gixt_worker/Components/inputs/input_number.dart';
+import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/services/Evidence/Add_evidence_service.dart';
@@ -21,38 +24,48 @@ class PayJobPage extends StatefulWidget {
     required this.km_priece,
     required this.price,
     required this.job_id,
+    required this.isExpress,
   });
   final double km_priece;
   final String job_id;
   final double price;
+  final bool isExpress;
   @override
   State<PayJobPage> createState() => _PayPageState();
 }
 
 class _PayPageState extends State<PayJobPage> {
   int _paginaActual = 0;
+  final TextEditingController _priceMatController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _quantityController = TextEditingController();
+  final TextEditingController _descriptionController = TextEditingController();
   final List<MaterialModel> _materiales = [];
 
   double get _subtotalMateriales =>
       _materiales.fold(0, (sum, m) => sum + m.cost);
 
-  double get _total =>
-      widget.price + widget.km_priece + _subtotalMateriales + _iva;
+  double get _total {
+    double price = double.tryParse(_priceController.text) ?? 0.0;
+
+    return price + widget.km_priece + _subtotalMateriales + _iva;
+  }
 
   double get _iva =>
       (widget.price + widget.km_priece + _subtotalMateriales) * 0.16;
   void _addMaterial() {
-    final nombre = _nameController.text.trim();
-    final precio = double.tryParse(_priceController.text.trim()) ?? 0;
-
-    if (nombre.isNotEmpty && precio > 0) {
+    final nombre =
+        '${_nameController.text.trim()} (${_quantityController.text.trim()})';
+    final precio = double.tryParse(_priceMatController.text.trim()) ?? 0;
+    final quantity = double.tryParse(_quantityController.text.trim()) ?? 0;
+    final total = precio * quantity;
+    if (nombre.isNotEmpty && total > 0) {
       setState(() {
-        _materiales.add(MaterialModel(name: nombre, cost: precio));
+        _materiales.add(MaterialModel(name: nombre, cost: total));
         _nameController.clear();
-        _priceController.clear();
+        _priceMatController.clear();
+        _quantityController.clear();
       });
     }
   }
@@ -66,6 +79,12 @@ class _PayPageState extends State<PayJobPage> {
   @override
   void dispose() {
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _priceController.text = widget.price.toString();
   }
 
   bool salir() {
@@ -91,11 +110,11 @@ class _PayPageState extends State<PayJobPage> {
 
       final result = await FinishSerivicioService.Send(
         job_id: widget.job_id,
-        labor_cost: widget.price,
-        km_cost: widget.km_priece,
         total: _total,
         material: _subtotalMateriales,
         iva: _iva,
+        labor_cost:  double.tryParse(_priceController.text.trim()) ,
+        description: _descriptionController.text,
         materials: _materiales,
       );
 
@@ -113,7 +132,12 @@ class _PayPageState extends State<PayJobPage> {
                 "Se mostrarán los precios y espera la confirmación del pago.",
             type: alert_type.exito,
           );
-          jobsStatusNotifierFinish.refresh();
+          if (widget.isExpress) {
+            finishexpressNotifier.refresh();
+          } else {
+            jobsStatusNotifierFinish.refresh();
+          }
+
           Navigator.pop(context);
         });
       } else {
@@ -160,17 +184,35 @@ class _PayPageState extends State<PayJobPage> {
   Widget _buildPay() {
     return Column(
       children: [
-        _buildSectionHeader('Desglose del servicio'),
-        _buildRow('Mano de obra', '\$${widget.price.toStringAsFixed(0)}'),
-        _buildRow(
-          'Precio de visita',
-          '\$${widget.km_priece.toStringAsFixed(0)}',
+        _buildSectionHeader('Descripcion del diagnostico'),
+        CustomDescriptionFormField(
+          controller: _descriptionController,
+          label: 'Descripción final',
+          hint: 'Ej: Se tiene que cambiar lamaparas e cablerias',
+          minLines: 3,
+          maxLines: 5,
+          validator: (value) {
+            if (value == null || value.isEmpty)
+              return 'Por favor agrega una descripción';
+            return null;
+          },
         ),
-        _buildRow('Materiales', '\$${_subtotalMateriales.toStringAsFixed(0)}'),
-        _buildRow('Iva', '\$${_iva.toStringAsFixed(0)}'),
-        _buildSubtotal('\$${_total.toStringAsFixed(0)}'),
-        const SizedBox(height: 28),
-
+        const SizedBox(height: 20),
+        _buildSectionHeader('Mano de obra'),
+        CustomTextFormFieldPrice(
+          controller: _priceController,
+          label: 'Precio de mano de obra',
+          onChanged: (value) {
+            setState(() {});
+          },
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Por favor ingrese el precio';
+            }
+            return null;
+          },
+        ),
+        const SizedBox(height: 20),
         _buildSectionHeader('Materiales utilizados'),
         for (var material in _materiales) ...[
           Row(
@@ -190,10 +232,18 @@ class _PayPageState extends State<PayJobPage> {
 
         const SizedBox(height: 28),
 
+        _buildSectionHeader('Desglose de costo'),
+        _buildRow('Mano de obra', '\$${_priceController.text}'),
+        _buildRow(
+          'Tarifa de traslado',
+          '\$${widget.km_priece.toStringAsFixed(0)}',
+        ),
+        _buildRow('Materiales', '\$${_subtotalMateriales.toStringAsFixed(0)}'),
+        _buildRow('Iva', '\$${_iva.toStringAsFixed(0)}'),
+        _buildSubtotal('\$${_total.toStringAsFixed(0)}'),
+        const SizedBox(height: 28),
         _buildSectionHeader('Método de pago'),
         _buildPaymentMethodCard(),
-        const SizedBox(height: 28),
-
         const SizedBox(height: 32),
       ],
     );
@@ -224,7 +274,7 @@ class _PayPageState extends State<PayJobPage> {
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
-          'Finalizar trabajo',
+          'Diagnosticar trabajo',
           style: GoogleFonts.poppins(
             fontSize: 22,
             fontWeight: FontWeight.w600,
@@ -237,9 +287,30 @@ class _PayPageState extends State<PayJobPage> {
 
   Widget _buildPaymentMethodCard() {
     return Container(
-      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
+        ),
+      ),
+      padding: const EdgeInsets.all(20),
       child: Row(
         children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              Icons.payments_rounded,
+              color: Theme.of(context).scaffoldBackgroundColor,
+              size: 16,
+            ),
+          ),
+          const SizedBox(width: 10),
           Text(
             'Método de pago',
             style: GoogleFonts.dmSans(
@@ -252,7 +323,7 @@ class _PayPageState extends State<PayJobPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
@@ -260,16 +331,20 @@ class _PayPageState extends State<PayJobPage> {
               children: [
                 Icon(
                   Icons.money_rounded,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: Theme.of(
+                    context,
+                  ).scaffoldBackgroundColor.withOpacity(0.85),
                   size: 15,
                 ),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text(
                   'Efectivo',
                   style: GoogleFonts.dmSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: Theme.of(
+                      context,
+                    ).scaffoldBackgroundColor.withOpacity(0.85),
                   ),
                 ),
               ],
@@ -431,7 +506,7 @@ class _PayPageState extends State<PayJobPage> {
                   children: [
                     const SizedBox(width: 6),
                     Text(
-                      'Finalizar',
+                      'Enviar',
                       style: GoogleFonts.dmSans(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -593,30 +668,72 @@ class _PayPageState extends State<PayJobPage> {
                     return null;
                   },
                 ),
-
                 const SizedBox(height: 22),
-                Text(
-                  'Precio unitario',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surface.withOpacity(0.7),
-                    letterSpacing: -0.1,
-                  ),
-                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Cantidad',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withOpacity(0.7),
+                              letterSpacing: -0.1,
+                            ),
+                          ),
 
-                const SizedBox(height: 10),
-                CustomTextFormFieldPrice(
-                  controller: _priceController,
-                  label: '\$ 0.00',
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Ingresa el precio';
-                    }
-                    return null;
-                  },
+                          const SizedBox(height: 8),
+                          CustomTextFormFieldNumber(
+                            controller: _quantityController,
+                            icon: Icons.numbers_rounded,
+                            label: '1',
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Cantidad';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Precio unitario',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withOpacity(0.7),
+                              letterSpacing: -0.1,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          CustomTextFormFieldPrice(
+                            controller: _priceMatController,
+                            label: '\$ 0.00',
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Precio';
+                              }
+                              return null;
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 32),

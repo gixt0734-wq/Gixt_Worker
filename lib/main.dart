@@ -69,10 +69,8 @@ Future<void> main() async {
   );
 
   await flutterLocalNotificationsPlugin.initialize(
-    initializationSettings,
+    settings: initializationSettings,
   );
-
-  
 
   runApp(
     ChangeNotifierProvider(
@@ -206,11 +204,13 @@ final context = navigatorKey.currentContext;
       );
 
       await flutterLocalNotificationsPlugin.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        notificationDetails,
-      );
+  id: notification.hashCode,
+  title: notification.title,
+  body: notification.body,
+  notificationDetails: notificationDetails,
+  payload: data.toString(),
+);
+
     }
   });
 }

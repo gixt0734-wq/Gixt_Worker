@@ -40,7 +40,7 @@ class CardsAgenda extends StatelessWidget {
       case 'in_progress':
         return Colors.orange;
       case 'going':
-        return Colors.orange;
+      case 'diagnosing':
       case 'arrived':
         return Colors.orange;
       case 'pending':
@@ -70,6 +70,8 @@ class CardsAgenda extends StatelessWidget {
         return 'En Domicilio';
       case 'pending':
         return 'Pendiente';
+      case 'diagnosing':
+        return 'Diagnosticando';
       case 'finalized':
         return 'Por Finalizar';
       case 'completed':

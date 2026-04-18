@@ -64,7 +64,7 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Future<void> _onRefresh() async {
-     if (!mounted) return;
+    if (!mounted) return;
     setState(() {
       isLoading = true;
       timeout = false;
@@ -231,9 +231,7 @@ class _AgendaPageState extends State<AgendaPage> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? colorsecundario.withOpacity(0.08)
-              : Colors.transparent,
+          color: isSelected ? colorsecundario : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
@@ -249,7 +247,7 @@ class _AgendaPageState extends State<AgendaPage> {
               icon,
               size: 16,
               color: isSelected
-                  ? colorsecundario
+                  ? colorWhite
                   : Theme.of(context).colorScheme.surface.withOpacity(0.4),
             ),
             const SizedBox(width: 7),
@@ -259,7 +257,7 @@ class _AgendaPageState extends State<AgendaPage> {
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
-                    ? colorsecundario
+                    ? colorWhite
                     : Theme.of(context).colorScheme.surface.withOpacity(0.55),
               ),
             ),
@@ -283,7 +281,7 @@ class _AgendaPageState extends State<AgendaPage> {
         return a.job_status == tipo;
       }
     }).toList();
-
+    final int count = filtrados.length;
     if (filtrados.isEmpty && !isLoading) {
       return Container();
     }
@@ -294,22 +292,37 @@ class _AgendaPageState extends State<AgendaPage> {
           Row(
             children: [
               Text(
-                'Tienes ${_category}: (${filtrados.length})',
+                _category.isEmpty
+                    ? ''
+                    : '${_category[0].toUpperCase()}${_category.substring(1).toLowerCase()}',
                 style: GoogleFonts.poppins(
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: Theme.of(context).colorScheme.surface,
                 ),
               ),
-              Spacer(),
-              InkWell(
-                onTap: () {},
-                child: Icon(
-                  Icons.arrow_forward_ios,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.surface,
+
+              if (count > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorsecundario.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${filtrados.length}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colorsecundario,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           SizedBox(height: 20),

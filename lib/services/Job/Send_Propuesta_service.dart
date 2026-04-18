@@ -7,7 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SendPropuestaService {
   static Future<Map<String, dynamic>> Update({
-    required double price,
+    required double km_cost,
+    required String labor_price,
     required String express_id
   }) async {
     int attempts = 0;
@@ -27,8 +28,9 @@ class SendPropuestaService {
         // Campos de texto
         request.fields['worker'] = id_user!;
         request.fields['id'] = express_id;
-        request.fields['price'] = price.toString();
-
+        request.fields['km_cost'] = km_cost.toString();
+        request.fields['labor_price'] = labor_price.toString();
+        print(request.fields);
         // Enviar request
         var streamedResponse = await request.send().timeout(const Duration(seconds: 30));
 

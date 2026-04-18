@@ -1,5 +1,6 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:gixt_worker/Components/alertExpress.dart';
 import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/main.dart';
@@ -16,11 +17,11 @@ void handleNotification(
 
   /// 🔥 EXPRESS
   if (data['serviceType'] == 'express') {
-    // mostrarDialogExpress(
-    //   id: data['serviceId'],
-    //   title: "Nuevo Servicio ${data['serviceId']}",
-    //   message: "Tienes un nuevo pedido",
-    // );
+    mostrarDialogExpress(
+      id: data['serviceId'],
+      title: "Nuevo Servicio ${data['serviceId']}",
+      message: "Tienes un nuevo pedido",
+    );
   }
 
   if (data['type'] == 'Express') {

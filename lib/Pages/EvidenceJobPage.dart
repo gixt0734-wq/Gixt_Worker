@@ -7,6 +7,7 @@ import 'package:gixt_worker/Components/alert.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
+import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/services/Evidence/Add_evidence_service.dart';
@@ -19,10 +20,12 @@ class Evidencejobpage extends StatefulWidget {
     required this.km_priece,
     required this.price,
     required this.job_id,
+    required this.isExpress
   });
   final double km_priece;
   final String job_id;
   final double price;
+  final bool isExpress;
   @override
   State<Evidencejobpage> createState() => _EvidencejobpageState();
 }
@@ -122,7 +125,15 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
               "Tu evidencia ha sido enviada correctamente, el cliente verificará el trabajo y te notificará si es necesario realizar algún cambio",
           type: alert_type.exito,
         );
-        jobsStatusNotifierFinish.refresh();
+        if(widget.isExpress)
+          {
+            finishexpressNotifier.refresh();
+       
+          }
+          else
+          {
+            jobsStatusNotifierFinish.refresh();
+          }
         Navigator.pop(context);
       });
     } else {

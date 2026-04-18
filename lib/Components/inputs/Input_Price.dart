@@ -5,9 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 
 class CustomTextFormFieldPrice extends StatefulWidget {
   final TextEditingController controller;
+  final String? Function(String?)? validator;
   final String label;
   final bool readOnly;
-  final String? Function(String?)? validator;
+  final String? Function(String?)? onChanged;
 
   const CustomTextFormFieldPrice({
     super.key,
@@ -15,6 +16,7 @@ class CustomTextFormFieldPrice extends StatefulWidget {
     required this.label,
     this.readOnly = false,
     this.validator,
+    this.onChanged
   });
   @override
   State<CustomTextFormFieldPrice> createState() => _CustomTextFormFieldState();
@@ -45,6 +47,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldPrice> {
     return TextFormField(
       controller: widget.controller,
       readOnly: widget.readOnly,
+      onChanged:  widget.onChanged,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       style: GoogleFonts.poppins(
         fontSize: 14,

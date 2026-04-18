@@ -30,6 +30,11 @@ class Express {
   bool is_active;
   String job_status;
   String payment_status;
+  double worker_price;
+  double km_cost;
+  double labor_cost;
+  double materials;
+  List<String> images_evicence;
 
   // images
   String? image;
@@ -52,7 +57,13 @@ class Express {
     required this.is_active,
     required this.job_status,
     required this.payment_status,
+    required this.worker_price,
+    required this.km_cost,
+    required this.labor_cost,
+    required this.materials,
+    required this.images_evicence,
     this.image,
+    
   });
 
   factory Express.fromJson(Map<String, dynamic> json) {
@@ -69,22 +80,27 @@ class Express {
       latitude: json['latitude'],
       longitude: json['longitude'],
       maps_address: json['maps_address'],
+      worker_price : (json['worker'] ? ['km_cost']) ?? 0.0,
 
+      km_cost : (json['payment'] ? ['km_cost']) ?? 0.0,
+      payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
+      labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
+      materials: (json['payment'] ? ['materials']) ?? 0.0,
       // job
       job_date: json['job_date'] ?? '',
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      payment_method: json['payment_method'] ?? '',
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       payment_status: json['payment_status'] ?? '',
-
+      images_evicence: List<String>.from(json['evidence'] ?? []),
       image: json['image'],
     );
   }
 }
+
 
 class ExpressById_service {
   List<Express> express = []; // Lista de empresas
@@ -99,7 +115,8 @@ class ExpressById_service {
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-
+    String? id_user = prefs.getString('id');
+    print("id user: ${id_user}");
     final headers = {'Authorization': 'Bearer $token'};
     int attempts = 0;
     const int maxAttempts = 2;
@@ -109,7 +126,7 @@ class ExpressById_service {
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Expresss/review/${id}'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Expresss/review/${id}?idworker=${id_user}'),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

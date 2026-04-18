@@ -39,7 +39,7 @@ class Job {
   String job_time;
   String description;
   String problem;
-  double price;
+  double labor_cost;
   double km_cost;
   String payment_method;
   bool is_active;
@@ -75,7 +75,7 @@ class Job {
     required this.job_time,
     required this.description,
     required this.problem,
-    required this.price,
+    required this.labor_cost,
     required this.km_cost,
     required this.payment_method,
     required this.is_active,
@@ -83,7 +83,7 @@ class Job {
     required this.payment_status,
     this.image_1,
     this.image_2,
-       required this.images_evicence,
+    required this.images_evicence,
   });
 
   factory Job.fromJson(Map<String, dynamic> json) {
@@ -121,16 +121,16 @@ class Job {
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-      price: (json['labor_cost'] as num?)?.toDouble() ?? 0.0,
-      km_cost: (json['km_cost'] as num?)?.toDouble() ?? 0.0,
-      payment_method: json['payment_method'] ?? '',
+      labor_cost: (json['payment']?['labor_cost']  as num?)?.toDouble() ?? 0.0,
+      payment_method: json['payment']?['payment_method'] ?? '',
+      km_cost: (json['payment']?['km_cost']  as num?)?.toDouble() ?? 0.0,
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       payment_status: json['payment_status'] ?? '',
 
       image_1: json['image_1'],
       image_2: json['image_2'],
-       images_evicence: List<String>.from(json['evidence'] ?? []),
+      images_evicence: List<String>.from(json['evidence'] ?? []),
     );
   }
 }

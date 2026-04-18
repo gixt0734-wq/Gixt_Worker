@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/SinDatos/cardsServicios.dart';
 import 'package:gixt_worker/Components/calendar.dart';
+import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/components/alert.dart';
 import 'package:gixt_worker/components/cards/CardsExpress.dart';
@@ -60,11 +61,11 @@ class _HomePageState extends State<HomePage> {
   bool isLoading = false;
   bool hasMore = true;
   bool timeout = false;
-   bool hayNotificacion = false;
+  bool hayNotificacion = false;
 
   void initState() {
     super.initState();
-        FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('llegoooooooo');
       if (!mounted) return;
       setState(() {
@@ -73,12 +74,12 @@ class _HomePageState extends State<HomePage> {
     });
     // 👇 SE EJECUTA AL ENTRAR A LA PÁGINA
     print("Entré a Restaurantes");
-   
+
     _loadUserId();
     _Initial();
     _GoMyLocation();
-    //  expressNotifier.addListener(_reload);
-    // cancelexpressNotifier.addListener(_reload);
+    expressNotifier.addListener(_reload);
+    cancelexpressNotifier.addListener(_reload);
   }
 
   Future<void> _loadUserId() async {
@@ -90,11 +91,9 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _reload() async {
-     await express.updatedata();
-          if (!mounted) return;
-     setState(() {
-       
-     });
+    await express.updatedata();
+    if (!mounted) return;
+    setState(() {});
   }
 
   Future<void> _onRefresh() async {
@@ -150,19 +149,15 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-    Future<void> _GoMyLocation() async {
-    
-      Position pos = await GeoLocationService.obtenerUbicacion(context);
-      latitude = pos.latitude;
-      longitude = pos.longitude;
-      setState(() {
-        posicionActual = LatLng(pos.latitude, pos.longitude);
-       
-      }); 
-    
+  Future<void> _GoMyLocation() async {
+    Position pos = await GeoLocationService.obtenerUbicacion(context);
+    latitude = pos.latitude;
+    longitude = pos.longitude;
+    setState(() {
+      posicionActual = LatLng(pos.latitude, pos.longitude);
+    });
 
     await GetStreet();
-    
   }
 
   Future<void> GetStreet() async {
@@ -182,8 +177,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-
- 
   @override
   Widget build(BuildContext context) {
     return KeyboardDismisser(
@@ -207,11 +200,14 @@ class _HomePageState extends State<HomePage> {
                   delegate: SliverChildListDelegate([
                     Calendar(),
                     const SizedBox(height: 20),
-                    if (express.express.isNotEmpty) ...[_buildDivider(),_buildExpress()],
+                    if (express.express.isNotEmpty) ...[
+                      _buildDivider(),
+                      _buildExpress(),
+                    ],
                     _buildDivider(),
                     _buildServicios(),
                     _buildDivider(),
-                    if (jobs.jobs.isNotEmpty) ...[_buildServiciosjob(),],
+                    if (jobs.jobs.isNotEmpty) ...[_buildServiciosjob()],
                     const SizedBox(height: 100),
                   ]),
                 ),
@@ -223,7 +219,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
- 
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -245,7 +240,7 @@ class _HomePageState extends State<HomePage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                  // Ubicación
+                // Ubicación
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,15 +248,24 @@ class _HomePageState extends State<HomePage> {
                     children: [
                       Row(
                         children: [
-                           Icon(Icons.radio_button_checked,
-                              size: 12, color: Theme.of(context).colorScheme.surface),
+                          Icon(
+                            Icons.radio_button_checked,
+                            size: 12,
+                            color: Theme.of(context).colorScheme.surface,
+                          ),
                           const SizedBox(width: 6),
-                          Text(
-                            ciudad.isEmpty ? 'Obteniendo ubicación…' : '$ciudad, $estado',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Theme.of(context).colorScheme.surface,
-                              fontWeight: FontWeight.w400,
+                          Expanded(
+                            child: Text(
+                              ciudad.isEmpty
+                                  ? 'Obteniendo ubicación…'
+                                  : '$ciudad, $estado ',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Theme.of(context).colorScheme.surface,
+                                fontWeight: FontWeight.w400,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                         ],
@@ -319,39 +323,48 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
- Widget _sectionHeader(String title, {String? sub, VoidCallback? onMore}) {
-      return  Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
+  Widget _sectionHeader(String title, {String? sub, VoidCallback? onMore}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: GoogleFonts.inter(
-                      fontSize: 20, fontWeight: FontWeight.w800,
-                      color:  Theme.of(context).colorScheme.surface, letterSpacing: -0.4,
-                    )),
-                if (sub != null)
-                  Text(sub,
-                      style: GoogleFonts.inter(
-                          fontSize: 12, color:  Theme.of(context).colorScheme.surface.withOpacity(0.55), fontWeight: FontWeight.w400)),
-              ],
+            Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Theme.of(context).colorScheme.surface,
+                letterSpacing: -0.4,
+              ),
             ),
-            Spacer(),
-                InkWell(
-                  onTap: () {},
-                  child: Icon(
-                    Icons.arrow_forward_ios,
-                    size: 20,
-                    color: Theme.of(context).colorScheme.surface,
-                  ),
+            if (sub != null)
+              Text(
+                sub,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surface.withOpacity(0.55),
+                  fontWeight: FontWeight.w400,
                 ),
-          
+              ),
           ],
+        ),
+        Spacer(),
+        InkWell(
+          onTap: () {},
+          child: Icon(
+            Icons.arrow_forward_ios,
+            size: 20,
+            color: Theme.of(context).colorScheme.surface,
+          ),
+        ),
+      ],
+    ).animate().fade().slideX(begin: -0.1);
+  }
 
-      ).animate().fade().slideX(begin: -0.1);
-    }
-  
   Widget _buildServiciosjob() {
     // Filtrar por estado
     final List<Jobs> filtrados = jobs.jobs.where((a) {
@@ -369,8 +382,11 @@ class _HomePageState extends State<HomePage> {
         alignment: Alignment.topLeft,
         child: Column(
           children: [
-              _sectionHeader('Servicios En Curso', sub: 'Servicios Programados Activos',),
-            
+            _sectionHeader(
+              'Servicios En Curso',
+              sub: 'Servicios Programados Activos',
+            ),
+
             GridView.builder(
               scrollDirection: Axis.vertical,
               shrinkWrap: true,
@@ -425,10 +441,13 @@ class _HomePageState extends State<HomePage> {
         alignment: Alignment.topLeft,
         child: Column(
           children: [
-              _sectionHeader('Servicios Creados', sub: 'Estos servicos ven los usuario',),
-           
+            _sectionHeader(
+              'Servicios Creados',
+              sub: 'Estos servicos ven los usuario',
+            ),
+
             SizedBox(
-               height: 370,
+              height: 370,
               child: GridView.builder(
                 controller: _scrollController,
                 scrollDirection: Axis.horizontal,
@@ -437,9 +456,9 @@ class _HomePageState extends State<HomePage> {
                   vertical: 30,
                 ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                 crossAxisCount: 1,
-          mainAxisSpacing: 30,
-          childAspectRatio: 1.45,
+                  crossAxisCount: 1,
+                  mainAxisSpacing: 30,
+                  childAspectRatio: 1.45,
                 ),
                 itemCount: isLoading
                     ? 3 //  skeletons visibles
@@ -481,6 +500,15 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildExpress() {
     final isLoading = express.express.isEmpty;
+    final List<Express> filtrados = express.express.where((a) {
+      return a.job_status == 'in_progress' ||
+          a.job_status == 'going' ||
+          a.job_status == 'arrived';
+    }).toList();
+
+    if (filtrados.isEmpty && !isLoading) {
+      return Container();
+    }
     if (timeout) {
       return CardsSN(img: 'assets/Banner1.png');
     }
@@ -490,15 +518,20 @@ class _HomePageState extends State<HomePage> {
         alignment: Alignment.topLeft,
         child: Column(
           children: [
-            _sectionHeader('Servicios Express Curso', sub: 'Servicios Express Activos',),
-            
+            _sectionHeader(
+              'Servicios Express Curso',
+              sub: 'Servicios Express Activos',
+            ),
+
             SizedBox(
-              
               child: GridView.builder(
                 scrollDirection: Axis.vertical,
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 0,
+                  vertical: 20,
+                ),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 1,
                   mainAxisSpacing: 20,
@@ -512,7 +545,7 @@ class _HomePageState extends State<HomePage> {
                     return const CardsEmpresaSkeleton();
                   }
                   try {
-                    final servicio = express.express[index];
+                    final servicio = filtrados[index];
                     return CardsExpress(
                           image_url: servicio.image,
                           name: servicio.problem,
@@ -542,8 +575,8 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
- Widget _buildDivider() {
-  return Container(
+  Widget _buildDivider() {
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
       height: 1,
       decoration: BoxDecoration(

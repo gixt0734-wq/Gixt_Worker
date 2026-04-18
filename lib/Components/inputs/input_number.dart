@@ -138,15 +138,15 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
        
 
         // Sufijo con la moneda (puedes cambiar MXN/USD según tu app)
-        suffix: Text(
-          'Horas',
-          style: TextStyle(
-            color: colorBase.withOpacity(0.5),
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 1,
-          ),
-        ),
+        // suffix: Text(
+        //   'Horas',
+        //   style: TextStyle(
+        //     color: colorBase.withOpacity(0.5),
+        //     fontSize: 12,
+        //     fontWeight: FontWeight.w600,
+        //     letterSpacing: 1,
+        //   ),
+        // ),
 
         counterText: '', // Oculta el contador de caracteres
 

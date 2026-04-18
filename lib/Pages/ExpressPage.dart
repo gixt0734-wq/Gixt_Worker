@@ -1,96 +1,124 @@
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:math';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
 import 'package:gixt_worker/Components/alert_bar.dart';
-import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
+import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
-import 'package:gixt_worker/Pages/PayjobPage.dart';
+import 'package:gixt_worker/Pages/PayJobPage.dart';
 import 'package:gixt_worker/components/BarStatus.dart';
+import 'package:gixt_worker/components/CircleImage.dart' show Circleimage;
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/alert.dart';
-import 'package:gixt_worker/components/circleimage.dart';
-import 'package:gixt_worker/config/location.dart';
-import 'package:gixt_worker/services/Job/JonId_service.dart';
+import 'package:gixt_worker/components/inputs/Input_Description.dart';
+import 'package:gixt_worker/components/inputs/Input_Time.dart';
+import 'package:gixt_worker/components/inputs/UbicacionesInput.dart';
+import 'package:gixt_worker/components/inputs/calendar_dialog.dart';
+import 'package:gixt_worker/components/inputs/input.dart';
+import 'package:gixt_worker/components/inputs/pick_image.dart';
+import 'package:gixt_worker/components/inputs/time_picker_helper.dart';
+import 'package:gixt_worker/components/sketor/opciones.dart';
+import 'package:gixt_worker/Config/Notification.dart';
+import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
+import 'package:gixt_worker/Config/location.dart';
+import 'package:gixt_worker/main.dart';
+import 'package:gixt_worker/routes/root.dart';
+import 'package:gixt_worker/services/Job/Express_Id_service.dart';
+import 'package:gixt_worker/services/Job/Send_Propuesta_service.dart';
+import 'package:gixt_worker/services/Job/Update_Express_service%20copy.dart';
 import 'package:gixt_worker/services/Job/Update_Job_service.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
+
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/hub_connection_builder.dart';
+import 'package:table_calendar/table_calendar.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 
-class ViewJobPage extends StatefulWidget {
-  const ViewJobPage({super.key, required this.id_trabajo});
-  final String id_trabajo;
+class ExpressPage extends StatefulWidget {
+  const ExpressPage({super.key, required this.express_id});
+
+  final String express_id;
   @override
-  State<ViewJobPage> createState() => _ViewJobPageState();
+  State<ExpressPage> createState() => _ExpressPageState();
 }
 
-class _ViewJobPageState extends State<ViewJobPage> {
-  bool isLoading = false;
-  bool hasMore = true;
-  final JobById_service job = JobById_service();
+class _ExpressPageState extends State<ExpressPage> {
+  final ExpressById_service express = ExpressById_service();
   final ScrollController _scrollController = ScrollController();
   final PreferencesService _preferencesService = PreferencesService();
-  bool _tracking = false;
-  bool _hubConnected = false;
-  HubConnection? _hubConnection;
-  double? _price;
-  GoogleMapController? mapController;
+
+  bool isLoading = false;
+  bool hasMore = true;
+
   bool isactive = false;
   bool isaccept = false;
   bool isSearch = false;
   bool timeout = false;
   bool loadig = true;
-  Set<Polyline> polylines = {};
+
+  bool _tracking = false;
   HubConnection? hubConnection;
-  Set<Marker> markers = {};
+
+  GoogleMapController? _mapController;
   List<LatLng> polylineCoordinates = [];
+  Set<Marker> markers = {};
+  Set<Polyline> polylines = {};
+
   double longitude = 0;
   double latitude = 0;
-  File? _image;
+
   String? calle;
   String? ciudad;
   String? estado;
   String? pais;
   String distanceText = "";
   String durationText = "";
+
   String? colonia;
   LatLng positionActual = const LatLng(20.9674, -89.5926);
-  LatLng positionclient = LatLng(20.9674, -89.5926);
-  bool onlocation = false;
-  String status = 'pending';
+  LatLng? positionclient = LatLng(20.9674, -89.5926);
+  
   BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
   StreamSubscription? _statusSub;
+
+  bool onlocation = false;
+  String status = 'pending';
+  double? _km_cost;
+  TextEditingController _priceController = TextEditingController();
+
   String _StatusGps = 'desconocido';
 
   @override
   void initState() {
     super.initState();
-    print("Entré a Mi trabajo");
+    print("Entré a Mi trabajo Express");
     marker();
     _initial();
-    jobsStatusNotifierFinish.addListener(_Refresh);
+    expressNotifier.addListener(_onRefresh);
+    cancelexpressNotifier.addListener(_cancelreload);
+    finishexpressNotifier.addListener(_Refresh);
     FlutterBackgroundService().isRunning().then((running) {
       print("🔍 Servicio corriendo: $running");
     });
@@ -114,53 +142,8 @@ class _ViewJobPageState extends State<ViewJobPage> {
     });
   }
 
-  @override
-  void dispose() {
-    _statusSub?.cancel();
-    super.dispose();
-  }
-
-  void _Refresh() async {
-    print('nose');
-    if (job.job[0].job_status == 'in_progress') {
-      _stopTracking();
-    }
-    _onRefresh();
-    _Update(job.job[0].job_status);
-  }
-
-  Future<void> marker() async {
-    const ImageConfiguration configuration = ImageConfiguration(
-      size: Size(80, 80),
-    );
-
-    final BitmapDescriptor icon = await BitmapDescriptor.fromAssetImage(
-      configuration,
-      "assets/marker.png",
-    );
-    final BitmapDescriptor iconworker = await BitmapDescriptor.fromAssetImage(
-      configuration,
-      "assets/worker.png",
-    );
-
-    if (mounted) {
-      setState(() {
-        markericon = icon;
-        workericon = iconworker;
-      });
-    }
-  }
-
-  Future<void> _startTracking() async {
-    await LocationService.start(widget.id_trabajo);
-  }
-
-  Future<void> _stopTracking() async {
-    await LocationService.stop();
-  }
-
   Future<void> _initial() async {
-    bool ok = await job.fetchServicioData(widget.id_trabajo);
+    bool ok = await express.fetchServicioData(widget.express_id);
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
@@ -170,10 +153,10 @@ class _ViewJobPageState extends State<ViewJobPage> {
           message: "No se pudo obtener la información",
           type: alert_type.error,
         );
-
-        Navigator.pop(context);
       });
+      Navigator.pop(context);
     }
+
     GetRute();
     setState(() {});
   }
@@ -184,7 +167,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
       print('Actualizando datos...');
       hasMore = true;
     });
-    bool ok = await job.fetchServicioData(widget.id_trabajo);
+    bool ok = await express.fetchServicioData(widget.express_id);
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
@@ -194,61 +177,61 @@ class _ViewJobPageState extends State<ViewJobPage> {
           message: "No se pudo obtener la información",
           type: alert_type.error,
         );
-
-        Navigator.pop(context);
       });
     }
     setState(() {});
   }
 
-  Future<void> abrirGoogleMaps(double lat, double lng) async {
-    final Uri googleMapsUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng");
-
-    if (await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication)) {
+  void _Refresh() async {
+    if (express.express[0].images_evicence.isEmpty) {
+      _onRefresh();
       return;
     }
-
-    final Uri webUrl = Uri.parse(
-      "https://www.google.com/maps/search/?api=1&query=$lat,$lng",
-    );
-
-    if (!await launchUrl(webUrl, mode: LaunchMode.externalApplication)) {
-      throw 'No se pudo abrir Google Maps';
-    }
+    _Update(express.express[0].job_status);
+    _stopTracking();
+  }
+  
+  Future<void> _cancelreload() async {
+    await _stopTracking();
+    if (!mounted) return;
+    Future.microtask(() async {
+      await mostrarAlerta(
+        context,
+        title: "Trabajo cancelado",
+        message: 'se el usuario cancelo el trabajo',
+        type: alert_type.error,
+      );
+      Navigator.pop(context);
+    });
   }
 
-  void _Update(String actions) async {
+  Future<void> _GoMyLocation() async {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => Indicador(),
     );
-
-    final result = await UpdateJobsService.Update(
-      action: actions,
-      job_id: widget.id_trabajo,
-    );
-
-    Navigator.pop(context);
-
-    if (result['success'] == true) {
-      final data = result['data'];
-      mostrarAlerta(
-        context,
-        title: "Trabajo Actualizado",
-        message: 'se notificara a tu cliente',
-        type: alert_type.exito,
-      );
-      jobsStatusNotifier.refresh();
-      _onRefresh();
-    } else {
-      mostrarAlerta(
-        context,
-        title: "Error",
-        message: result['message'],
-        type: alert_type.error,
-      );
+    try {
+      Position pos = await GeoLocationService.obtenerUbicacion(context);
+      latitude = pos.latitude;
+      longitude = pos.longitude;
+      setState(() {
+        positionActual = LatLng(pos.latitude, pos.longitude);
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: positionActual!, zoom: 17),
+          ),
+        );
+      });
+    } catch (e) {
+      print(e);
     }
+
+    await GetStreet();
+    setState(() {
+      loadig = false;
+    });
+    Navigator.pop(context);
   }
 
   Future<void> GetStreet() async {
@@ -266,35 +249,6 @@ class _ViewJobPageState extends State<ViewJobPage> {
             });
           },
     );
-  }
-
-  Future<void> _GoMyLocation() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Indicador(),
-    );
-    try {
-      Position pos = await GeoLocationService.obtenerUbicacion(context);
-      latitude = pos.latitude;
-      longitude = pos.longitude;
-      setState(() {
-        positionActual = LatLng(pos.latitude, pos.longitude);
-        mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(target: positionActual!, zoom: 17),
-          ),
-        );
-      });
-    } catch (e) {
-      print(e);
-    }
-
-    await GetStreet();
-    setState(() {
-      loadig = false;
-    });
-    Navigator.pop(context);
   }
 
   Future<void> getDistanceAndTime() async {
@@ -329,10 +283,10 @@ class _ViewJobPageState extends State<ViewJobPage> {
 
   Future<void> GetRute() async {
     final position = await Geolocator.getCurrentPosition();
-
+ 
     final workerPos = LatLng(position.latitude, position.longitude);
-    final clientPos = LatLng(job.job[0].latitude, job.job[0].longitude);
-    mapController?.animateCamera(
+    final clientPos = LatLng(express.express[0].latitude, express.express[0].longitude);
+    _mapController?.animateCamera(
       CameraUpdate.newCameraPosition(
         CameraPosition(target: clientPos, zoom: 17),
       ),
@@ -377,7 +331,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
       ),
     );
 
-    mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+    _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
 
     /// obtener dirección
     GetStreet();
@@ -428,9 +382,135 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
+  Future<void> marker() async {
+    const ImageConfiguration configuration = ImageConfiguration(
+      size: Size(80, 80),
+    );
+
+    final BitmapDescriptor icon = await BitmapDescriptor.fromAssetImage(
+      configuration,
+      "assets/marker.png",
+    );
+    final BitmapDescriptor iconworker = await BitmapDescriptor.fromAssetImage(
+      configuration,
+      "assets/worker.png",
+    );
+
+    if (mounted) {
+      setState(() {
+        markericon = icon;
+        workericon = iconworker;
+      });
+    }
+  }
+
+  void _Send() async {
+    if (_priceController.text.isEmpty) {
+      mostrarAlerta(
+        context,
+        title: 'Precio requerido',
+        message: 'Ingresa el precio de los materiales',
+        type: alert_type.error,
+      );
+      return;
+    }
+    if (_km_cost == null) {
+      mostrarAlerta(
+        context,
+        title: 'Selecciona un precio',
+        message: 'Selecciona una opcion',
+        type: alert_type.error,
+      );
+      return;
+    }
+    print('llamando a send');
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+    print(
+      'precio: ${_priceController.text}, km_cost: ${_km_cost?.roundToDouble()}',
+    );
+    final result = await SendPropuestaService.Update(
+      express_id: widget.express_id,
+      km_cost: _km_cost?.roundToDouble() ?? 0.0,
+      labor_price: _priceController.text,
+    );
+
+    Navigator.pop(context);
+
+    if (result['success'] == true) {
+      final data = result['data'];
+      mostrarAlerta(
+        context,
+        title: "Trabajo Actualizado",
+        message: 'se notificara a tu cliente',
+        type: alert_type.exito,
+      );
+      _onRefresh();
+    } else {
+      mostrarAlerta(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+    }
+  }
+
+  void _Update(String actions) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await UpdateExpressService.Update(
+      action: actions,
+      job_id: widget.express_id,
+    );
+
+    Navigator.pop(context);
+
+    if (result['success'] == true) {
+      final data = result['data'];
+      mostrarAlerta(
+        context,
+        title: "Trabajo Actualizado",
+        message: 'se notificara a tu cliente',
+        type: alert_type.exito,
+      );
+      _onRefresh();
+    } else {
+      mostrarAlerta(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+    }
+  }
+
+  Future<void> _startTracking() async {
+    setState(() {
+      _tracking = true;
+    });
+    await LocationService.start(widget.express_id);
+  }
+
+  Future<void> _stopTracking() async {
+    if (!mounted) return;
+    setState(() {
+      _tracking = false;
+    });
+    await LocationService.stop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (job.job.isEmpty) {
+    if (express.express.isEmpty) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Indicador(),
@@ -457,7 +537,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
                   decoration: BoxDecoration(
                     color: Theme.of(context).scaffoldBackgroundColor,
                     borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(25),
+                      top: Radius.circular(24),
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -488,8 +568,10 @@ class _ViewJobPageState extends State<ViewJobPage> {
   Widget _buildMap() {
     final h = MediaQuery.of(context).size.height;
     final topPadding = MediaQuery.of(context).padding.top;
+
     return Stack(
       children: [
+        // ── Mapa ──────────────────────────────────────────────────────────
         SizedBox(
           height: h,
           child: GoogleMap(
@@ -497,26 +579,26 @@ class _ViewJobPageState extends State<ViewJobPage> {
               target: positionActual,
               zoom: 16,
             ),
-            polylines: polylines,
-            scrollGesturesEnabled: true,
-            zoomGesturesEnabled: true,
-            rotateGesturesEnabled: true,
+            scrollGesturesEnabled: !isSearch,
+            zoomGesturesEnabled: !isSearch,
+            rotateGesturesEnabled: !isactive,
             tiltGesturesEnabled: !isactive,
-            onMapCreated: (controller) => mapController = controller,
+            onMapCreated: (controller) => _mapController = controller,
             gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
               Factory<OneSequenceGestureRecognizer>(
                 () => EagerGestureRecognizer(),
               ),
             },
+            polylines: polylines,
             markers: markers,
           ),
         ),
-        Positioned(
+       Positioned(
           top: MediaQuery.of(context).padding.top + 62,
           right: 12,
           child: Gpsstatus(status: _StatusGps), // 👈 una sola línea
         ),
-        // botón mi ubicación
+
         Positioned(
           top: MediaQuery.of(context).padding.top + 12,
           right: 12,
@@ -549,7 +631,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
           child: GestureDetector(
             onTap: () {
               if (positionclient != null) {
-                mapController?.animateCamera(
+                _mapController?.animateCamera(
                   CameraUpdate.newCameraPosition(
                     CameraPosition(target: positionclient!, zoom: 17),
                   ),
@@ -577,9 +659,8 @@ class _ViewJobPageState extends State<ViewJobPage> {
             ),
           ),
         ),
-        // chip de dirección
         if (calle != null)
-          Positioned(
+        Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 12,
             right: 64,
@@ -618,7 +699,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "${calle} ${ciudad} a ${job.job[0].maps_address}",
+                    "${calle} ${ciudad} a ${express.express[0].maps_address}",
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -643,6 +724,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
               ),
             ),
           ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
+        
 
         // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],
@@ -653,9 +735,23 @@ class _ViewJobPageState extends State<ViewJobPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+
         children: [
+          SizedBox(height: 20),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+
           SizedBox(height: 20),
           _buildTitle()
               .animate()
@@ -663,9 +759,9 @@ class _ViewJobPageState extends State<ViewJobPage> {
               .slideX(begin: -0.2),
           SizedBox(height: 20),
           Barstatus(
-                estadoTrabajo: job.job[0].job_status.isEmpty
+                estadoTrabajo: express.express[0].job_status.isEmpty
                     ? ''
-                    : job.job[0].job_status,
+                    : express.express[0].job_status,
               )
               .animate()
               .animate()
@@ -676,30 +772,20 @@ class _ViewJobPageState extends State<ViewJobPage> {
               .animate()
               .fade(duration: 450.ms, delay: 60.ms)
               .slideX(begin: -0.2),
+          SizedBox(height: 20),
           _buildEvidence()
               .animate()
               .fade(duration: 450.ms, delay: 60.ms)
               .slideX(begin: -0.2),
+          image(
+            express.express[0].image,
+          ).animate().fade(duration: 450.ms, delay: 60.ms).slideX(begin: -0.2),
+          SizedBox(height: 10),
           _buildClient()
               .animate()
               .fade(duration: 450.ms, delay: 60.ms)
               .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildServicio()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildImg()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildUbicacion()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
+          SizedBox(height: 40),
         ],
       ),
     );
@@ -712,7 +798,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
         const SizedBox(width: 4),
         Expanded(
           child: Text(
-            job.job[0].maps_address,
+            express.express[0].maps_address,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: GoogleFonts.poppins(
@@ -729,7 +815,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
         ),
         const SizedBox(width: 3),
         Text(
-          job.job[0].job_date,
+          express.express[0].job_date,
           style: GoogleFonts.poppins(
             fontSize: 11,
             color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
@@ -743,7 +829,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
         ),
         const SizedBox(width: 3),
         Text(
-          job.job[0].job_time,
+          express.express[0].job_time,
           style: GoogleFonts.poppins(
             fontSize: 11,
             color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
@@ -791,7 +877,14 @@ class _ViewJobPageState extends State<ViewJobPage> {
                     child: CachedNetworkImage(
                       imageUrl: imagen!,
                       fit: BoxFit.cover,
-                      placeholder: (context, url) => Center(child: Indicador()),
+                      placeholder: (context, url) => Center(
+                        child: Container(color: Colors.white24)
+                            .animate(
+                              onPlay: (controller) => controller.repeat(),
+                            )
+                            .shimmer(duration: 1200.ms)
+                            .fade(begin: 0.4, end: 1),
+                      ),
                       errorWidget: (context, url, error) =>
                           const Icon(Icons.broken_image),
                     ),
@@ -833,7 +926,11 @@ class _ViewJobPageState extends State<ViewJobPage> {
           ),
           child: Row(
             children: [
-              Circleimage(w: 56, h: 56, image_url: job.job[0].client_image),
+              Circleimage(
+                w: 56,
+                h: 56,
+                image_url: express.express[0].client_image,
+              ),
               const SizedBox(width: 20),
               Expanded(
                 child: Column(
@@ -845,7 +942,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
                       children: [
                         Flexible(
                           child: Text(
-                            job.job[0].client_username,
+                            express.express[0].client_username,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
@@ -868,42 +965,13 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
-  Widget _buildServicio() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-
-      children: [
-        Text(
-          'Servicio solicitado:   ${job.job[0].service_name}',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-
-        const SizedBox(height: 10),
-        Text(
-          '${job.job[0].service_description}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrabajo() {
+  Widget image(String? imagen) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Problema a resolver',
+          'Imagen de evidencia',
           style: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
@@ -912,175 +980,50 @@ class _ViewJobPageState extends State<ViewJobPage> {
           ),
         ),
         SizedBox(height: 10),
-        Text(
-          '${job.job[0].problem}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
+        SizedBox(
+          width: 100,
+          height: 130,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
 
-        SizedBox(height: 20),
-        Text(
-          'Descripción',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 10),
-        Text(
-          '${job.job[0].description}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
-        SizedBox(height: 20),
-
-        Text(
-          'Pago y Metodo',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-
-        SizedBox(height: 20),
-        Column(
-          children: [
-            _buildPriceRow('Mano de obra', '\$${job.job[0].labor_cost}'),
-            _buildPriceRow(
-              'Precio estimado de visita ',
-              '\$${job.job[0].km_cost}',
-            ),
-          ],
-        ),
-        SizedBox(height: 20),
-        _buildPaymentMethodCard(),
-      ],
-    );
-  }
-
-  Widget _buildUbicacion() {
-    return Column(
-      children: [
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Text(
-              'Ubicacion',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 20),
-        Row(
-          children: [
-            imageBox(job.job[0].location_image),
-            SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${job.job[0].maps_address}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      height: 1.75,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withOpacity(0.9),
-                    ),
-                  ),
-                  Text(
-                    '${job.job[0].state} ${job.job[0].neighborhood} ',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      height: 1.75,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withOpacity(0.55),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => abrirGoogleMaps(
-                        job.job[0].latitude,
-                        job.job[0].longitude,
-                      ),
-                      icon: const Icon(
-                        Icons.directions_rounded,
-                        color: colorWhite,
-                      ),
-                      label: Text(
-                        'Cómo llegar',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: colorWhite,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorsecundario,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 20),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildImg() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Text(
-              'Imagenes',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 20),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
             children: [
-              imageBox(job.job[0].image_1),
-              const SizedBox(width: 20),
-              imageBox(job.job[0].image_2),
-              const SizedBox(width: 10),
+              imagen == null
+                  ? Container(
+                      decoration: BoxDecoration(
+                        color: Color.fromARGB(255, 177, 177, 177),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      width: 200,
+                      height: 200,
+                      child: IconButton(
+                        onPressed: () {},
+                        icon: const Icon(
+                          Icons.person,
+                        ), // Usa un icono de calendario
+                        color: const Color.fromARGB(255, 255, 255, 255),
+                        iconSize: 65,
+                      ),
+                    )
+                  : Container(
+                      decoration: BoxDecoration(
+                        color: Color.fromARGB(0, 103, 10, 10),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      width: 200,
+                      height: 200,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: CachedNetworkImage(
+                          imageUrl: imagen!,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) =>
+                              Center(child: Indicador()),
+                          errorWidget: (context, url, error) =>
+                              const Icon(Icons.broken_image),
+                        ),
+                      ),
+                    ),
             ],
           ),
         ),
@@ -1089,7 +1032,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
   }
 
   Widget _buildEvidence() {
-    if (job.job[0].images_evicence.isEmpty) {
+    if (express.express[0].images_evicence.isEmpty) {
       return SizedBox.shrink();
     }
     return Column(
@@ -1119,9 +1062,9 @@ class _ViewJobPageState extends State<ViewJobPage> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              imageBox(job.job[0].images_evicence[0]),
+              imageBox(express.express[0].images_evicence[0]),
               const SizedBox(width: 20),
-              imageBox(job.job[0].images_evicence[1]),
+              imageBox(express.express[0].images_evicence[1]),
               const SizedBox(width: 10),
             ],
           ),
@@ -1131,26 +1074,256 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
-  Widget _buildButton() {
-    final jobStatus = job.job[0].job_status.toLowerCase();
+  Widget _buildTrabajo() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Problema a resolver',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.2,
+          ),
+        ),
+        SizedBox(height: 10),
+        Text(
+          '${express.express[0].problem}',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            height: 1.75,
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+          ),
+        ),
+
+        SizedBox(height: 20),
+        Text(
+          'Descripción',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.2,
+          ),
+        ),
+        SizedBox(height: 10),
+        Text(
+          '${express.express[0].description}',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            height: 1.75,
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+          ),
+        ),
+        SizedBox(height: 20),
+        Text(
+          'Nota',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.2,
+          ),
+        ),
+        SizedBox(height: 10),
+        Text(
+          'Cuando llenes el precio de los materiales, no podras cambiarlo despues, asi que asegurate de poner el precio correcto.',
+          style: GoogleFonts.poppins(
+            fontSize: 13,
+            height: 1.75,
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+          ),
+        ),
+        const SizedBox(height: 20),
+        if (express.express[0].job_status != 'pending') ...[_buildPrice()],
+        SizedBox(height: 20),
+        _buildPaymentMethodCard(),
+        if (express.express[0].job_status == 'pending') ...[_buildForm()],
+      ],
+    );
+  }
+
+  Widget _buildPrice() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Costos',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.2,
+          ),
+        ),
+        Column(
+          children: [
+            _buildPriceRow(
+              'Precio estimado de Mano de obra',
+              '\$${express.express[0].labor_cost.toStringAsFixed(2)}',
+            ),
+            _buildPriceRow(
+              'Precio estimado de Materiales',
+              '\$${express.express[0].materials.toStringAsFixed(2)}',
+            ),
+            _buildPriceRow(
+              'Precio estimado de visita',
+              '\$${express.express[0].km_cost.toStringAsFixed(2)}',
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildForm() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(height: 20),
+        Text(
+          'Otros precios',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.2,
+          ),
+        ),
+
+        SizedBox(height: 10),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _paymentChip(
+                value: express.express[0].worker_price * 1.10,
+                label:
+                    '${(express.express[0].worker_price * 1.10).toStringAsFixed(0)}',
+                icon: Icons.star_rounded,
+              ),
+
+              const SizedBox(width: 12),
+
+              _paymentChip(
+                value: express.express[0].worker_price * 1.20,
+                label:
+                    '${(express.express[0].worker_price * 1.20).toStringAsFixed(0)}',
+                icon: Icons.flash_on_rounded,
+              ),
+
+              const SizedBox(width: 12),
+
+              _paymentChip(
+                value: express.express[0].worker_price * 1.30,
+                label:
+                    '${(express.express[0].worker_price * 1.30).toStringAsFixed(0)}',
+                icon: Icons.local_fire_department_rounded,
+              ),
+
+              const SizedBox(width: 12),
+
+              _paymentChip(
+                value: express.express[0].worker_price * 1.50,
+                label:
+                    '${(express.express[0].worker_price * 1.50).toStringAsFixed(0)}',
+                icon: Icons.workspace_premium_rounded,
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: 20),
+        Text(
+          'Precio de mano de obra',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.2,
+          ),
+        ),
+        SizedBox(height: 20),
+        CustomTextFormFieldPrice(
+          controller: _priceController,
+          label: '\$ 0.00',
+          validator: (value) {
+            if (value == null || value.isEmpty) {
+              return 'Ingresa el precio';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _bottomBar(BuildContext context) {
+    final expressStatus = express.express[0].job_status.toLowerCase();
 
     IconData icon = Icons.info;
     String text = '';
     VoidCallback? action;
     Color bgColor = colorsecundario;
-    action = () {
-      _Update(job.job[0].job_status);
-      if (job.job[0].job_status == 'accepted') {
+    action = () async {
+     print(express.express[0].job_status);
+      if (express.express[0].job_status == 'pending') {
+        _Send();
+        return;
+      } 
+      else if (express.express[0].job_status != 'in_progress') {
+        _Update(express.express[0].job_status);
+      
+      if (express.express[0].job_status == 'accepted') {
         _startTracking();
       }
-      if (job.job[0].job_status == 'in_progress') {
-        _stopTracking();
+      }
+      else if (express.express[0].job_status == 'in_progress') {
+        if (express.express[0].images_evicence.isEmpty) {
+          bool? ok = await mostrarAlerta(
+            context,
+            title: 'Evidencia',
+            message:
+                'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
+            type: alert_type.advertencia,
+          );
+          if (ok!) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => Evidencejobpage(
+                  isExpress: true,
+                  job_id: express.express[0].express_id,
+                  price: express.express[0].labor_cost,
+                  km_priece: express.express[0].km_cost,
+                ),
+              ),
+            );
+
+            return;
+          }
+        }
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PayJobPage(
+              isExpress: true,
+              job_id: express.express[0].express_id,
+              price: express.express[0].labor_cost,
+              km_priece: express.express[0].km_cost,
+            ),
+          ),
+        );
       }
     };
-    switch (jobStatus) {
+    switch (expressStatus) {
       case 'pending':
         icon = Icons.check_circle;
-        text = 'Aceptar';
+        text = 'Enviar Propuesta';
         break;
 
       case 'accepted':
@@ -1185,47 +1358,47 @@ class _ViewJobPageState extends State<ViewJobPage> {
 
       default:
         icon = Icons.help;
-        text = jobStatus;
+        text = expressStatus;
         bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
     }
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ElevatedButton.icon(
-          onPressed: action,
-          icon: Icon(icon, color: colorWhite, size: 25),
-          label: Text(
-            text,
-            style: const TextStyle(fontSize: 18, color: colorWhite),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: bgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
+    return Container(
+      height: 86,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
+            width: 1,
           ),
         ),
-        if (_tracking) ...[
-          SizedBox(width: 10),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-              backgroundColor: !_tracking ? Colors.red : Colors.green,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: 
+              ElevatedButton.icon(
+                onPressed: action,
+                icon: Icon(icon, color: colorWhite, size: 25),
+                label: Text(
+                  text,
+                  style: const TextStyle(fontSize: 18, color: colorWhite),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: bgColor,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 50,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
-            ),
-            onPressed: () {},
-            child: Icon(
-              _tracking ? Icons.location_off : Icons.location_on,
-              size: 28,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ],
+            
+          
+        
+      ),
     );
   }
 
@@ -1269,14 +1442,94 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
+  Widget _buildInfoCard({required IconData icon, required String text}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorsecundario.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorsecundario.withOpacity(0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: colorsecundario),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _paymentChip({
+    required double value,
+    required String label,
+    required IconData icon,
+  }) {
+    final isSelected = _km_cost == value;
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _km_cost = value;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorsecundario.withOpacity(0.08)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? colorsecundario
+                : Theme.of(context).colorScheme.surface.withOpacity(0.12),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected
+                  ? colorsecundario
+                  : Theme.of(context).colorScheme.surface.withOpacity(0.4),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? colorsecundario
+                    : Theme.of(context).colorScheme.surface.withOpacity(0.55),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPaymentMethodCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
+        color: Theme.of(context,).colorScheme.surface.withOpacity(0.06),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-        ),
+        border: Border.all(color: Theme.of(context,).colorScheme.surface.withOpacity(0.06)),
       ),
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -1285,12 +1538,12 @@ class _ViewJobPageState extends State<ViewJobPage> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              color: Theme.of(context,).colorScheme.surface.withOpacity(0.8),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               Icons.payments_rounded,
-              color: Theme.of(context).scaffoldBackgroundColor,
+              color: Theme.of(context,).scaffoldBackgroundColor,
               size: 16,
             ),
           ),
@@ -1300,14 +1553,16 @@ class _ViewJobPageState extends State<ViewJobPage> {
             style: GoogleFonts.dmSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.85),
+              color: Theme.of(
+                    context,
+                  ).colorScheme.surface.withOpacity(0.85),
             ),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              color:  Theme.of(context,).colorScheme.surface.withOpacity(0.8),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
@@ -1315,161 +1570,26 @@ class _ViewJobPageState extends State<ViewJobPage> {
               children: [
                 Icon(
                   Icons.money_rounded,
-                  color: Theme.of(
+                  color:Theme.of(
                     context,
                   ).scaffoldBackgroundColor.withOpacity(0.85),
                   size: 15,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  '${job.job[0].payment_method == 'cash' ? 'Efectivo' : 'Tarjeta'} ',
+                  '${express.express[0].payment_method == 'cash' ? 'Efectivo' : 'Tarjeta'} ',
                   style: GoogleFonts.dmSans(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Theme.of(
-                      context,
-                    ).scaffoldBackgroundColor.withOpacity(0.85),
+                    context,
+                  ).scaffoldBackgroundColor.withOpacity(0.85),
                   ),
                 ),
               ],
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _bottomBar(BuildContext context) {
-    final jobStatus = job.job[0].job_status.toLowerCase();
-
-    IconData icon = Icons.info;
-    String text = '';
-    VoidCallback? action;
-    Color bgColor = colorsecundario;
-    action = () async {
-      print(job.job[0].job_status);
-
-      if (job.job[0].job_status == 'arrived') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PayJobPage(
-              isExpress: false,
-              job_id: job.job[0].job_id,
-              price: job.job[0].labor_cost,
-              km_priece: job.job[0].km_cost,
-            ),
-          ),
-        );
-      } else if (job.job[0].job_status == 'in_progress') {
-        if (job.job[0].images_evicence.isEmpty) {
-          bool? ok = await mostrarAlerta(
-            context,
-            title: 'Evidencia requerida',
-            message:
-                'Antes de finalizar, envía la evidencia de que el trabajo ya fue terminado.',
-            type: alert_type.advertencia,
-          );
-          if (ok!) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Evidencejobpage(
-                  isExpress: false,
-                  job_id: job.job[0].job_id,
-                  price: job.job[0].labor_cost,
-                  km_priece: job.job[0].km_cost,
-                ),
-              ),
-            );
-
-            return;
-          }
-        }
-      } else if (job.job[0].job_status != 'in_progress') {
-        _Update(job.job[0].job_status);
-
-        if (job.job[0].job_status == 'accepted') {
-          print('0');
-          _startTracking();
-        }
-      }
-    };
-    switch (jobStatus) {
-      case 'pending':
-        icon = Icons.check_circle_outline;
-        text = 'Aceptar trabajo';
-        break;
-
-      case 'accepted':
-        icon = Icons.directions_bike;
-        text = 'Voy en camino';
-        break;
-
-      case 'going':
-        icon = Icons.location_on_outlined;
-        text = 'Ya llegué';
-        break;
-
-      case 'arrived':
-        icon = Icons.search;
-        text = 'Iniciar diagnóstico';
-        break;
-
-      case 'diagnosing':
-        icon = Icons.hourglass_top;
-        text = 'Esperando aprobación';
-        bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
-        action = null;
-        break;
-
-      case 'in_progress':
-        icon = Icons.task_alt;
-        text = 'Finalizar trabajo';
-        break;
-      case 'finalized':
-        icon = Icons.schedule;
-        text = 'Esperando pago';
-        action = null;
-        break;
-      case 'completed':
-        icon = Icons.verified;
-        text = 'Trabajo completado';
-        action = null;
-        break;
-
-      default:
-        icon = Icons.help_outline;
-        text = jobStatus;
-        bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
-    }
-
-    return Container(
-      height: 86,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
-            width: 1,
-          ),
-        ),
-      ),
-      child: ElevatedButton.icon(
-        onPressed: action,
-        icon: Icon(icon, color: colorWhite, size: 25),
-        label: Text(
-          text,
-          style: const TextStyle(fontSize: 18, color: colorWhite),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
-          ),
-        ),
       ),
     );
   }

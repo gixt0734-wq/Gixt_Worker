@@ -597,6 +597,7 @@ class _AddServicePageState extends State<AddServicePage> {
       ),
     );
   }
+  
   Widget imageperBox(int index) {
     return GestureDetector(
       onTap: () => _pickImage(index),
@@ -644,6 +645,7 @@ class _AddServicePageState extends State<AddServicePage> {
       ),
     );
   }
+  
   Widget imageBox(int index) {
     return GestureDetector(
       onTap: () => _pickImage(index),
@@ -731,8 +733,7 @@ class _AddServicePageState extends State<AddServicePage> {
     );
   }
 
-
-   Widget _buildInfoCard({
+  Widget _buildInfoCard({
     required IconData icon,
     required String text,
 

@@ -9,11 +9,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 class FinishSerivicioService {
   static Future<Map<String, dynamic>> Send({
     required String job_id,
-    required double labor_cost,
-    required double km_cost,
     required double total,
     required double material,
     required double iva,
+    required double? labor_cost,
+    required String description,
     required List<MaterialModel> materials,
   }) async {
     int attempts = 0;
@@ -27,20 +27,21 @@ class FinishSerivicioService {
       try {
         response = await http
             .post(
-              Uri.parse('${dotenv.env['API_URL']}/api/Costs'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Payment'),
               headers: {'Content-Type': 'application/json'},
               body: json.encode({
                 'job_id': job_id,
-                'labor_cost': labor_cost,
-                'km_cost': km_cost,
                 'materials': material,
                 'iva': iva,
                 'total': total,
+                'labor_cost': labor_cost,
+                'description': description,
+                'isexpress': false,
                 'materiales': materials.map((m) => m.toJson()).toList(),
               }),
             )
             .timeout(const Duration(seconds: 30));
-
+        print(response);
         if (response.statusCode == 200) {
           return {'success': true, 'data': jsonDecode(response.body)};
         }

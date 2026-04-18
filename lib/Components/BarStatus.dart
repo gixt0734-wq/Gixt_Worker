@@ -13,6 +13,7 @@ class Barstatus extends StatelessWidget {
     'in_progress',
     'finalized',
     'completed',
+    'diagnosing'
   ];
 
   Color _colorForState(String state) {
@@ -21,6 +22,7 @@ class Barstatus extends StatelessWidget {
       case 'accepted':  return Colors.blue;
       case 'going':
       case 'arrived':
+      case 'diagnosing':
       case 'in_progress': return Colors.orange;
       case 'finalized': return Colors.red;
       case 'completed': return Colors.green;
@@ -47,6 +49,7 @@ class Barstatus extends StatelessWidget {
       case 'accepted':    return 'Aceptado';
       case 'going':       return 'En camino';
       case 'arrived':     return 'En domicilio';
+      case 'diagnosing':  return 'Diagnosticando';
       case 'in_progress': return 'En proceso';
       case 'finalized':   return 'Por finalizar';
       case 'completed':   return 'Completado';
@@ -59,7 +62,7 @@ class Barstatus extends StatelessWidget {
   int _currentIndex() {
     final s = estadoTrabajo.toLowerCase();
     // going/arrived cuentan como in_progress en la barra
-    final mapped = (s == 'going' || s == 'arrived') ? 'in_progress' : s;
+    final mapped = (s == 'going' || s == 'arrived' || s== 'diagnosing') ? 'in_progress' : s;
     final idx = _steps.indexOf(mapped);
     return idx == -1 ? 0 : idx;
   }
