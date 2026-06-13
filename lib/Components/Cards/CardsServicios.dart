@@ -226,115 +226,99 @@ class CardsServicios extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment:
-                          MainAxisAlignment.spaceBetween, // ← clave
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context).colorScheme.surface,
-                                height: 1.2,
-                              ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                              color:Theme.of(context).colorScheme.surface,
+                              height: 1.2,
                             ),
-                            const SizedBox(height: 8),
-                            // Descripción
-                            Text(
-                              description,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.poppins(
-                                fontSize: 12,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surface.withOpacity(0.7),
-                                fontWeight: FontWeight.w400,
-                                height: 1.3,
-                              ),
+                          ),
+                          const SizedBox(height: 5),
+                          Text(
+                            description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.poppins(
+                              fontSize: 11,
+                              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.58),
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
                             ),
+                          ),
+                        ],
+                      ),
 
-                            const SizedBox(height: 2),
-                          ],
-                        ),
-
-                        // Precio y acción
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            // Precio
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 6,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorsecundario,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '\$',
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: colorWhite,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 2),
-                                  Text(
-                                    price.toStringAsFixed(2),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 12,
-                                      color: colorWhite,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                      // Price + arrow
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
                             ),
-                            if (favorito)
-                              Positioned(
-                                top: 12,
-                                right: 70,
-                                child: Icon(
-                                  Icons.favorite_rounded,
-                                  color: colorError,
-                                  size: 25,
+                            decoration: BoxDecoration(
+                              color: colorsecundario,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '\$',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                            // Botón de acción
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surface.withOpacity(0.1),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Theme.of(context).colorScheme.surface,
-                                size: 20,
-                              ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  price.toStringAsFixed(2),
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 10),
-                      ],
-                    ),
+                          ),
+                          if (favorito)
+                            Icon(
+                              Icons.favorite_rounded,
+                              color: colorError,
+                              size: 22,
+                            ),
+                          Container(
+                            padding: const EdgeInsets.all(7),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.08),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.arrow_forward_rounded,
+                              color: Theme.of(context).colorScheme.surface,
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  )
                   ),
                 ),
               ],

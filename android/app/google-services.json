@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "124592417777",
-    "project_id": "gixt-bcfdc",
-    "storage_bucket": "gixt-bcfdc.firebasestorage.app"
+    "project_number": "776598654182",
+    "project_id": "gixt-9af7f",
+    "storage_bucket": "gixt-9af7f.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:124592417777:android:12f18fd0b9be634c67f250",
+        "mobilesdk_app_id": "1:776598654182:android:22d791f72bde532227bf27",
+        "android_client_info": {
+          "package_name": "com.example.gixt"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBeSoFagUfePvlWEVroCJ_mejOM9XJ82-s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:776598654182:android:a9807701c56a6e9527bf27",
         "android_client_info": {
           "package_name": "com.example.gixt_worker"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBhDfucM7XEXg03iryZv8501093B2bxlh8"
+          "current_key": "AIzaSyBeSoFagUfePvlWEVroCJ_mejOM9XJ82-s"
         }
       ],
       "services": {

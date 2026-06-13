@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense para saber los atributos posibles.
+    // Mantenga el puntero para ver las descripciones de los existentes atributos.
+    // Para más información, visite: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Flutter (Device 1)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "10AF3E24X50023J"
+        },
+        {
+            "name": "Flutter (Device A14)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "RF8W90R1L8T"
+        },
+        {
+            "name": "Flutter (A31)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "RF8N83145BZ"
+        },
+                {
+            "name": "Flutter (Device 3)",
+            "request": "launch",
+            "type": "dart",
+            "deviceId": "emulator-5554"
+        }
+    ],
+    "compounds": [
+    {
+      "name": "Run All Devices",
+      "configurations": ["Flutter (Device 1)", "Flutter (Device 2)"]
+    }
+  ]
+}

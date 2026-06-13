@@ -10,7 +10,9 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/alert_bar.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/cache.dart';
@@ -20,7 +22,6 @@ import 'package:gixt_worker/Pages/PayJobPage.dart';
 import 'package:gixt_worker/components/BarStatus.dart';
 import 'package:gixt_worker/components/CircleImage.dart' show Circleimage;
 import 'package:gixt_worker/components/Indicador.dart';
-import 'package:gixt_worker/components/alert.dart';
 import 'package:gixt_worker/components/inputs/Input_Description.dart';
 import 'package:gixt_worker/components/inputs/Input_Time.dart';
 import 'package:gixt_worker/components/inputs/UbicacionesInput.dart';
@@ -62,7 +63,7 @@ class ExpressPage extends StatefulWidget {
   State<ExpressPage> createState() => _ExpressPageState();
 }
 
-class _ExpressPageState extends State<ExpressPage> {
+class _ExpressPageState extends State<ExpressPage> with TickerProviderStateMixin {
   final ExpressById_service express = ExpressById_service();
   final ScrollController _scrollController = ScrollController();
   final PreferencesService _preferencesService = PreferencesService();
@@ -78,12 +79,14 @@ class _ExpressPageState extends State<ExpressPage> {
 
   bool _tracking = false;
   HubConnection? hubConnection;
-
+  StreamSubscription<Position>? _positionStreamSubscription;
   GoogleMapController? _mapController;
   List<LatLng> polylineCoordinates = [];
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
+  AnimationController? _markerAnimController;
 
+  LatLng? posicionAnterior;
   double longitude = 0;
   double latitude = 0;
 
@@ -97,7 +100,7 @@ class _ExpressPageState extends State<ExpressPage> {
   String? colonia;
   LatLng positionActual = const LatLng(20.9674, -89.5926);
   LatLng? positionclient = LatLng(20.9674, -89.5926);
-  
+
   BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
@@ -109,19 +112,23 @@ class _ExpressPageState extends State<ExpressPage> {
   TextEditingController _priceController = TextEditingController();
 
   String _StatusGps = 'desconocido';
+  String get _mapsKey => dotenv.env['MAPS_API_KEY'] ?? '';
 
   @override
   void initState() {
     super.initState();
-    print("Entré a Mi trabajo Express");
+
     marker();
     _initial();
+
     expressNotifier.addListener(_onRefresh);
     cancelexpressNotifier.addListener(_cancelreload);
     finishexpressNotifier.addListener(_Refresh);
+
     FlutterBackgroundService().isRunning().then((running) {
       print("🔍 Servicio corriendo: $running");
     });
+    
     _statusSub = FlutterBackgroundService().on("status").listen((event) {
       final state = event?["state"];
       if (state != null && mounted) {
@@ -147,7 +154,7 @@ class _ExpressPageState extends State<ExpressPage> {
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: "No se pudo obtener la información",
@@ -157,21 +164,24 @@ class _ExpressPageState extends State<ExpressPage> {
       Navigator.pop(context);
     }
 
-    GetRute();
+    await GetRute();
+    await _GoMyLocation();
+    _startTracking();
     setState(() {});
   }
 
   Future<void> _onRefresh() async {
     if (!mounted) return;
     setState(() {
-      print('Actualizando datos...');
       hasMore = true;
     });
+
     bool ok = await express.fetchServicioData(widget.express_id);
+
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: "No se pudo obtener la información",
@@ -179,23 +189,26 @@ class _ExpressPageState extends State<ExpressPage> {
         );
       });
     }
+    if (!mounted) return;
     setState(() {});
+    _startTracking();
   }
 
   void _Refresh() async {
-    if (express.express[0].images_evicence.isEmpty) {
-      _onRefresh();
-      return;
+    if (express.express[0].images_evicence.isNotEmpty) {
+      _stopTracking();
     }
-    _Update(express.express[0].job_status);
-    _stopTracking();
+    _onRefresh();
   }
-  
+
   Future<void> _cancelreload() async {
     await _stopTracking();
+    await _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
+
     if (!mounted) return;
     Future.microtask(() async {
-      await mostrarAlerta(
+      await Toast(
         context,
         title: "Trabajo cancelado",
         message: 'se el usuario cancelo el trabajo',
@@ -206,15 +219,19 @@ class _ExpressPageState extends State<ExpressPage> {
   }
 
   Future<void> _GoMyLocation() async {
+    if (!mounted) return;
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => Indicador(),
     );
+
     try {
       Position pos = await GeoLocationService.obtenerUbicacion(context);
       latitude = pos.latitude;
       longitude = pos.longitude;
+
       setState(() {
         positionActual = LatLng(pos.latitude, pos.longitude);
         _mapController?.animateCamera(
@@ -223,15 +240,14 @@ class _ExpressPageState extends State<ExpressPage> {
           ),
         );
       });
+      await GetRoute();
     } catch (e) {
       print(e);
     }
 
     await GetStreet();
-    setState(() {
-      loadig = false;
-    });
-    Navigator.pop(context);
+    if (mounted) setState(() => loadig = false);
+    if (mounted) Navigator.pop(context);
   }
 
   Future<void> GetStreet() async {
@@ -240,6 +256,7 @@ class _ExpressPageState extends State<ExpressPage> {
       longitud: longitude,
       onResult:
           (ciudadResult, calleResult, estadoResult, paisResult, coloniaResult) {
+            if (!mounted) return; 
             setState(() {
               ciudad = ciudadResult;
               calle = calleResult;
@@ -257,7 +274,7 @@ class _ExpressPageState extends State<ExpressPage> {
         "?origins=${positionActual!.latitude},${positionActual!.longitude}"
         "&destinations=${positionclient!.latitude},${positionclient!.longitude}"
         "&mode=driving"
-        "&key=AIzaSyAjcb5WA1kNYLE5Gchmx1sNnpZM31vzXF8";
+        "&key=$_mapsKey";
 
     final response = await http.get(Uri.parse(url));
 
@@ -283,14 +300,11 @@ class _ExpressPageState extends State<ExpressPage> {
 
   Future<void> GetRute() async {
     final position = await Geolocator.getCurrentPosition();
- 
+
     final workerPos = LatLng(position.latitude, position.longitude);
-    final clientPos = LatLng(express.express[0].latitude, express.express[0].longitude);
-    _mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: clientPos, zoom: 17),
-      ),
-    );
+    final clientPos = LatLng( express.express[0].latitude,express.express[0].longitude);
+
+    if (!mounted) return;
     setState(() {
       positionActual = workerPos;
       positionclient = clientPos;
@@ -333,8 +347,10 @@ class _ExpressPageState extends State<ExpressPage> {
 
     _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
 
+    _startTracking();
+
     /// obtener dirección
-    GetStreet();
+    await GetStreet();
 
     /// dibujar ruta
     await GetRoute();
@@ -342,15 +358,12 @@ class _ExpressPageState extends State<ExpressPage> {
 
   Future<void> GetRoute() async {
     PolylinePoints polylinePoints = PolylinePoints(
-      apiKey: "AIzaSyAjcb5WA1kNYLE5Gchmx1sNnpZM31vzXF8",
+      apiKey: _mapsKey,
     );
 
     PolylineRequest request = PolylineRequest(
-      origin: PointLatLng(positionclient!.latitude, positionclient!.longitude),
-      destination: PointLatLng(
-        positionActual!.latitude,
-        positionActual!.longitude,
-      ),
+      origin: PointLatLng(positionActual!.latitude, positionActual!.longitude),
+      destination: PointLatLng(positionclient!.latitude,positionclient!.longitude),
       mode: TravelMode.driving,
     );
 
@@ -359,11 +372,11 @@ class _ExpressPageState extends State<ExpressPage> {
     );
 
     if (result.points.isNotEmpty) {
-      polylineCoordinates.clear();
-
-      for (var point in result.points) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      }
+     polylineCoordinates
+          ..clear()
+          ..addAll(
+            result.points.map((p) => LatLng(p.latitude, p.longitude)),
+          );
       if (!mounted) return;
       await createPolyline();
       await getDistanceAndTime();
@@ -406,7 +419,7 @@ class _ExpressPageState extends State<ExpressPage> {
 
   void _Send() async {
     if (_priceController.text.isEmpty) {
-      mostrarAlerta(
+      Toast(
         context,
         title: 'Precio requerido',
         message: 'Ingresa el precio de los materiales',
@@ -415,7 +428,7 @@ class _ExpressPageState extends State<ExpressPage> {
       return;
     }
     if (_km_cost == null) {
-      mostrarAlerta(
+      Toast(
         context,
         title: 'Selecciona un precio',
         message: 'Selecciona una opcion',
@@ -423,35 +436,36 @@ class _ExpressPageState extends State<ExpressPage> {
       );
       return;
     }
-    print('llamando a send');
 
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => Indicador(),
     );
-    print(
-      'precio: ${_priceController.text}, km_cost: ${_km_cost?.roundToDouble()}',
-    );
+ 
     final result = await SendPropuestaService.Update(
       express_id: widget.express_id,
       km_cost: _km_cost?.roundToDouble() ?? 0.0,
       labor_price: _priceController.text,
     );
 
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
 
     if (result['success'] == true) {
       final data = result['data'];
-      mostrarAlerta(
+      if (!mounted) return;
+      Toast(
         context,
         title: "Trabajo Actualizado",
         message: 'se notificara a tu cliente',
         type: alert_type.exito,
       );
+
+      _priceController.clear();
+      if (mounted) Navigator.pop(context);
       _onRefresh();
     } else {
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: result['message'],
@@ -460,7 +474,7 @@ class _ExpressPageState extends State<ExpressPage> {
     }
   }
 
-  void _Update(String actions) async {
+  Future<void> _Update(String actions) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -472,19 +486,20 @@ class _ExpressPageState extends State<ExpressPage> {
       job_id: widget.express_id,
     );
 
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
 
     if (result['success'] == true) {
       final data = result['data'];
-      mostrarAlerta(
+      Toast(
         context,
         title: "Trabajo Actualizado",
         message: 'se notificara a tu cliente',
         type: alert_type.exito,
       );
       _onRefresh();
+      _startTracking();
     } else {
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: result['message'],
@@ -494,18 +509,126 @@ class _ExpressPageState extends State<ExpressPage> {
   }
 
   Future<void> _startTracking() async {
-    setState(() {
-      _tracking = true;
-    });
-    await LocationService.start(widget.express_id);
+    final excludedStatuses = ['pending', 'canceled', 'completed', 'finalized'];
+
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print("❌ GPS apagado");
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      print("❌ Permiso GPS bloqueado");
+
+      return;
+    }
+
+    await _positionStreamSubscription?.cancel();
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 0,
+          ),
+        ).listen((position) {
+          if (!mounted) return; // ← CHECK MOUNTED PRIMERO
+          final nuevaPosicion = LatLng(position.latitude, position.longitude);
+          final anterior = positionActual; // ← guardar ANTES
+          
+          try {
+            setState(() {
+              
+              positionActual = nuevaPosicion;
+              _animarMovimiento(anterior, nuevaPosicion);
+            });
+          } catch (e) {
+            print("Error: $e");
+          }
+        });
+    if (_StatusGps == 'desconocido' &&
+        !excludedStatuses.contains(express.express[0].job_status)) {
+        if (mounted) setState(() => _tracking = true);
+        await LocationService.start(widget.express_id);
+    }
   }
 
-  Future<void> _stopTracking() async {
-    if (!mounted) return;
-    setState(() {
-      _tracking = false;
+  void _animarMovimiento(LatLng desde, LatLng hasta) {
+    _markerAnimController?.dispose();
+
+    _markerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    final tween = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeInOut),
+    );
+
+    _markerAnimController!.addListener(() {
+      final t = tween.value;
+      final lat = desde.latitude + (hasta.latitude - desde.latitude) * t;
+      final lng = desde.longitude + (hasta.longitude - desde.longitude) * t;
+
+      positionActual = LatLng(lat, lng);
+      markers.removeWhere((m) => m.markerId.value == "worker");
+      markers.add(
+        Marker(
+          markerId: const MarkerId("worker"),
+          position: positionActual!,
+          infoWindow: const InfoWindow(title: "Tu ubicación"),
+          icon: markericon,
+        ),
+      );
+      // Fuera del setState
+      _mapController?.animateCamera(CameraUpdate.newLatLng(positionActual!));
+      if (mounted) setState(() {});
     });
+
+    _markerAnimController!.forward();
+  }
+  
+  @override
+  void dispose() {
+
+    _positionStreamSubscription?.cancel();
+    _markerAnimController?.stop();
+    _markerAnimController?.dispose();
+    super.dispose();
+  }
+
+
+  Future<void> _stopTracking() async {
+    if (mounted) setState(() => _tracking = false);
     await LocationService.stop();
+  }
+
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: EdgeInsets.all(10),
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context), // cerrar al tocar
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -567,7 +690,6 @@ class _ExpressPageState extends State<ExpressPage> {
 
   Widget _buildMap() {
     final h = MediaQuery.of(context).size.height;
-    final topPadding = MediaQuery.of(context).padding.top;
 
     return Stack(
       children: [
@@ -580,8 +702,8 @@ class _ExpressPageState extends State<ExpressPage> {
               zoom: 16,
             ),
             scrollGesturesEnabled: !isSearch,
+            rotateGesturesEnabled: true,
             zoomGesturesEnabled: !isSearch,
-            rotateGesturesEnabled: !isactive,
             tiltGesturesEnabled: !isactive,
             onMapCreated: (controller) => _mapController = controller,
             gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
@@ -593,7 +715,7 @@ class _ExpressPageState extends State<ExpressPage> {
             markers: markers,
           ),
         ),
-       Positioned(
+        Positioned(
           top: MediaQuery.of(context).padding.top + 62,
           right: 12,
           child: Gpsstatus(status: _StatusGps), // 👈 una sola línea
@@ -660,7 +782,7 @@ class _ExpressPageState extends State<ExpressPage> {
           ),
         ),
         if (calle != null)
-        Positioned(
+          Positioned(
             top: MediaQuery.of(context).padding.top + 12,
             left: 12,
             right: 64,
@@ -724,7 +846,6 @@ class _ExpressPageState extends State<ExpressPage> {
               ),
             ),
           ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
-        
 
         // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],
@@ -737,7 +858,6 @@ class _ExpressPageState extends State<ExpressPage> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
-
         children: [
           SizedBox(height: 20),
           Center(
@@ -841,8 +961,8 @@ class _ExpressPageState extends State<ExpressPage> {
 
   Widget imageBox(String? imagen) {
     return SizedBox(
-      width: 100,
-      height: 130,
+      width: 130,
+      height: 150,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
@@ -899,30 +1019,13 @@ class _ExpressPageState extends State<ExpressPage> {
     return Column(
       children: [
         SizedBox(height: 20),
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Text(
-              'Cliente',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
+        _fieldLabel('Información del cliente'),
         SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.primary,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-              width: 1,
-            ),
           ),
           child: Row(
             children: [
@@ -970,23 +1073,14 @@ class _ExpressPageState extends State<ExpressPage> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Imagen de evidencia',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 10),
+        _fieldLabel('Imagen de evidencia'),
+        SizedBox(height: 20),
         SizedBox(
-          width: 100,
-          height: 130,
+          width: 130,
+          height: 150,
           child: Stack(
             alignment: Alignment.center,
             clipBehavior: Clip.none,
-
             children: [
               imagen == null
                   ? Container(
@@ -994,8 +1088,8 @@ class _ExpressPageState extends State<ExpressPage> {
                         color: Color.fromARGB(255, 177, 177, 177),
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      width: 200,
-                      height: 200,
+                      width: double.infinity,
+                      height: double.infinity,
                       child: IconButton(
                         onPressed: () {},
                         icon: const Icon(
@@ -1005,22 +1099,27 @@ class _ExpressPageState extends State<ExpressPage> {
                         iconSize: 65,
                       ),
                     )
-                  : Container(
-                      decoration: BoxDecoration(
-                        color: Color.fromARGB(0, 103, 10, 10),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      width: 200,
-                      height: 200,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: CachedNetworkImage(
-                          imageUrl: imagen!,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) =>
-                              Center(child: Indicador()),
-                          errorWidget: (context, url, error) =>
-                              const Icon(Icons.broken_image),
+                  : GestureDetector(
+                      onTap: () {
+                        _showFullImage(imagen);
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Color.fromARGB(0, 103, 10, 10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: CachedNetworkImage(
+                            imageUrl: imagen!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) =>
+                                Center(child: Indicador()),
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.broken_image),
+                          ),
                         ),
                       ),
                     ),
@@ -1032,7 +1131,8 @@ class _ExpressPageState extends State<ExpressPage> {
   }
 
   Widget _buildEvidence() {
-    if (express.express[0].images_evicence.isEmpty) {
+    final evidence = express.express[0].images_evicence;
+    if (evidence.isEmpty) {
       return SizedBox.shrink();
     }
     return Column(
@@ -1040,32 +1140,16 @@ class _ExpressPageState extends State<ExpressPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 20),
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Expanded(
-              child: Text(
-                'Evidencias proporcionadas por el trabajador',
-                maxLines: 2,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.surface,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _fieldLabel('Evidencias del trabajador'),
         SizedBox(height: 20),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              imageBox(express.express[0].images_evicence[0]),
+              for ( final img in evidence)...[
+              imageBox(img),
               const SizedBox(width: 20),
-              imageBox(express.express[0].images_evicence[1]),
-              const SizedBox(width: 10),
+              ]
             ],
           ),
         ),
@@ -1079,68 +1163,24 @@ class _ExpressPageState extends State<ExpressPage> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Problema a resolver',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 10),
-        Text(
-          '${express.express[0].problem}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
-
+        _fieldLabel('Problema a resolver'),
         SizedBox(height: 20),
-        Text(
-          'Descripción',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 10),
-        Text(
-          '${express.express[0].description}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
+        _fieldText(express.express[0].problem),
         SizedBox(height: 20),
-        Text(
-          'Nota',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
+        _fieldLabel('Descripción del trabajo'),
+        SizedBox(height: 20),
+        _fieldText(express.express[0].description),
+        SizedBox(height: 20),
+        _buildInfoCard(
+          icon: Icons.info_outline,
+          text:'El precio mostrado corresponde a la mano de obra y de ir al domicilio; el costo final puede variar según los materiales necesarios.',
         ),
-        SizedBox(height: 10),
-        Text(
-          'Cuando llenes el precio de los materiales, no podras cambiarlo despues, asi que asegurate de poner el precio correcto.',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (express.express[0].job_status != 'pending') ...[_buildPrice()],
+        if (express.express[0].job_status != 'pending') ...[
+          SizedBox(height: 20),
+          _buildPrice(),
+        ],
         SizedBox(height: 20),
         _buildPaymentMethodCard(),
-        if (express.express[0].job_status == 'pending') ...[_buildForm()],
       ],
     );
   }
@@ -1150,15 +1190,7 @@ class _ExpressPageState extends State<ExpressPage> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Costos',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
+        _fieldLabel('Costos'),
         Column(
           children: [
             _buildPriceRow(
@@ -1179,88 +1211,6 @@ class _ExpressPageState extends State<ExpressPage> {
     );
   }
 
-  Widget _buildForm() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(height: 20),
-        Text(
-          'Otros precios',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-
-        SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _paymentChip(
-                value: express.express[0].worker_price * 1.10,
-                label:
-                    '${(express.express[0].worker_price * 1.10).toStringAsFixed(0)}',
-                icon: Icons.star_rounded,
-              ),
-
-              const SizedBox(width: 12),
-
-              _paymentChip(
-                value: express.express[0].worker_price * 1.20,
-                label:
-                    '${(express.express[0].worker_price * 1.20).toStringAsFixed(0)}',
-                icon: Icons.flash_on_rounded,
-              ),
-
-              const SizedBox(width: 12),
-
-              _paymentChip(
-                value: express.express[0].worker_price * 1.30,
-                label:
-                    '${(express.express[0].worker_price * 1.30).toStringAsFixed(0)}',
-                icon: Icons.local_fire_department_rounded,
-              ),
-
-              const SizedBox(width: 12),
-
-              _paymentChip(
-                value: express.express[0].worker_price * 1.50,
-                label:
-                    '${(express.express[0].worker_price * 1.50).toStringAsFixed(0)}',
-                icon: Icons.workspace_premium_rounded,
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 20),
-        Text(
-          'Precio de mano de obra',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 20),
-        CustomTextFormFieldPrice(
-          controller: _priceController,
-          label: '\$ 0.00',
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Ingresa el precio';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
   Widget _bottomBar(BuildContext context) {
     final expressStatus = express.express[0].job_status.toLowerCase();
 
@@ -1269,26 +1219,22 @@ class _ExpressPageState extends State<ExpressPage> {
     VoidCallback? action;
     Color bgColor = colorsecundario;
     action = () async {
-     print(express.express[0].job_status);
+      print(express.express[0].job_status);
       if (express.express[0].job_status == 'pending') {
-        _Send();
+        // _Send();
+        _showofferSheet();
         return;
-      } 
-      else if (express.express[0].job_status != 'in_progress') {
-        _Update(express.express[0].job_status);
-      
-      if (express.express[0].job_status == 'accepted') {
+      } else if (express.express[0].job_status != 'in_progress') {
+        await _Update(express.express[0].job_status);
         _startTracking();
-      }
-      }
-      else if (express.express[0].job_status == 'in_progress') {
+      } else if (express.express[0].job_status == 'in_progress') {
         if (express.express[0].images_evicence.isEmpty) {
-          bool? ok = await mostrarAlerta(
+          bool? ok = await ActionAlert(
             context,
             title: 'Evidencia',
             message:
                 'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
-            type: alert_type.advertencia,
+            type: action_type.advertencia,
           );
           if (ok!) {
             Navigator.push(
@@ -1306,18 +1252,6 @@ class _ExpressPageState extends State<ExpressPage> {
             return;
           }
         }
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PayJobPage(
-              isExpress: true,
-              job_id: express.express[0].express_id,
-              price: express.express[0].labor_cost,
-              km_priece: express.express[0].km_cost,
-            ),
-          ),
-        );
       }
     };
     switch (expressStatus) {
@@ -1337,8 +1271,30 @@ class _ExpressPageState extends State<ExpressPage> {
         break;
 
       case 'arrived':
-        icon = Icons.home_repair_service;
-        text = 'Empezar';
+        icon = Icons.search;
+        text = 'Iniciar diagnóstico';
+        action = () {
+          _startTracking();
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PayJobPage(
+                isExpress: true,
+                job_id: express.express[0].express_id,
+                price: express.express[0].labor_cost,
+                km_priece: express.express[0].km_cost,
+              ),
+            ),
+          );
+        };
+        break;
+
+      case 'diagnosing':
+        icon = Icons.hourglass_top;
+        text = 'Esperando aprobación';
+        bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
+        action = null;
         break;
 
       case 'in_progress':
@@ -1376,32 +1332,187 @@ class _ExpressPageState extends State<ExpressPage> {
       ),
       child: SizedBox(
         width: double.infinity,
-        child: 
-              ElevatedButton.icon(
-                onPressed: action,
-                icon: Icon(icon, color: colorWhite, size: 25),
-                label: Text(
-                  text,
-                  style: const TextStyle(fontSize: 18, color: colorWhite),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: bgColor,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 50,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-              ),
-            
-          
-        
+        child: ElevatedButton.icon(
+          onPressed: action,
+          icon: Icon(icon, color: colorWhite, size: 25),
+          label: Text(
+            text,
+            style: const TextStyle(fontSize: 18, color: colorWhite),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bgColor,
+            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+          ),
+        ),
       ),
     );
   }
 
+  void _showofferSheet() {
+  // Estado local del sheet: índice del chip seleccionado
+  int? selectedChipIndex;
+
+  // Multiplicadores y su valor base
+  final basePrice = express.express[0].worker_price;
+  final multipliers = [1.10, 1.20, 2, 3];
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: KeyboardDismisser(
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(24),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 24,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar centrado
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        margin: const EdgeInsets.only(bottom: 20),
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withOpacity(0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Propuesta de precio',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.surface,
+                            letterSpacing: -0.4,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'este es el precio que le vas a proponer al cliente por tu visita y diagnóstico, el cliente puede aceptar o rechazar la propuesta',
+                          style: GoogleFonts.dmSans(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w400,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withOpacity(0.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    _fieldLabel('Tarifa de visita y diagnóstico'),
+                    const SizedBox(height: 20),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: List.generate(multipliers.length, (index) {
+                          final value = basePrice * multipliers[index];
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              right: index == multipliers.length - 1 ? 0 : 12,
+                            ),
+                            child: _paymentChip(
+                              value: value,
+                              label: value.toStringAsFixed(0),
+                              icon: Icons.attach_money_rounded,
+                              isSelected: selectedChipIndex == index,
+                              onTap: () {
+                                setModalState(() {
+                                  _km_cost = value;
+                                  selectedChipIndex = index;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _fieldLabel('Tarifa de mano de obra'),
+                    const SizedBox(height: 20),
+                    CustomTextFormFieldPrice(
+                      controller: _priceController,
+                      label: '\$ 0.00',
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Ingresa el precio';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 32),
+                    // Botones de acción
+                    ElevatedButton(
+                      onPressed: () {
+                        _Send();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: colorsecundario,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.send, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Enviar propuesta',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+}
+  
   Widget _buildPriceRow(String label, String value) {
     return Column(
       children: [
@@ -1413,7 +1524,7 @@ class _ExpressPageState extends State<ExpressPage> {
               Text(
                 label,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w400,
                   color: Theme.of(
                     context,
@@ -1423,7 +1534,7 @@ class _ExpressPageState extends State<ExpressPage> {
               Text(
                 value,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Theme.of(
                     context,
@@ -1459,7 +1570,7 @@ class _ExpressPageState extends State<ExpressPage> {
             child: Text(
               text,
               style: GoogleFonts.poppins(
-                fontSize: 13,
+                fontSize: 12,
                 height: 1.5,
                 color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
               ),
@@ -1474,21 +1585,16 @@ class _ExpressPageState extends State<ExpressPage> {
     required double value,
     required String label,
     required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
   }) {
-    final isSelected = _km_cost == value;
     return GestureDetector(
-      onTap: () {
-        setState(() {
-          _km_cost = value;
-        });
-      },
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? colorsecundario.withOpacity(0.08)
-              : Colors.transparent,
+          color: isSelected ? colorsecundario : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
@@ -1504,7 +1610,7 @@ class _ExpressPageState extends State<ExpressPage> {
               icon,
               size: 16,
               color: isSelected
-                  ? colorsecundario
+                  ? colorWhite
                   : Theme.of(context).colorScheme.surface.withOpacity(0.4),
             ),
             const SizedBox(width: 7),
@@ -1514,7 +1620,7 @@ class _ExpressPageState extends State<ExpressPage> {
                 fontSize: 13,
                 fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                 color: isSelected
-                    ? colorsecundario
+                    ? colorWhite
                     : Theme.of(context).colorScheme.surface.withOpacity(0.55),
               ),
             ),
@@ -1527,9 +1633,8 @@ class _ExpressPageState extends State<ExpressPage> {
   Widget _buildPaymentMethodCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context,).colorScheme.surface.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Theme.of(context,).colorScheme.surface.withOpacity(0.06)),
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(20),    
       ),
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -1538,12 +1643,12 @@ class _ExpressPageState extends State<ExpressPage> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: Theme.of(context,).colorScheme.surface.withOpacity(0.8),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
               Icons.payments_rounded,
-              color: Theme.of(context,).scaffoldBackgroundColor,
+              color: Theme.of(context).scaffoldBackgroundColor,
               size: 16,
             ),
           ),
@@ -1553,16 +1658,14 @@ class _ExpressPageState extends State<ExpressPage> {
             style: GoogleFonts.dmSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.85),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.85),
             ),
           ),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color:  Theme.of(context,).colorScheme.surface.withOpacity(0.8),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.white.withOpacity(0.08)),
             ),
@@ -1570,7 +1673,7 @@ class _ExpressPageState extends State<ExpressPage> {
               children: [
                 Icon(
                   Icons.money_rounded,
-                  color:Theme.of(
+                  color: Theme.of(
                     context,
                   ).scaffoldBackgroundColor.withOpacity(0.85),
                   size: 15,
@@ -1582,14 +1685,54 @@ class _ExpressPageState extends State<ExpressPage> {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Theme.of(
-                    context,
-                  ).scaffoldBackgroundColor.withOpacity(0.85),
+                      context,
+                    ).scaffoldBackgroundColor.withOpacity(0.85),
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String label) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 18,
+          decoration: BoxDecoration(
+            color: colorsecundario,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.surface,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _fieldText(String text) {
+    return Text(
+      text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.poppins(
+        fontSize: 13,
+        height: 1.6,
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
       ),
     );
   }

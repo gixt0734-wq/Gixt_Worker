@@ -14,6 +14,7 @@ class FinishSerivicioService {
     required double iva,
     required double? labor_cost,
     required String description,
+    required bool isexpress,
     required List<MaterialModel> materials,
   }) async {
     int attempts = 0;
@@ -36,17 +37,24 @@ class FinishSerivicioService {
                 'total': total,
                 'labor_cost': labor_cost,
                 'description': description,
-                'isexpress': false,
+                'isexpress': isexpress,
                 'materiales': materials.map((m) => m.toJson()).toList(),
               }),
             )
             .timeout(const Duration(seconds: 30));
-        print(response);
+        print(response.statusCode);
         if (response.statusCode == 200) {
           return {'success': true, 'data': jsonDecode(response.body)};
         }
 
-        if (response.statusCode == 401) {
+        else if (response.statusCode == 401) {
+          return {
+            'success': false,
+            'message': jsonDecode(response.body)['message'],
+          };
+        }
+
+        else if (response.statusCode == 400) {
           return {
             'success': false,
             'message': jsonDecode(response.body)['message'],

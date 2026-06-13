@@ -8,20 +8,16 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:gixt_worker/Auth/Login.dart';
+import 'package:gixt_worker/Components/Indicador.dart';
+import 'package:gixt_worker/Components/Toast.dart';
+import 'package:gixt_worker/Components/inputs/Input.dart';
+import 'package:gixt_worker/Components/inputs/Input_Fecha.dart';
+import 'package:gixt_worker/Components/inputs/Input_Phone.dart';
+import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
-import 'package:gixt_worker/GPS/gps_tracking_page.dart';
-import 'package:gixt_worker/Pages/PerfilworkerPage.dart';
-import 'package:gixt_worker/components/Indicador.dart';
-import 'package:gixt_worker/components/alert.dart';
-import 'package:gixt_worker/components/inputs/Input.dart';
-import 'package:gixt_worker/components/inputs/Input_Fecha.dart';
-import 'package:gixt_worker/components/inputs/Input_Phone.dart';
-import 'package:gixt_worker/components/inputs/Pick_Image.dart';
-import 'package:gixt_worker/providers/theme_provider.dart';
+import 'package:gixt_worker/services/user/Update_service.dart';
 import 'package:gixt_worker/services/user/User_service.dart';
-import 'package:gixt_worker/services/user/update_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:image_cropper/image_cropper.dart';
@@ -31,15 +27,14 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 
-
-class PerfilPage extends StatefulWidget {
-  const PerfilPage({super.key});
+class Updateperfilpage extends StatefulWidget {
+  const Updateperfilpage({super.key});
 
   @override
-  State<PerfilPage> createState() => _PerfilPageState();
+  State<Updateperfilpage> createState() => _UpdateperfilpageState();
 }
 
-class _PerfilPageState extends State<PerfilPage> {
+class _UpdateperfilpageState extends State<Updateperfilpage> {
   bool isLoading = false;
   bool hasMore = true;
   final User_service user = User_service();
@@ -84,7 +79,7 @@ class _PerfilPageState extends State<PerfilPage> {
     bool ok = await user.fetchUserData();
     if (!ok) {
       if (!mounted) return;
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: "No se pudo obtener la información",
@@ -93,26 +88,13 @@ class _PerfilPageState extends State<PerfilPage> {
     }
 
     setState(() {
-      print('Iniciando home');
+      print('Iniciando perfil');
       hasMore = true;
+      _gender = user.user[0].gender;
     });
   }
 
-  void _logout() async {
-    bool? continuar = await mostrarAlerta(
-      context,
-      title: "Logout",
-      message: 'Seguro que deseas cerrar sesión?',
-      type: alert_type.advertencia,
-    );
-    if (!continuar!) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
-    );
-  }
+ 
 
   void _Crear() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -135,7 +117,8 @@ class _PerfilPageState extends State<PerfilPage> {
 
     if (result['success'] == true) {
       final data = result['data'];
-      mostrarAlerta(
+      Future.microtask(() async {
+      Toast(
         context,
         title: "Datos Actualizados",
         message: 'tus datos se actualizo correctamente',
@@ -143,8 +126,10 @@ class _PerfilPageState extends State<PerfilPage> {
       );
       await user.updatedata();
       _updateUser(user.user[0].username, user.user[0].image_url);
+      Navigator.pop(context);
+      });
     } else {
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: result['message'],
@@ -189,110 +174,52 @@ class _PerfilPageState extends State<PerfilPage> {
                 ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    const SizedBox(height: 30),
+                     _PageHeader(
+            'Informacion del Perfil',
+            'Asegurate de que la información sea correcta, puedes actualizar tu foto de perfil, nombre, apellido, teléfono, fecha de nacimiento y género.',
+          ),
 
+                    const SizedBox(height: 20),
                     _buildIMGPerfil().animate().fade().slideX(begin: -0.2),
-
                     const SizedBox(height: 30),
-
-                    _buildopcions().animate().fade().slideX(begin: -0.2),
-
-                    const SizedBox(height: 40),
-
                     _buidFormularioInfo().animate().fade().slideX(begin: -0.2),
                   ]),
                 ),
               ),
             ],
           ),
-        ),
+        ),bottomNavigationBar: _bottomBar(context),
       ),
     );
   }
-
-  Widget _buildopcions() {
-    return Expanded(
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _actionTile(
-            icon: Icons.location_on_outlined,
-            color: colorsecundario,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const PerfilWorkerPage(),
-                ),
-              );
-            }
-          ),
-
-          const SizedBox(width: 12),
-
-          _actionTile(
-            icon: Icons.lock_outline_rounded,
-            color: colorsecundario,
-            onTap: () {
-              // TODO: Navegar a cambiar contraseña
-            },
-          ),
-
-          const SizedBox(width: 12),
-          _actionTile(
-            icon: Icons.logout_rounded,
-            color: colorError,
-            onTap: _logout,
-          ),
-
-          // const SizedBox(width: 12),
-          // Consumer<ThemeProvider>(
-          //   builder: (context, themeProvider, child) {
-          //     final isDark = themeProvider.themeMode == ThemeMode.dark;
-          //     return _actionTile(
-          //       icon: isDark
-          //           ? Icons.dark_mode_outlined
-          //           : Icons.light_mode_outlined,
-
-          //       color: colorsecundario,
-          //       onTap: () => themeProvider.toggleTheme(),
-          //     );
-          //   },
-          // ),
-        ],
-      ),
-    );
-  }
-
 
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 80,
+      expandedHeight: 50,
       pinned: true, //  deja solo la barra pequeña visible
       floating: false, //  NO aparece al subir
       snap: false, // NO animación automática
       elevation: 0,
-      toolbarHeight: 80,
-      automaticallyImplyLeading: false,
+      toolbarHeight: 50,
+      iconTheme: IconThemeData(color: Theme.of(context).colorScheme.surface),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(0)),
       ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Divider(
-          height: 1,
-          thickness: 0.5,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-        ),
-      ),
+      // bottom: PreferredSize(
+      //   preferredSize: const Size.fromHeight(1),
+      //   child: Divider(
+      //     height: 1,
+      //     thickness: 0.5,
+      //     color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+      //   ),
+      // ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
           'Mi Perfil',
           style: GoogleFonts.poppins(
-            fontSize: 30,
+            fontSize: 22,
             fontWeight: FontWeight.w600,
             color: Theme.of(context).colorScheme.surface,
           ),
@@ -331,7 +258,7 @@ class _PerfilPageState extends State<PerfilPage> {
   }
 
   Widget _genderChip(String value, String label, IconData icon) {
-    _gender = user.user[0].gender;
+    
     final isSelected = _gender == value;
     return Expanded(
       child: GestureDetector(
@@ -341,7 +268,7 @@ class _PerfilPageState extends State<PerfilPage> {
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: BoxDecoration(
             color: isSelected
-                ? colorsecundario.withOpacity(0.08)
+                ? colorsecundario
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
@@ -358,7 +285,7 @@ class _PerfilPageState extends State<PerfilPage> {
                 icon,
                 size: 18,
                 color: isSelected
-                    ? colorsecundario
+                    ? colorWhite
                     : Theme.of(context).colorScheme.surface.withOpacity(0.4),
               ),
               const SizedBox(width: 7),
@@ -368,7 +295,7 @@ class _PerfilPageState extends State<PerfilPage> {
                   fontSize: 13,
                   fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   color: isSelected
-                      ? colorsecundario
+                      ? colorWhite
                       : Theme.of(context).colorScheme.surface.withOpacity(0.55),
                 ),
               ),
@@ -439,15 +366,8 @@ class _PerfilPageState extends State<PerfilPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          _PageHeader(
-            'Informacion del Perfil',
-            'Asegurate de que la información sea correcta, puedes actualizar tu foto de perfil, nombre, apellido, teléfono, fecha de nacimiento y género.',
-          ),
 
           const SizedBox(height: 20),
-
-          const SizedBox(height: 30),
-
           /// NOMBRE
           CustomTextFormField(
             controller: _first_nameController,
@@ -542,47 +462,15 @@ class _PerfilPageState extends State<PerfilPage> {
               ),
             ],
           ),
-          const SizedBox(height: 40),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _Crear,
-
-              /// 🔥 ESTILO
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: colorsecundario,
-                foregroundColor: colorWhite,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 14,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-
-              icon: const Icon(Icons.update, size: 22),
-              label: Text(
-                'Actuzalizar',
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  height: 1.6,
-                  color: colorWhite,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {},
-            child: Text(
-              'Eliminar Cuenta',
-              style: TextStyle(color: Theme.of(context).colorScheme.surface),
-            ),
-          ),
-          const SizedBox(height: 100),
+          
+          // TextButton(
+          //   onPressed: () {},
+          //   child: Text(
+          //     'Eliminar Cuenta',
+          //     style: TextStyle(color: Theme.of(context).colorScheme.surface),
+          //   ),
+          // ),
+          const SizedBox(height: 50),
         ],
       ),
     );
@@ -593,17 +481,16 @@ class _PerfilPageState extends State<PerfilPage> {
     required Color color,
     required VoidCallback onTap,
   }) {
-    final theme = Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: theme.colorScheme.surface.withOpacity(0.08),
+            color: color,
             width: 1,
           ),
         ),
@@ -612,13 +499,50 @@ class _PerfilPageState extends State<PerfilPage> {
             Container(
               width: 30,
               height: 30,
-              child: Icon(icon, size: 20, color: color),
+              child: Icon(icon, size: 20, color: colorWhite),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _bottomBar(BuildContext context) {
+    return Container(
+      height: 86,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(
+          top: BorderSide(
+            color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
+            width: 1,
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () {_Crear();},
+          style: ElevatedButton.styleFrom(
+            elevation: 0,
+            backgroundColor: colorsecundario,
+            foregroundColor: colorWhite,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+          icon: const Icon(Icons.update, size: 20),
+          label: Text(
+            'Actualizar',
+            style: GoogleFonts.poppins(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
-
-

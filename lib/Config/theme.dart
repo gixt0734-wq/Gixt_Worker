@@ -3,15 +3,13 @@ import 'package:flutter/material.dart';
 
 // TEMA LIGHT
 ThemeData lightTheme = ThemeData(
-  scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+  scaffoldBackgroundColor: const Color(0xFFF7F8FA),
   colorScheme: const ColorScheme.light(
-    primary: Color(0xFFE9ECEF), //negro y blanco
+    primary: Color(0xFFFFFFFF), //negro y blanco
     secondary: Color(0xFF1A1A1F), //gris y negro
     surface: Color(0xFF000000), // blanco y negro
     onPrimary: Color(0xFF1A1A1F)
   ),
-  
- 
 );
 
 // // TEMA DARK

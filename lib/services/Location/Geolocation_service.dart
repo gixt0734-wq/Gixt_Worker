@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/ActionAlert%20.dart';
 
 class GeoLocationService {
   static Future<Position> obtenerUbicacion(BuildContext context) async {
@@ -23,12 +23,12 @@ class GeoLocationService {
 
       if (permiso == LocationPermission.deniedForever) {
         bool irAConfiguracion =
-            await mostrarAlerta(
+            await ActionAlert(
               context,
               title: "Permiso requerido",
               message:
                   "La ubicación está desactivada permanentemente.\n¿Deseas ir a configuración?",
-              type: alert_type.advertencia,
+              type: action_type.advertencia,
             ) ??
             false;
 

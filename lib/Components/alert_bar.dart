@@ -62,7 +62,7 @@ void initState() {
     begin: 0,
     end: 1,
   ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
+    _controller.forward();
  
    Future.delayed(const Duration(seconds: 5), () {
     if (mounted) {

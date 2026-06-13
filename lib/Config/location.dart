@@ -121,7 +121,7 @@ hubConnection!.onclose(({Exception? error}) {
   } catch (e) {
     print("🚫 Error SignalR: $e");
     await Future.delayed(const Duration(seconds: 5));
-    await initSignalR(); // reintenta desde cero
+    FlutterBackgroundService().invoke("stop");
     service.invoke("status", {"state": "ubicando"});  
   }
 }
@@ -180,6 +180,7 @@ Future<void> _reconnectManual() async {
                 );
               }
             } catch (e) {
+               FlutterBackgroundService().invoke("stop");
               print("❌ Error enviando ubicación: $e");
             }
           });
@@ -210,4 +211,7 @@ Future<void> _reconnectManual() async {
       service.stopSelf();
     });
   }
+
+    
 }
+

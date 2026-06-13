@@ -12,16 +12,18 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/alert_bar.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayjobPage.dart';
+import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
 import 'package:gixt_worker/components/BarStatus.dart';
 import 'package:gixt_worker/components/Indicador.dart';
-import 'package:gixt_worker/components/alert.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/config/location.dart';
 import 'package:gixt_worker/services/Job/JonId_service.dart';
@@ -44,7 +46,7 @@ class ViewJobPage extends StatefulWidget {
   State<ViewJobPage> createState() => _ViewJobPageState();
 }
 
-class _ViewJobPageState extends State<ViewJobPage> {
+class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixin {
   bool isLoading = false;
   bool hasMore = true;
   final JobById_service job = JobById_service();
@@ -78,9 +80,11 @@ class _ViewJobPageState extends State<ViewJobPage> {
   LatLng positionclient = LatLng(20.9674, -89.5926);
   bool onlocation = false;
   String status = 'pending';
+  StreamSubscription<Position>? _positionStreamSubscription;
   BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
-
+  AnimationController? _markerAnimController;
+  LatLng? posicionAnterior;
   StreamSubscription? _statusSub;
   String _StatusGps = 'desconocido';
 
@@ -91,6 +95,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
     marker();
     _initial();
     jobsStatusNotifierFinish.addListener(_Refresh);
+    jobsStatusNotifier.addListener(_Refresh);
     FlutterBackgroundService().isRunning().then((running) {
       print("🔍 Servicio corriendo: $running");
     });
@@ -112,6 +117,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
         print("✅ Status recibido: $state");
       }
     });
+    _startTracking();
   }
 
   @override
@@ -124,9 +130,9 @@ class _ViewJobPageState extends State<ViewJobPage> {
     print('nose');
     if (job.job[0].job_status == 'in_progress') {
       _stopTracking();
+      _onRefresh();
     }
     _onRefresh();
-    _Update(job.job[0].job_status);
   }
 
   Future<void> marker() async {
@@ -152,7 +158,90 @@ class _ViewJobPageState extends State<ViewJobPage> {
   }
 
   Future<void> _startTracking() async {
-    await LocationService.start(widget.id_trabajo);
+      final excludedStatuses = ['pending', 'canceled', 'completed', 'finalized','accepted'];
+
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      print("❌ GPS apagado");
+      return;
+    }
+
+    LocationPermission permission = await Geolocator.checkPermission();
+
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.deniedForever) {
+      print("❌ Permiso GPS bloqueado");
+
+      return;
+    }
+
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 0,
+          ),
+        ).listen((position) {
+          if (!mounted) return; // ← CHECK MOUNTED PRIMERO
+          final nuevaPosicion = LatLng(position.latitude, position.longitude);
+          final anterior = positionActual; // ← guardar ANTES
+          
+          try {
+            setState(() {
+              
+              positionActual = nuevaPosicion;
+              _animarMovimiento(anterior, nuevaPosicion);
+            });
+          } catch (e) {
+            print("Error: $e");
+          }
+        });
+    if (_StatusGps == 'desconocido' &&
+        !excludedStatuses.contains(job.job[0].job_status)) {
+      setState(() {
+        _tracking = true;
+      });
+      await LocationService.start(widget.id_trabajo);
+    }
+
+  }
+
+
+  void _animarMovimiento(LatLng desde, LatLng hasta) {
+    _markerAnimController?.dispose();
+
+    _markerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+
+    final tween = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeInOut),
+    );
+
+    _markerAnimController!.addListener(() {
+      final t = tween.value;
+      final lat = desde.latitude + (hasta.latitude - desde.latitude) * t;
+      final lng = desde.longitude + (hasta.longitude - desde.longitude) * t;
+
+      positionActual = LatLng(lat, lng);
+      markers.removeWhere((m) => m.markerId.value == "worker");
+      markers.add(
+        Marker(
+          markerId: const MarkerId("worker"),
+          position: positionActual!,
+          infoWindow: const InfoWindow(title: "Tu ubicación"),
+          icon: markericon,
+        ),
+      );
+      // Fuera del setState
+      mapController?.animateCamera(CameraUpdate.newLatLng(positionActual!));
+      if (mounted) setState(() {});
+    });
+
+    _markerAnimController!.forward();
   }
 
   Future<void> _stopTracking() async {
@@ -164,7 +253,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: "No se pudo obtener la información",
@@ -188,7 +277,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: "No se pudo obtener la información",
@@ -217,7 +306,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
     }
   }
 
-  void _Update(String actions) async {
+  Future<void> _Update(String actions) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -233,7 +322,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
 
     if (result['success'] == true) {
       final data = result['data'];
-      mostrarAlerta(
+      Toast(
         context,
         title: "Trabajo Actualizado",
         message: 'se notificara a tu cliente',
@@ -241,8 +330,9 @@ class _ViewJobPageState extends State<ViewJobPage> {
       );
       jobsStatusNotifier.refresh();
       _onRefresh();
+      _startTracking();
     } else {
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: result['message'],
@@ -286,6 +376,9 @@ class _ViewJobPageState extends State<ViewJobPage> {
           ),
         );
       });
+      
+        GetRoute();
+      
     } catch (e) {
       print(e);
     }
@@ -303,7 +396,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
         "?origins=${positionActual!.latitude},${positionActual!.longitude}"
         "&destinations=${positionclient!.latitude},${positionclient!.longitude}"
         "&mode=driving"
-        "&key=AIzaSyAjcb5WA1kNYLE5Gchmx1sNnpZM31vzXF8";
+        "&key=AIzaSyD_Hw4Izij6u7r5lv0RqukDOfft6tExN64";
 
     final response = await http.get(Uri.parse(url));
 
@@ -388,15 +481,15 @@ class _ViewJobPageState extends State<ViewJobPage> {
 
   Future<void> GetRoute() async {
     PolylinePoints polylinePoints = PolylinePoints(
-      apiKey: "AIzaSyAjcb5WA1kNYLE5Gchmx1sNnpZM31vzXF8",
+      apiKey: "AIzaSyD_Hw4Izij6u7r5lv0RqukDOfft6tExN64",
     );
 
     PolylineRequest request = PolylineRequest(
-      origin: PointLatLng(positionclient!.latitude, positionclient!.longitude),
-      destination: PointLatLng(
+      origin: PointLatLng(
         positionActual!.latitude,
         positionActual!.longitude,
       ),
+      destination: PointLatLng(positionclient!.latitude, positionclient!.longitude),
       mode: TravelMode.driving,
     );
 
@@ -428,6 +521,30 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
+  void _showFullImage(String imageUrl) {
+    showDialog(
+      context: context,
+      builder: (_) {
+        return Dialog(
+          backgroundColor: Colors.black,
+          insetPadding: EdgeInsets.all(10),
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context), // cerrar al tocar
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4,
+              child: CachedNetworkImage(
+                imageUrl: imageUrl,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (job.job.isEmpty) {
@@ -440,6 +557,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        floatingActionButton: ['canceled', 'completed','in_progress','finalized'].contains(job.job[0].job_status)? _buttonDelete(context) :null ,
         body: Stack(
           children: [
             // 🗺️ MAPA DE FONDO
@@ -649,61 +767,100 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
-  Widget _buildInformacion() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(height: 20),
-          _buildTitle()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          Barstatus(
-                estadoTrabajo: job.job[0].job_status.isEmpty
-                    ? ''
-                    : job.job[0].job_status,
-              )
-              .animate()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildTrabajo()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          _buildEvidence()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          _buildClient()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildServicio()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildImg()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-          _buildUbicacion()
-              .animate()
-              .fade(duration: 450.ms, delay: 60.ms)
-              .slideX(begin: -0.2),
-          SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
+ Widget _buildInformacion() {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+    child: Column(
+      mainAxisAlignment: MainAxisAlignment.center,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(height: 20),
+
+        // Título: entrada protagónica desde arriba con scale sutil
+        _buildTitle()
+            .animate()
+            .fadeIn(duration: 500.ms, curve: Curves.easeOut)
+            .slideY(begin: -0.2, curve: Curves.easeOutCubic)
+            .scale(
+              begin: const Offset(0.95, 0.95),
+              end: const Offset(1, 1),
+              duration: 500.ms,
+              curve: Curves.easeOutCubic,
+            ),
+
+        const SizedBox(height: 20),
+
+        // Status bar: entra "expandiéndose" horizontalmente — refuerza que es un indicador de progreso
+        Barstatus(
+          estadoTrabajo: job.job[0].job_status.isEmpty
+              ? ''
+              : job.job[0].job_status,
+        )
+            .animate(delay: 200.ms)
+            .fadeIn(duration: 450.ms)
+            .scaleX(
+              begin: 0.7,
+              end: 1,
+              alignment: Alignment.centerLeft,
+              curve: Curves.easeOutCubic,
+              duration: 600.ms,
+            ),
+
+        const SizedBox(height: 20),
+
+        // Bloque "Trabajo": desliza desde la izquierda
+        _buildTrabajo()
+            .animate(delay: 350.ms)
+            .fadeIn(duration: 500.ms)
+            .slideX(begin: -0.15, curve: Curves.easeOutCubic),
+
+        // Evidence: desliza desde la derecha (efecto espejo con el anterior)
+        _buildEvidence()
+            .animate(delay: 450.ms)
+            .fadeIn(duration: 500.ms)
+            .slideX(begin: 0.15, curve: Curves.easeOutCubic),
+
+        // Client: vuelve desde la izquierda (zigzag visual)
+        _buildClient()
+            .animate(delay: 550.ms)
+            .fadeIn(duration: 500.ms)
+            .slideX(begin: -0.15, curve: Curves.easeOutCubic),
+
+        const SizedBox(height: 20),
+
+        // Servicio: entrada con blur (cambio de "sección")
+        _buildServicio()
+            .animate(delay: 700.ms)
+            .fadeIn(duration: 550.ms)
+            .blurXY(begin: 6, end: 0, duration: 550.ms)
+            .slideY(begin: 0.1, curve: Curves.easeOut),
+
+        const SizedBox(height: 20),
+
+        // Imagen: scale + fade (protagonismo visual)
+        _buildImg()
+            .animate(delay: 850.ms)
+            .fadeIn(duration: 600.ms)
+            .scale(
+              begin: const Offset(0.88, 0.88),
+              end: const Offset(1, 1),
+              curve: Curves.easeOutBack,
+              duration: 700.ms,
+            ),
+
+        const SizedBox(height: 20),
+
+        // Ubicación: sube desde abajo (cierre natural de la lista)
+        _buildUbicacion()
+            .animate(delay: 1000.ms)
+            .fadeIn(duration: 500.ms)
+            .slideY(begin: 0.25, curve: Curves.easeOutCubic),
+
+        const SizedBox(height: 20),
+      ],
+    ),
+  );
+}
 
   Widget _buildTitle() {
     return Row(
@@ -755,12 +912,11 @@ class _ViewJobPageState extends State<ViewJobPage> {
 
   Widget imageBox(String? imagen) {
     return SizedBox(
-      width: 100,
-      height: 130,
+      width: 130,
+      height: 150,
       child: Stack(
         alignment: Alignment.center,
         clipBehavior: Clip.none,
-
         children: [
           imagen == null
               ? Container(
@@ -768,32 +924,28 @@ class _ViewJobPageState extends State<ViewJobPage> {
                     color: Color.fromARGB(255, 177, 177, 177),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  width: 200,
-                  height: 200,
-                  child: IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.person,
-                    ), // Usa un icono de calendario
-                    color: const Color.fromARGB(255, 255, 255, 255),
-                    iconSize: 65,
-                  ),
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Icon(Icons.person, color: Colors.white, size: 65),
                 )
-              : Container(
-                  decoration: BoxDecoration(
-                    color: Color.fromARGB(0, 103, 10, 10),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  width: 200,
-                  height: 200,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: CachedNetworkImage(
-                      imageUrl: imagen!,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Center(child: Indicador()),
-                      errorWidget: (context, url, error) =>
-                          const Icon(Icons.broken_image),
+              : GestureDetector(
+                  onTap: () {
+                    _showFullImage(imagen);
+                  },
+                  child: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    width: double.infinity,
+                    height: double.infinity,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: CachedNetworkImage(
+                        imageUrl: imagen,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) =>
+                            Container(color: Colors.white24),
+                      ),
                     ),
                   ),
                 ),
@@ -806,20 +958,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
     return Column(
       children: [
         SizedBox(height: 20),
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Text(
-              'Cliente',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
+        _fieldLabel('Cliente'),
         SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(16),
@@ -861,6 +1000,30 @@ class _ViewJobPageState extends State<ViewJobPage> {
                   ],
                 ),
               ),
+
+               GestureDetector(
+            onTap: () {
+               Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddReportPage(type: 'client', id: job.job[0].client_id,user: "${job.job[0].client_username}".trim(),type_job: null,),
+              ));
+            },
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: colorError,
+                borderRadius: BorderRadius.circular(50),
+               
+              ),
+              child: Icon(
+                Icons.report_outlined,
+                color: colorWhite,
+                size: 20,
+              ),
+            ),
+          ),
             ],
           ),
         ),
@@ -872,27 +1035,10 @@ class _ViewJobPageState extends State<ViewJobPage> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
-
       children: [
-        Text(
-          'Servicio solicitado:   ${job.job[0].service_name}',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-
-        const SizedBox(height: 10),
-        Text(
-          '${job.job[0].service_description}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
+        _fieldLabel('Servicio solicitado:   ${job.job[0].service_name}'),
+        const SizedBox(height: 20),
+        _fieldText(job.job[0].service_description),
       ],
     );
   }
@@ -902,56 +1048,15 @@ class _ViewJobPageState extends State<ViewJobPage> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Problema a resolver',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 10),
-        Text(
-          '${job.job[0].problem}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
-
+        _fieldLabel('Problema descrito por el cliente'),
         SizedBox(height: 20),
-        Text(
-          'Descripción',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        SizedBox(height: 10),
-        Text(
-          '${job.job[0].description}',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
+        _fieldText(job.job[0].problem),
         SizedBox(height: 20),
-
-        Text(
-          'Pago y Metodo',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-
+        _fieldLabel('Descripción del trabajo'),
+        SizedBox(height: 20),
+        _fieldText(job.job[0].description),
+        SizedBox(height: 20),
+        _fieldLabel('Pago y método de pago'),
         SizedBox(height: 20),
         Column(
           children: [
@@ -959,6 +1064,10 @@ class _ViewJobPageState extends State<ViewJobPage> {
             _buildPriceRow(
               'Precio estimado de visita ',
               '\$${job.job[0].km_cost}',
+            ),
+             _buildPriceRow(
+              'Precio estimado de materiales',
+              '\$${job.job[0].materials_cost > 0 ? job.job[0].materials_cost : '0.0'}',
             ),
           ],
         ),
@@ -971,20 +1080,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
   Widget _buildUbicacion() {
     return Column(
       children: [
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Text(
-              'Ubicacion',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
+        _fieldLabel('Ubicación del trabajo'),
         SizedBox(height: 20),
         Row(
           children: [
@@ -1058,20 +1154,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Text(
-              'Imagenes',
-              style: GoogleFonts.poppins(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.2,
-              ),
-            ),
-          ],
-        ),
+        _fieldLabel('Imagenes del cliente'),
         SizedBox(height: 20),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1080,7 +1163,6 @@ class _ViewJobPageState extends State<ViewJobPage> {
               imageBox(job.job[0].image_1),
               const SizedBox(width: 20),
               imageBox(job.job[0].image_2),
-              const SizedBox(width: 10),
             ],
           ),
         ),
@@ -1097,23 +1179,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(height: 20),
-        Row(
-          children: [
-            SizedBox(height: 20),
-            Expanded(
-              child: Text(
-                'Evidencias proporcionadas por el trabajador',
-                maxLines: 2,
-                style: GoogleFonts.poppins(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.surface,
-                  letterSpacing: -0.2,
-                ),
-              ),
-            ),
-          ],
-        ),
+        _fieldLabel('Evidencias del trabajador'),
         SizedBox(height: 20),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1131,104 +1197,6 @@ class _ViewJobPageState extends State<ViewJobPage> {
     );
   }
 
-  Widget _buildButton() {
-    final jobStatus = job.job[0].job_status.toLowerCase();
-
-    IconData icon = Icons.info;
-    String text = '';
-    VoidCallback? action;
-    Color bgColor = colorsecundario;
-    action = () {
-      _Update(job.job[0].job_status);
-      if (job.job[0].job_status == 'accepted') {
-        _startTracking();
-      }
-      if (job.job[0].job_status == 'in_progress') {
-        _stopTracking();
-      }
-    };
-    switch (jobStatus) {
-      case 'pending':
-        icon = Icons.check_circle;
-        text = 'Aceptar';
-        break;
-
-      case 'accepted':
-        icon = Icons.delivery_dining_outlined;
-        text = 'Estoy llendo';
-        break;
-
-      case 'going':
-        icon = Icons.house_rounded;
-        text = 'Ya llegue';
-        break;
-
-      case 'arrived':
-        icon = Icons.home_repair_service;
-        text = 'Empezar';
-        break;
-
-      case 'in_progress':
-        icon = Icons.home_repair_service;
-        text = 'Finalizar';
-        break;
-      case 'finalized':
-        icon = Icons.home_repair_service;
-        text = 'Esperando Pago';
-        action = null;
-        break;
-      case 'completed':
-        icon = Icons.payment;
-        text = 'Completado';
-        action = null;
-        break;
-
-      default:
-        icon = Icons.help;
-        text = jobStatus;
-        bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
-    }
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ElevatedButton.icon(
-          onPressed: action,
-          icon: Icon(icon, color: colorWhite, size: 25),
-          label: Text(
-            text,
-            style: const TextStyle(fontSize: 18, color: colorWhite),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: bgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-        if (_tracking) ...[
-          SizedBox(width: 10),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 14),
-              backgroundColor: !_tracking ? Colors.red : Colors.green,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () {},
-            child: Icon(
-              _tracking ? Icons.location_off : Icons.location_on,
-              size: 28,
-              color: Colors.white,
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _buildPriceRow(String label, String value) {
     return Column(
       children: [
@@ -1237,20 +1205,24 @@ class _ViewJobPageState extends State<ViewJobPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Expanded(child: 
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w400,
                   color: Theme.of(
                     context,
                   ).colorScheme.surface.withOpacity(0.65),
                 ),
               ),
+              ),
               Text(
                 value,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Theme.of(
                     context,
@@ -1268,7 +1240,7 @@ class _ViewJobPageState extends State<ViewJobPage> {
       ],
     );
   }
-
+ 
   Widget _buildPaymentMethodCard() {
     return Container(
       decoration: BoxDecoration(
@@ -1295,14 +1267,17 @@ class _ViewJobPageState extends State<ViewJobPage> {
             ),
           ),
           const SizedBox(width: 10),
+          Expanded(child: 
           Text(
             'Método de pago',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: GoogleFonts.dmSans(
               fontSize: 13,
               fontWeight: FontWeight.w600,
               color: Theme.of(context).colorScheme.surface.withOpacity(0.85),
             ),
-          ),
+          )),
           const Spacer(),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1349,26 +1324,14 @@ class _ViewJobPageState extends State<ViewJobPage> {
     action = () async {
       print(job.job[0].job_status);
 
-      if (job.job[0].job_status == 'arrived') {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PayJobPage(
-              isExpress: false,
-              job_id: job.job[0].job_id,
-              price: job.job[0].labor_cost,
-              km_priece: job.job[0].km_cost,
-            ),
-          ),
-        );
-      } else if (job.job[0].job_status == 'in_progress') {
+     if (job.job[0].job_status == 'in_progress') {
         if (job.job[0].images_evicence.isEmpty) {
-          bool? ok = await mostrarAlerta(
+          bool? ok = await ActionAlert(
             context,
             title: 'Evidencia requerida',
             message:
                 'Antes de finalizar, envía la evidencia de que el trabajo ya fue terminado.',
-            type: alert_type.advertencia,
+            type: action_type.advertencia,
           );
           if (ok!) {
             Navigator.push(
@@ -1382,17 +1345,13 @@ class _ViewJobPageState extends State<ViewJobPage> {
                 ),
               ),
             );
-
             return;
           }
         }
+        
       } else if (job.job[0].job_status != 'in_progress') {
-        _Update(job.job[0].job_status);
-
-        if (job.job[0].job_status == 'accepted') {
-          print('0');
-          _startTracking();
-        }
+        await _Update(job.job[0].job_status);
+        _startTracking();
       }
     };
     switch (jobStatus) {
@@ -1414,6 +1373,21 @@ class _ViewJobPageState extends State<ViewJobPage> {
       case 'arrived':
         icon = Icons.search;
         text = 'Iniciar diagnóstico';
+         action = () {
+          _startTracking();
+
+          Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PayJobPage(
+              isExpress: false,
+              job_id: job.job[0].job_id,
+              price: job.job[0].labor_cost,
+              km_priece: job.job[0].km_cost,
+            ),
+          ),
+        );
+        };
         break;
 
       case 'diagnosing':
@@ -1470,6 +1444,66 @@ class _ViewJobPageState extends State<ViewJobPage> {
             borderRadius: BorderRadius.circular(10),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String label) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 18,
+          decoration: BoxDecoration(
+            color: colorsecundario,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.surface,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _fieldText(String text) {
+    return Text(
+      text,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      style: GoogleFonts.poppins(
+        fontSize: 13,
+        height: 1.6,
+        color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
+      ),
+    );
+  }
+
+ Widget _buttonDelete(BuildContext context) {
+  
+    return FloatingActionButton(
+      onPressed: () {
+         Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => AddReportPage(type: 'job', id: widget.id_trabajo,user: "${job.job[0].problem}" ,type_job: 'job',),
+              ));
+      },
+      backgroundColor: colorError,
+      elevation: 6,
+      child: const Icon(
+        Icons.report,
+        color: Colors.white,
+        size: 28,
       ),
     );
   }

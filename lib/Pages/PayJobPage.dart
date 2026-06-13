@@ -2,8 +2,9 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/Indicador.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
@@ -94,12 +95,12 @@ class _PayPageState extends State<PayJobPage> {
 
   void _Send() async {
     FocusScope.of(context).unfocus();
-    bool? ok = await mostrarAlerta(
+    bool? ok = await ActionAlert(
       context,
       title: 'Finalizar',
       message:
           'Asegurate que los precios esten correctos ya que no se pueden modificar despues de finalizar',
-      type: alert_type.advertencia,
+      type: action_type.advertencia,
     );
     if (ok!) {
       showDialog(
@@ -116,6 +117,7 @@ class _PayPageState extends State<PayJobPage> {
         labor_cost:  double.tryParse(_priceController.text.trim()) ,
         description: _descriptionController.text,
         materials: _materiales,
+        isexpress: widget.isExpress
       );
 
       Navigator.pop(context); // cerrar loader
@@ -125,7 +127,7 @@ class _PayPageState extends State<PayJobPage> {
         print(data);
 
         Future.microtask(() async {
-          await mostrarAlerta(
+          await Toast(
             context,
             title: "Costos enviado",
             message:
@@ -141,7 +143,7 @@ class _PayPageState extends State<PayJobPage> {
           Navigator.pop(context);
         });
       } else {
-        mostrarAlerta(
+        Toast(
           context,
           title: "Error",
           message: result['message'],
@@ -184,7 +186,8 @@ class _PayPageState extends State<PayJobPage> {
   Widget _buildPay() {
     return Column(
       children: [
-        _buildSectionHeader('Descripcion del diagnostico'),
+        _buildSectionHeader(number: '1',title:  'Descripcion del diagnostico',subtitle: 'Agrega una descripción detallada del trabajo realizado'),
+        const SizedBox(height: 20),
         CustomDescriptionFormField(
           controller: _descriptionController,
           label: 'Descripción final',
@@ -198,7 +201,8 @@ class _PayPageState extends State<PayJobPage> {
           },
         ),
         const SizedBox(height: 20),
-        _buildSectionHeader('Mano de obra'),
+        _buildSectionHeader(number: '2', title: 'Mano de obra' , subtitle: 'Agrega el precio de la mano de obra'),
+        const SizedBox(height: 20),
         CustomTextFormFieldPrice(
           controller: _priceController,
           label: 'Precio de mano de obra',
@@ -213,7 +217,8 @@ class _PayPageState extends State<PayJobPage> {
           },
         ),
         const SizedBox(height: 20),
-        _buildSectionHeader('Materiales utilizados'),
+        _buildSectionHeader(number: '3', title:  'Materiales utilizados' , subtitle: 'Agrega los materiales utilizados en el trabajo'),
+        const SizedBox(height: 20),
         for (var material in _materiales) ...[
           Row(
             children: [
@@ -229,10 +234,9 @@ class _PayPageState extends State<PayJobPage> {
         ],
         _buildSubtotal('\$${_subtotalMateriales.toStringAsFixed(0)}'),
         _buildAddMaterial(_materiales),
-
-        const SizedBox(height: 28),
-
-        _buildSectionHeader('Desglose de costo'),
+        const SizedBox(height: 20),
+        _buildSectionHeader(number: '4', title: 'Desglose de costo' , subtitle: 'Revisa el desglose de los costos antes de enviar'),
+        const SizedBox(height: 20),
         _buildRow('Mano de obra', '\$${_priceController.text}'),
         _buildRow(
           'Tarifa de traslado',
@@ -242,9 +246,7 @@ class _PayPageState extends State<PayJobPage> {
         _buildRow('Iva', '\$${_iva.toStringAsFixed(0)}'),
         _buildSubtotal('\$${_total.toStringAsFixed(0)}'),
         const SizedBox(height: 28),
-        _buildSectionHeader('Método de pago'),
-        _buildPaymentMethodCard(),
-        const SizedBox(height: 32),
+
       ],
     );
   }
@@ -285,95 +287,59 @@ class _PayPageState extends State<PayJobPage> {
     );
   }
 
-  Widget _buildPaymentMethodCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-        ),
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              Icons.payments_rounded,
-              color: Theme.of(context).scaffoldBackgroundColor,
-              size: 16,
-            ),
+  Widget _buildSectionHeader({
+    required String number,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: colorsecundario.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
           ),
-          const SizedBox(width: 10),
-          Text(
-            'Método de pago',
-            style: GoogleFonts.dmSans(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.85),
-            ),
-          ),
-          const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.money_rounded,
-                  color: Theme.of(
-                    context,
-                  ).scaffoldBackgroundColor.withOpacity(0.85),
-                  size: 15,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Efectivo',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(
-                      context,
-                    ).scaffoldBackgroundColor.withOpacity(0.85),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Text(
-            title,
+          alignment: Alignment.center,
+          child: Text(
+            number,
             style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.surface,
-              letterSpacing: -0.2,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: colorsecundario,
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.surface,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
-
+  
   Widget _buildRow(String label, String value) {
     return Column(
       children: [
@@ -795,4 +761,6 @@ class _PayPageState extends State<PayJobPage> {
       ),
     );
   }
+
+
 }

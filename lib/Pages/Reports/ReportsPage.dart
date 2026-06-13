@@ -1,56 +1,47 @@
-import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:geolocator/geolocator.dart';
+import 'package:gixt_worker/Components/ReportsOptions.dart';
 import 'package:gixt_worker/Components/SinDatos/cardsServicios.dart';
+import 'package:gixt_worker/Components/Sketor/LocationsOptions.dart';
 import 'package:gixt_worker/Components/Toast.dart';
-import 'package:gixt_worker/Components/calendar.dart';
-import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
+import 'package:gixt_worker/Config/Notifiers/reports_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
-import 'package:gixt_worker/components/cards/cardsAgenda.dart';
-import 'package:gixt_worker/components/sketor/cardsCategoria.dart';
-import 'package:gixt_worker/services/Job/Job_service.dart';
+import 'package:gixt_worker/services/Reports/Report_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
-import 'package:signalr_netcore/hub_connection.dart';
 
-class AgendaPage extends StatefulWidget {
-  const AgendaPage({super.key});
+class ReportsPage extends StatefulWidget {
+  const ReportsPage({super.key});
 
   @override
-  State<AgendaPage> createState() => _AgendaPageState();
+  State<ReportsPage> createState() => _ReportsPageState();
 }
 
-class _AgendaPageState extends State<AgendaPage> {
-  final Jobs_service api = Jobs_service();
+class _ReportsPageState extends State<ReportsPage> {
   final ScrollController _scrollController = ScrollController();
-  final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
-
-  String _category = 'todos';
+  final ReportsService reports = ReportsService();
   bool isLoading = false;
   bool hasMore = true;
   bool timeout = false;
-  String? img;
-  String? username;
+  String _category = 'todos';
 
-  @override
   void initState() {
     super.initState();
-    _loadInitialData();
-    jobsStatusNotifier.addListener(_onRefresh);
+    print("Entré a Mis Reportes");
+    reportsNotifier.addListener(_onRefresh);
+    _initial();
   }
 
-  Future<void> _loadInitialData() async {
+  Future<void> _initial() async {
     setState(() {
       isLoading = true;
       timeout = false;
     });
-
-    bool ok = await api.fetchAgendaData();
-    print(ok);
+    bool ok = await reports.fetchData();
+    isLoading = true;
     if (!ok) {
       if (!mounted) return;
+      setState(() {});
       Future.microtask(() async {
         await Toast(
           context,
@@ -58,23 +49,20 @@ class _AgendaPageState extends State<AgendaPage> {
           message: "No se pudo obtener la información",
           type: alert_type.error,
         );
+
+        Navigator.pop(context);
       });
     }
-
     _Validation();
   }
 
   Future<void> _onRefresh() async {
-    if (!mounted) return;
     setState(() {
-      isLoading = true;
-      timeout = false;
+      print('Actualizando datos...');
+      _initial();
     });
-    await api.updatedata();
-    _Validation();
-    setState(() {});
   }
-
+  
   Future<void> _Validation() async {
     print('empezando contador');
     Future.delayed(const Duration(seconds: 5), () {
@@ -85,9 +73,8 @@ class _AgendaPageState extends State<AgendaPage> {
         print('terminando contador');
       }
     });
-    if (!mounted) return;
     setState(() {
-      if (api.jobs.isNotEmpty) {
+      if (reports.reports.isNotEmpty) {
         isLoading = false;
       }
     });
@@ -105,20 +92,21 @@ class _AgendaPageState extends State<AgendaPage> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               _buildSliverAppBar(),
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 20,
-                  vertical: 10,
-                ),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    Calendar(),
-                    const SizedBox(height: 10),
-                    _buildFiltros(),
-                    const SizedBox(height: 20),
-                    _buildData(),
-                    const SizedBox(height: 100),
-                  ]),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 10),
+                      _buildFiltros(),
+                      const SizedBox(height: 20),
+                      _buildData(),
+                      const SizedBox(height: 100),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -137,9 +125,9 @@ class _AgendaPageState extends State<AgendaPage> {
       snap: false, // NO animación automática
       elevation: 0,
       toolbarHeight: 50,
-      automaticallyImplyLeading: false,
-      iconTheme: const IconThemeData(
-        color: Colors.white, // 👈 color del ícono
+      iconTheme: IconThemeData(color: Theme.of(context).colorScheme.surface),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(0)),
       ),
       // bottom: PreferredSize(
       //   preferredSize: const Size.fromHeight(1),
@@ -149,13 +137,10 @@ class _AgendaPageState extends State<AgendaPage> {
       //     color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
       //   ),
       // ),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(0)),
-      ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
-          'Agenda',
+          'Mis Reportes',
           style: GoogleFonts.poppins(
             fontSize: 22,
             fontWeight: FontWeight.w600,
@@ -163,15 +148,6 @@ class _AgendaPageState extends State<AgendaPage> {
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildData() {
-    return Column(
-      children: [
-        if (timeout) ...[CardsSN(img: 'assets/Banner2.png')],
-        if (!timeout) ...[_buildServicios(_category)],
-      ],
     );
   }
 
@@ -183,37 +159,37 @@ class _AgendaPageState extends State<AgendaPage> {
           _categoryChip(
             value: 'todos',
             label: 'Todos',
-            icon: Icons.list_alt_outlined,
+            icon: Icons.list_alt_rounded,
           ),
           const SizedBox(width: 10),
           _categoryChip(
             value: 'pending',
             label: 'Pendiente',
-            icon: Icons.pending_actions_outlined,
+            icon: Icons.schedule_rounded,
           ),
           const SizedBox(width: 10),
           _categoryChip(
-            value: 'accepted',
-            label: 'Aceptado',
-            icon: Icons.check_circle_outline,
+            value: 'resolved',
+            label: 'Resuelto',
+            icon: Icons.task_alt_rounded,
           ),
           const SizedBox(width: 10),
           _categoryChip(
-            value: 'in_progress',
+            value: 'in_review',
             label: 'En progreso',
-            icon: Icons.work_outline,
+            icon: Icons.autorenew_rounded,
           ),
           const SizedBox(width: 10),
           _categoryChip(
-            value: 'finalized',
-            label: 'Finalizado',
-            icon: Icons.done_outline,
+            value: 'dismissed',
+            label: 'Rechazado',
+            icon: Icons.block_rounded,
           ),
           const SizedBox(width: 10),
           _categoryChip(
-            value: 'completed',
-            label: 'Completado',
-            icon: Icons.thumb_up_outlined,
+            value: 'canceled',
+            label: 'Cancelado',
+            icon: Icons.highlight_off_rounded,
           ),
         ],
       ),
@@ -269,20 +245,25 @@ class _AgendaPageState extends State<AgendaPage> {
     );
   }
 
-  Widget _buildServicios(String tipo) {
-    // Filtrar por estado
-    final List<Jobs> filtrados = api.jobs.where((a) {
-      if (tipo.toLowerCase() == 'in_progress') {
-        // cuando llamas "in_progress" incluimos los 3 estados
-        return a.job_status == 'in_progress' ||
-            a.job_status == 'going' ||
-            a.job_status == 'arrived';
-      } else if (tipo.toLowerCase() == 'todos') {
-        return true; // incluye todos los estados
+  Widget _buildData() {
+    return Column(
+      children: [
+        if (timeout) ...[CardsSN(img: 'assets/Banner2.png')],
+        if (!timeout) ...[_buildServicios(_category)],
+      ],
+    );
+  }
+
+  Widget _buildServicios(tipo) {
+    final isLoading = reports.reports.isEmpty;
+    final List<Reports> filtrados = reports.reports.where((a) {
+      if (tipo.toLowerCase() == 'todos') {
+        return true;
       } else {
-        return a.job_status == tipo;
+        return a.status_report == tipo;
       }
     }).toList();
+
     final int count = filtrados.length;
     if (filtrados.isEmpty && !isLoading) {
       return Container();
@@ -294,7 +275,7 @@ class _AgendaPageState extends State<AgendaPage> {
           Row(
             children: [
               Text(
-                _category.isEmpty
+                filtrados.isEmpty
                     ? ''
                     : '${_category[0].toUpperCase()}${_category.substring(1).toLowerCase()}',
                 style: GoogleFonts.poppins(
@@ -327,46 +308,36 @@ class _AgendaPageState extends State<AgendaPage> {
               ],
             ],
           ),
-          SizedBox(height: 20),
           GridView.builder(
-            scrollDirection: Axis.vertical,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 1,
-              mainAxisSpacing: 20,
-              childAspectRatio: 2.5,
+              mainAxisSpacing: 10,
+              childAspectRatio: 2.4,
             ),
-            itemCount: isLoading ? 3 : filtrados.length,
+            itemCount: isLoading ? 5 : filtrados.length,
             itemBuilder: (context, index) {
               if (isLoading && !timeout) {
-                return const CardsCategoriaSkeleton();
+                return const LocationsOptionsSkeleton();
               }
 
-              final agenda = filtrados[index];
-
-              return CardsAgenda(
-                    image_url: agenda.service_image,
-                    name: agenda.problem,
-                    client_image: agenda.client_image,
-                    job_id: agenda.job_id,
-                    client: agenda.client_first_name,
-                    date: agenda.job_date,
-                    time: agenda.job_time,
-                    price: agenda.price,
-                    description: agenda.description,
-                    address: agenda.maps_address,
-                    status: agenda.job_status,
-                  )
-                  .animate()
-                  .fade(duration: 400.ms)
-                  .slideY(begin: 0.15)
-                  .scale(begin: const Offset(0.96, 0.96));
+              final report = filtrados[index];
+              return ReportsOptions(
+                description: report.description,
+                reason: report.reason,
+                type_job: report.type_job,
+                type: report.type,
+                report_id: report.report_id,
+                created_at: report.created_at,
+                status_report: report.status_report,
+              );
             },
           ),
         ],
       ),
-    );
+    ).animate().fade().slideX(begin: -0.2);
   }
+
+  
 }

@@ -16,7 +16,10 @@ class User {
   String email;
   String birth_date;
   String gender;
-
+  int workers;
+  int services;
+  bool is_working;
+  
   User({
     required this.user_id,
     required this.username,
@@ -27,6 +30,9 @@ class User {
     required this.email,
     required this.birth_date,
     required this.gender,
+    required this.workers,
+    required this.services,
+    required this.is_working
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -40,6 +46,9 @@ class User {
       email: json['email'],
       birth_date: json['birth_date'],
       gender: json['gender'],
+      workers: json['workers']?? 0,
+      services: json['services'] ?? 0,
+      is_working:json['is_working']??0
     );
   }
 
@@ -67,7 +76,7 @@ class User_service {
     final prefs = await SharedPreferences.getInstance();
 
     // config cache
-    const cacheDuration = Duration(days: 1);
+    const cacheDuration = Duration(seconds: 1);
 
     // leer cache
     final cachedData = prefs.getString(_cacheKey);

@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 const Color colorError = Color(0xFFFF0000);
 // Paleta de colores azul elegante
 const Color colorprimario   = Color(0xFF1A1A1F); // Azul-gris oscuro
+// const Color colorsecundario = Color(0xFF2563EB); // Azul
+//  const Color colorsecundario = Color(0xFF7C3AED); // Morado
+// const Color colorsecundario = Color(0xFF14532D); // Verde oscuro
+//  const Color colorsecundario = Color(0xFFEE7C1B); // Anaranjado Truper
+// const Color colorsecundario = Color(0xFFEC4899); // Rosado
 const Color colorsecundario =  Color(0xFF1E6AE1); // Naranja
 const Color colorterciario  = Color(0xFF1B263B); // Gris muy oscuro
 const Color colorcuartario = Color(0xFFE9ECEF);

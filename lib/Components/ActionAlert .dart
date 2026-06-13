@@ -1,30 +1,31 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:gixt_worker/Config/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 
-enum alert_type { exito, error, advertencia }
+enum action_type { exito, error, advertencia }
 
-Future<bool?> mostrarAlerta(
+Future<bool?> ActionAlert(
   BuildContext context, {
   required String title,
   required String message,
-  required alert_type type,
+  required action_type type,
 }) async {
   // Config por tipo
   IconData icon;
   Color color;
 
   switch (type) {
-    case alert_type.exito:
+    case action_type.exito:
       icon = Icons.check_circle_rounded;
       color = const Color(0xFF30C45E);
       break;
-    case alert_type.error:
+    case action_type.error:
       icon = Icons.cancel_rounded;
       color = Colors.redAccent;
       break;
-    case alert_type.advertencia:
+    case action_type.advertencia:
       icon = Icons.warning_amber_rounded;
       color = Colors.orangeAccent;
       break;
@@ -34,7 +35,7 @@ Future<bool?> mostrarAlerta(
 
   late OverlayEntry entry;
   entry = OverlayEntry(
-    builder: (_) => _AlertBanner(
+    builder: (_) => _ActionAlertBanner(
       title: title,
       message: message,
       icon: icon,
@@ -53,15 +54,15 @@ Future<bool?> mostrarAlerta(
 
 // ── Widget del banner ──────────────────────────────────────────────────────
 
-class _AlertBanner extends StatefulWidget {
+class _ActionAlertBanner extends StatefulWidget {
   final String title;
   final String message;
   final IconData icon;
   final Color color;
-  final alert_type type;
+  final action_type type;
   final ValueChanged<bool?> onResult;
 
-  const _AlertBanner({
+  const _ActionAlertBanner({
     required this.title,
     required this.message,
     required this.icon,
@@ -71,10 +72,10 @@ class _AlertBanner extends StatefulWidget {
   });
 
   @override
-  State<_AlertBanner> createState() => _AlertBannerState();
+  State<_ActionAlertBanner> createState() => _ActionAlertBannerState();
 }
 
-class _AlertBannerState extends State<_AlertBanner>
+class _ActionAlertBannerState extends State<_ActionAlertBanner>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<Offset> _slide;
@@ -83,15 +84,23 @@ class _AlertBannerState extends State<_AlertBanner>
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 380),
-    );
-    _slide = Tween<Offset>(begin: const Offset(0, -1), end: Offset.zero)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
-    _fade = Tween<double>(begin: 0, end: 1)
-        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+  _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+  );
+
+  _slide = Tween<Offset>(
+    begin: const Offset(0, -1),
+    end: Offset.zero,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+
+  _fade = Tween<double>(
+    begin: 0,
+    end: 1,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
     _controller.forward();
+
   }
 
   Future<void> _dismiss(bool? result) async {
@@ -107,7 +116,7 @@ class _AlertBannerState extends State<_AlertBanner>
 
   @override
   Widget build(BuildContext context) {
-    final isAdvert = widget.type == alert_type.advertencia;
+    final isAdvert = widget.type == action_type.advertencia;
 
     return Positioned(
       top: 0,
@@ -126,10 +135,7 @@ class _AlertBannerState extends State<_AlertBanner>
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.primary,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: widget.color.withOpacity(0.22),
-                      width: 1,
-                    ),
+                    
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.18),
@@ -152,10 +158,7 @@ class _AlertBannerState extends State<_AlertBanner>
                           Container(
                             width: 38,
                             height: 38,
-                            decoration: BoxDecoration(
-                              color: widget.color.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
+                        
                             child: Icon(widget.icon, color: widget.color, size: 22),
                           ),
 
@@ -186,19 +189,7 @@ class _AlertBannerState extends State<_AlertBanner>
                               ],
                             ),
                           ),
-
-                          // X para cerrar
-                          GestureDetector(
-                            onTap: () => _dismiss(true),
-                            child: Padding(
-                              padding: const EdgeInsets.only(left: 8),
-                              child: Icon(
-                                Icons.close_rounded,
-                                size: 18,
-                                color: Theme.of(context).colorScheme.surface.withOpacity(0.3),
-                              ),
-                            ),
-                          ),
+                          
                         ],
                       ),
 
@@ -236,14 +227,10 @@ class _AlertBannerState extends State<_AlertBanner>
                               onPressed: () => _dismiss(true),
                               style: ElevatedButton.styleFrom(
                                 elevation: 0,
-                                backgroundColor: widget.color.withOpacity(0.12),
+                                backgroundColor: widget.color,
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(10),
-                                  side: BorderSide(
-                                    color: widget.color.withOpacity(0.3),
-                                    width: 0.8,
-                                  ),
                                 ),
                               ),
                               child: Text(
@@ -251,7 +238,7 @@ class _AlertBannerState extends State<_AlertBanner>
                                 style: GoogleFonts.poppins(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: widget.color,
+                                  color: colorWhite,
                                 ),
                               ),
                             ),

@@ -11,13 +11,13 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Auth/Login.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/GPS/gps_tracking_page.dart';
 import 'package:gixt_worker/components/Indicador.dart';
-import 'package:gixt_worker/components/alert.dart';
 import 'package:gixt_worker/components/inputs/Input.dart';
 import 'package:gixt_worker/components/inputs/Input_Fecha.dart';
 import 'package:gixt_worker/components/inputs/Input_Phone.dart';
@@ -27,6 +27,7 @@ import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 import 'package:gixt_worker/services/user/User_service.dart';
 import 'package:gixt_worker/services/user/Worker_service.dart';
+import 'package:gixt_worker/services/user/update_info_service.dart';
 import 'package:gixt_worker/services/user/update_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -49,20 +50,25 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final Worker_service worker = Worker_service();
+
   int _paginaActual = 0;
   bool isLoading = false;
   bool hasMore = true;
+
   double longitude = 0;
   double latitude = 0;
   double _rangoKm = 1.0;
+
   String? calle;
   String? ciudad;
   String? estado;
   String? pais;
   String? colonia;
+
   GoogleMapController? mapController;
   LatLng? posicionActual = LatLng(20.9674, -89.5926);
   bool loadig = true;
+
   BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   final ScrollController _scrollController = ScrollController();
   final PreferencesService _preferencesService = PreferencesService();
@@ -183,7 +189,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     bool ok = await worker.fetchUserData();
     if (!ok) {
       if (!mounted) return;
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: "No se pudo obtener la información",
@@ -208,6 +214,44 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
       );
       GetStreet();
     });
+  }
+
+ void _Update() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await UpdateInfoService.Send(
+      description: _descriptionController.text, 
+      city: ciudad ?? '', 
+      latitude: latitude, 
+      longitude: longitude, 
+      labor_cost: double.parse(_priceController.text), 
+      range_km: _rangoKm 
+    );
+
+    Navigator.pop(context);
+
+    if (result['success'] == true) {
+      final data = result['data'];
+      Toast(
+        context,
+        title: "Datos Actualizados",
+        message: 'tus datos se actualizo correctamente',
+        type: alert_type.exito,
+      );
+      _onRefresh();
+    } else {
+      Toast(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+    }
   }
 
   @override
@@ -255,12 +299,12 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 70,
+      expandedHeight: 50,
       pinned: true, //  deja solo la barra pequeña visible
       floating: false, //  NO aparece al subir
       snap: false, // NO animación automática
       elevation: 0,
-      toolbarHeight: 70,
+      toolbarHeight: 50,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(0),
@@ -274,20 +318,20 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
           salir();
         },
       ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Divider(
-          height: 1,
-          thickness: 0.5,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-        ),
-      ),
+      // bottom: PreferredSize(
+      //   preferredSize: const Size.fromHeight(1),
+      //   child: Divider(
+      //     height: 1,
+      //     thickness: 0.5,
+      //     color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+      //   ),
+      // ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
           'Mi Espacio de Trabajo',
           style: GoogleFonts.poppins(
-            fontSize: 25,
+            fontSize: 22,
             fontWeight: FontWeight.w600,
             color: Theme.of(context).colorScheme.surface,
           ),
@@ -326,13 +370,17 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   }
 
   Widget _fieldLabel(String label) {
-    return Text(
-      label,
-      style: GoogleFonts.poppins(
-        fontSize: 12,
-        height: 1.6,
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
-      ),
+     return Row(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+          ),
+        ),
+      ],
     );
   }
 
@@ -666,7 +714,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (calle == null) {
-                              mostrarAlerta(
+                              Toast(
                                 context,
                                 title: 'Ubicación requerida',
                                 message: 'Por favor selecciona tu ubicación',
@@ -675,7 +723,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                               return;
                             }
                             setState(() {
-                              _paginaActual++;
+                              _paginaActual--;
                             });
                           },
                           style: ElevatedButton.styleFrom(
@@ -691,7 +739,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                'Siguiente',
+                                'Guardar y continuar',
                                 style: GoogleFonts.poppins(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -738,13 +786,10 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _PageHeader(
-              'Tu perfil laboral',
-              'Cuéntanos sobre ti como trabajador para que los clientes te encuentren.',
-            ),
-            const SizedBox(height: 10),
+            _buildSectionHeader(number: '1', title: 'Información laboral', subtitle: 'Cuéntanos sobre tu experiencia y servicios'),
+            const SizedBox(height: 20),
             _fieldLabel('Descripción como trabajador'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
             CustomDescriptionFormField(
               controller: _descriptionController,
               label: 'Descripción como trabajador',
@@ -757,10 +802,8 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 10),
-            _fieldLabel(
-              '¿Cuánto cobras solo por ir al domicilio dentro de tu rango?',
-            ),
+            const SizedBox(height: 20),
+            _fieldLabel('Tarifa por visita y diagnóstico',),
             const SizedBox(height: 10),
             CustomTextFormFieldPrice(
               controller: _priceController,
@@ -770,18 +813,22 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                 return null;
               },
             ),
-            const SizedBox(height: 10),
-            _fieldLabel('Ubicación y rango de trabajo'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 20),
+            _buildInfoCard(
+              icon: Icons.tips_and_updates_outlined,
+              text:'Consejo: Investiga precios de servicios similares '
+                  'en tu zona para ser competitivo.',
+            ),
+            const SizedBox(height: 20),
+            _buildSectionHeader(number: '2', title: 'Ubicacion y rango de trabajo', subtitle: 'Define tu área de servicio y distancia máxima de desplazamiento'),
+            const SizedBox(height: 20),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
+                color: colorsecundario.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.08),
+                  color: colorsecundario.withOpacity(0.5),
                 ),
               ),
               child: Column(
@@ -796,7 +843,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                         style: GoogleFonts.poppins(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.surface,
+                          color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
                         ),
                       ),
                       _buildRefreshButton(),
@@ -810,9 +857,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                       Icon(
                         Icons.place_outlined,
                         size: 16,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withOpacity(0.45),
+                        color: colorsecundario,
                       ),
                       const SizedBox(width: 6),
                       Expanded(
@@ -837,9 +882,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                       Icon(
                         Icons.radar_rounded,
                         size: 16,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withOpacity(0.8),
+                        color: colorsecundario.withOpacity(0.8),
                       ),
                       const SizedBox(width: 6),
                       Text(
@@ -856,17 +899,17 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                 ],
               ),
             ),
-            const SizedBox(height: 90),
+            const SizedBox(height: 20),
             _nextButton('Actualizar', () {
               if (!(_formKey.currentState?.validate() ?? false)) return;
+              _Update();
             }),
+            const SizedBox(height: 100),
           ],
         ),
       ),
     );
   }
-
-  bool _isRefreshing = false;
 
   Widget _buildRefreshButton() {
     return GestureDetector(
@@ -878,7 +921,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
+          color: colorsecundario,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -887,7 +930,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
             Icon(
               Icons.refresh_rounded,
               size: 14,
-              color: Theme.of(context).colorScheme.surface,
+              color: colorWhite,
             ),
             const SizedBox(width: 6),
             Text(
@@ -895,11 +938,147 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
               style: GoogleFonts.poppins(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: Theme.of(context).colorScheme.surface,
+                color: colorWhite,
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildFormHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorsecundario.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorsecundario.withOpacity(0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: colorsecundario.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(13),
+            ),
+            child: const Icon(
+              Icons.work_outline_rounded,
+              color: colorsecundario,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Tu perfil laboral',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.surface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Esta informacion es visible para los clientes que te buscan',
+                  style: GoogleFonts.poppins(
+                    fontSize: 11,
+                    height: 1.5,
+                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader({
+    required String number,
+    required String title,
+    required String subtitle,
+  }) {
+    return Row(
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: colorsecundario.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            number,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: colorsecundario,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: GoogleFonts.poppins(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(context).colorScheme.surface,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              Text(
+                subtitle,
+                style: GoogleFonts.poppins(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w400,
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInfoCard({required IconData icon, required String text}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorsecundario.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorsecundario.withOpacity(0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: colorsecundario),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

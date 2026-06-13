@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Auth/Login.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/components/Indicador.dart';
@@ -83,7 +83,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
 
   void _Crear() async {
     if (_image == null) {
-      mostrarAlerta(
+      Toast(
         context,
         title: 'Imagen requerida',
         message: 'Por favor selecciona una imagen de perfil',
@@ -92,7 +92,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
       return;
     }
     if (!terms!) {
-      mostrarAlerta(
+      Toast(
         context,
         title: 'Términos y condiciones',
         message: 'Debes aceptar los términos y condiciones para continuar.',
@@ -132,7 +132,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
           data['username'],
           data['img'],
         );
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Bienvenido",
           message: message,
@@ -145,7 +145,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
       });
     } else {
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: result['message'],
@@ -175,7 +175,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
       });
     } else {
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: result['message'],
@@ -543,7 +543,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
           const SizedBox(height: 70),
           _nextButton('Siguiente', () {
             if (_passwordController.text != _passwordconfirmarController.text) {
-              mostrarAlerta(
+              Toast(
                 context,
                 title: 'Las contraseñas no coinciden',
                 message: 'Por favor, revisa la contraseña',
@@ -880,7 +880,7 @@ class _CrearcuentaState extends State<Crearcuenta> {
           _nextButton('Siguiente', () {
             if (!(_formKeyinfo.currentState?.validate() ?? false)) return;
             if (_gender == null) {
-              mostrarAlerta(
+              Toast(
                 context,
                 title: 'Género requerido',
                 message: 'Por favor, selecciona tu género',

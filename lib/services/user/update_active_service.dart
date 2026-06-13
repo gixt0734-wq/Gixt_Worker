@@ -2,49 +2,29 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/config/device.dart';
+import 'package:gixt_worker/services/Auth/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-class AddEvidenceService {
-  static Future<Map<String, dynamic>> Send({
-    required String job_id,
-    required bool is_express,
-    List<File?> images = const [],
-  }) async {
-    
+class UpdateActvieService {
+  static Future<Map<String, dynamic>> Send(
+  ) async {
     int attempts = 0;
     const int maxAttempts = 2;
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    final headers = {'Authorization': 'Bearer $token'};
+     final prefs = await SharedPreferences.getInstance();
+    String? id_user = prefs.getString('id');
 
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Evidence');
+        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/working?id=${id_user}');
 
         // Crear MultipartRequest
-        var request = http.MultipartRequest('POST', uri);
+        var request = http.MultipartRequest('PATCH', uri);
 
-        // Campos de texto
-        request.fields['job_id'] = job_id!;
-        request.fields['is_express'] = is_express.toString();
-
-        for (int i = 0; i < images.length; i++) {
-          if (images[i] != null) {
-            request.files.add(
-              await http.MultipartFile.fromPath(
-                'images', // mismo nombre que el DTO
-                images[i]!.path,
-              ),
-            );
-          }
-        }
-       
-
-       
         // Enviar request
-        var streamedResponse = await request.send().timeout(const Duration(seconds: 60));
+        var streamedResponse = await request.send().timeout(const Duration(seconds: 30));
 
         // Convertir la respuesta a String
         final responseString = await streamedResponse.stream.bytesToString();
@@ -52,15 +32,17 @@ class AddEvidenceService {
         print(responseString);
 
         if (streamedResponse.statusCode == 200) {
+            final data = responseString;
+            print(data);
             return {
               'success': true,
-              'message': 'creado correctamente',
+              'data': data,
             };
         }
         if (streamedResponse.statusCode == 401) {
           return {
             'success': false,
-            'message': 'error al crear servicio',
+            'message': jsonDecode(responseString)['message'],
           };
         }
 
@@ -68,7 +50,7 @@ class AddEvidenceService {
         {
           return {
             'success': false,
-            'message': 'error al crear servicio',
+            'message': jsonDecode(responseString)['message'],
           };
         }
       } on TimeoutException {

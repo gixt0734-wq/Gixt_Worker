@@ -8,10 +8,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/SinDatos/cardsServicios.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/calendar.dart';
-import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
-import 'package:gixt_worker/components/alert.dart';
+import 'package:gixt_worker/Pages/NotificationPage.dart';
 import 'package:gixt_worker/components/cards/CardsExpress.dart';
 import 'package:gixt_worker/components/cards/cardsAgenda.dart';
 import 'package:gixt_worker/components/cards/cardsServicios.dart';
@@ -78,8 +78,8 @@ class _HomePageState extends State<HomePage> {
     _loadUserId();
     _Initial();
     _GoMyLocation();
-    expressNotifier.addListener(_reload);
-    cancelexpressNotifier.addListener(_reload);
+    //  expressNotifier.addListener(_reload);
+    // cancelexpressNotifier.addListener(_reload);
   }
 
   Future<void> _loadUserId() async {
@@ -121,7 +121,7 @@ class _HomePageState extends State<HomePage> {
     if (!okData || !ok || !okEx) {
       if (!mounted) return;
       setState(() {});
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: "No se pudo obtener la información",
@@ -201,13 +201,13 @@ class _HomePageState extends State<HomePage> {
                     Calendar(),
                     const SizedBox(height: 20),
                     if (express.express.isNotEmpty) ...[
-                      _buildDivider(),
                       _buildExpress(),
                     ],
+                    if (jobs.jobs.isNotEmpty) ...[_buildServiciosjob()],
                     _buildDivider(),
                     _buildServicios(),
                     _buildDivider(),
-                    if (jobs.jobs.isNotEmpty) ...[_buildServiciosjob()],
+                    
                     const SizedBox(height: 100),
                   ]),
                 ),
@@ -254,20 +254,20 @@ class _HomePageState extends State<HomePage> {
                             color: Theme.of(context).colorScheme.surface,
                           ),
                           const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              ciudad.isEmpty
-                                  ? 'Obteniendo ubicación…'
-                                  : '$ciudad, $estado ',
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: Theme.of(context).colorScheme.surface,
-                                fontWeight: FontWeight.w400,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          Expanded(child: 
+                          Text(
+                            ciudad.isEmpty
+                                ? 'Obteniendo ubicación…'
+                                : '$ciudad, $estado',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              color: Theme.of(context).colorScheme.surface,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
+                          )
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -291,6 +291,12 @@ class _HomePageState extends State<HomePage> {
                       color: Theme.of(context).colorScheme.surface,
                       iconSize: 28,
                       onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => NotificationPage(),
+                          ),
+                        );
                         setState(() {
                           hayNotificacion = false;
                         });
@@ -346,7 +352,7 @@ class _HomePageState extends State<HomePage> {
                   fontSize: 12,
                   color: Theme.of(
                     context,
-                  ).colorScheme.surface.withOpacity(0.55),
+                  ).colorScheme.surface.withValues(alpha: 0.55),
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -388,17 +394,17 @@ class _HomePageState extends State<HomePage> {
             ),
 
             GridView.builder(
-              scrollDirection: Axis.vertical,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 1,
-                mainAxisSpacing: 20,
-                childAspectRatio: 2.5,
-              ),
-              itemCount: isLoading ? 3 : filtrados.length,
-              itemBuilder: (context, index) {
+            scrollDirection: Axis.vertical,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 1,
+              mainAxisSpacing: 20,
+              childAspectRatio: 2.5,
+            ),
+            itemCount: isLoading ? 1 : filtrados.length,
+            itemBuilder: (context, index) {
                 if (isLoading && !timeout) {
                   return const CardsCategoriaSkeleton();
                 }
@@ -407,14 +413,14 @@ class _HomePageState extends State<HomePage> {
 
                 return CardsAgenda(
                       image_url: agenda.service_image,
-                      name: agenda.service_name,
+                      name: agenda.problem,
                       client_image: agenda.client_image,
                       job_id: agenda.job_id,
                       client: agenda.client_first_name,
                       date: agenda.job_date,
                       time: agenda.job_time,
                       price: agenda.price,
-                      description: agenda.service_description,
+                      description: agenda.description,
                       address: agenda.maps_address,
                       status: agenda.job_status,
                     )
@@ -432,6 +438,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildServicios() {
     final isLoading = api.servicios.isEmpty;
+    
     if (timeout) {
       return CardsSN(img: 'assets/Banner1.png');
     }
@@ -499,18 +506,12 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildExpress() {
-    final isLoading = express.express.isEmpty;
     final List<Express> filtrados = express.express.where((a) {
-      return a.job_status == 'in_progress' ||
-          a.job_status == 'going' ||
-          a.job_status == 'arrived';
+      return a.job_status != 'completed';
     }).toList();
-
-    if (filtrados.isEmpty && !isLoading) {
+    
+   if (filtrados.isEmpty && !isLoading) {
       return Container();
-    }
-    if (timeout) {
-      return CardsSN(img: 'assets/Banner1.png');
     }
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 0),
@@ -518,56 +519,50 @@ class _HomePageState extends State<HomePage> {
         alignment: Alignment.topLeft,
         child: Column(
           children: [
+            _buildDivider(),
             _sectionHeader(
               'Servicios Express Curso',
               sub: 'Servicios Express Activos',
             ),
 
-            SizedBox(
-              child: GridView.builder(
-                scrollDirection: Axis.vertical,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 0,
-                  vertical: 20,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 1,
-                  mainAxisSpacing: 20,
-                  childAspectRatio: 2.5,
-                ),
-                itemCount: isLoading
-                    ? 1 //  skeletons visibles
-                    : express.express.length,
-                itemBuilder: (context, index) {
-                  if (isLoading && !timeout) {
-                    return const CardsEmpresaSkeleton();
-                  }
-                  try {
-                    final servicio = filtrados[index];
-                    return CardsExpress(
-                          image_url: servicio.image,
-                          name: servicio.problem,
-                          client_image: servicio.client_image,
-                          express_id: servicio.express_id,
-                          client: servicio.client_username,
-                          maps_address: servicio.maps_address,
-                          price: servicio.price,
-                          description: servicio.description,
-                          date: servicio.job_date,
-                          time: servicio.job_time,
-                          status: servicio.job_status,
-                        )
-                        .animate()
-                        .fade(duration: 400.ms)
-                        .slideY(begin: 0.15)
-                        .scale(begin: const Offset(0.96, 0.96));
-                  } catch (e) {
-                    return const SizedBox(); // widget vacío
-                  }
-                },
-              ),
+            GridView.builder(
+            scrollDirection: Axis.vertical,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 1,
+              mainAxisSpacing: 20,
+              childAspectRatio: 2.5,
+            ),
+            itemCount: isLoading ? 1 : filtrados.length,
+            itemBuilder: (context, index) {
+                if (isLoading && !timeout) {
+                  return const CardsCategoriaSkeleton();
+                }
+                try {
+                  final servicio = filtrados[index];
+                  return CardsExpress(
+                        image_url: servicio.image,
+                        name: servicio.problem,
+                        client_image: servicio.client_image,
+                        express_id: servicio.express_id,
+                        client: servicio.client_username,
+                        maps_address: servicio.maps_address,
+                        price: servicio.price,
+                        description: servicio.description,
+                        date: servicio.job_date,
+                        time: servicio.job_time,
+                        status: servicio.job_status,
+                      )
+                      .animate()
+                      .fade(duration: 400.ms)
+                      .slideY(begin: 0.15)
+                      .scale(begin: const Offset(0.96, 0.96));
+                } catch (e) {
+                  return const SizedBox();
+                }
+              },
             ),
           ],
         ),
@@ -583,7 +578,7 @@ class _HomePageState extends State<HomePage> {
         gradient: LinearGradient(
           colors: [
             Colors.transparent,
-            Theme.of(context).colorScheme.surface.withOpacity(0.12),
+            Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
             Colors.transparent,
           ],
         ),

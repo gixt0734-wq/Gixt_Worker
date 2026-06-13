@@ -52,7 +52,7 @@ class UpdateService {
         // Convertir la respuesta a String
         final responseString = await streamedResponse.stream.bytesToString();
 
-        print(responseString);
+        print(streamedResponse.request);
 
         if (streamedResponse.statusCode == 200) {
           return {

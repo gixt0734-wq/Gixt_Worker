@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:gixt_worker/Components/Indicador.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
@@ -92,7 +92,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
   void sendevidence() async {
     FocusScope.of(context).unfocus();
     if (_images.where((image) => image != null).length < 2) {
-      mostrarAlerta(
+      Toast(
         context,
         title: 'Imagen requerida',
         message: 'Por favor llena los 2 campos de imagen',
@@ -109,6 +109,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
     final result = await AddEvidenceService.Send(
       job_id: widget.job_id,
       images: _images,
+      is_express: widget.isExpress
     );
 
     Navigator.pop(context); // cerrar loader
@@ -118,7 +119,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
       print(data);
 
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Evidencia enviada",
           message:
@@ -137,7 +138,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
         Navigator.pop(context);
       });
     } else {
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: result['message'],
@@ -183,11 +184,13 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
           'Imagenes de evidencia',
           'Agrega 2 fotos del trabajo realizado para que el cliente pueda verificarlo',
         ),
-
         SizedBox(height: 20),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Row(children: [imageBox(0), imageBox(1)]),
+          child: Row(children: [
+          imageBox(0), 
+          SizedBox(width: 20),
+          imageBox(1)]),
         ),
       ],
     );
@@ -197,16 +200,16 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
     return GestureDetector(
       onTap: () => _pickImage(index),
       child: SizedBox(
-        width: 190,
-        height: 200,
+        width: 150,
+        height: 170,
         child: Stack(
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
             _images[index] == null
                 ? Container(
-                    width: 150,
-                    height: 150,
+                    width: double.infinity,
+                    height: double.infinity,
                     decoration: BoxDecoration(
                       color: Theme.of(
                         context,
@@ -226,14 +229,42 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
                       ).colorScheme.surface.withOpacity(0.25),
                     ),
                   )
-                : ClipRRect(
+                : 
+                Stack(
+                    children: [
+                ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: Image.file(
                       _images[index]!,
-                      width: 150,
-                      height: 150,
+                      width: double.infinity,
+                      height: double.infinity,
                       fit: BoxFit.cover,
                     ),
+                  ),
+                  Positioned(
+                        top: 6,
+                        right: 6,
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _images[index] = null;
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.6),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
           ],
         ),
@@ -273,29 +304,30 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 70,
+      expandedHeight: 50,
       pinned: true,
       floating: false,
       snap: false,
       elevation: 0,
-      toolbarHeight: 70,
+      toolbarHeight: 50,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         color: Theme.of(context).colorScheme.surface,
         onPressed: () => salir(),
       ),
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(1),
-        child: Divider(
-          height: 1,
-          thickness: 0.5,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
-        ),
-      ),
+      // bottom: PreferredSize(
+      //   preferredSize: const Size.fromHeight(1),
+      //   child: Divider(
+      //     height: 1,
+      //     thickness: 0.5,
+      //     color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
+      //   ),
+      // ),
+      automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
-          'Evidencia del trabajo',
+          'Evidencia',
           style: GoogleFonts.poppins(
             fontSize: 22,
             fontWeight: FontWeight.w600,

@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Components/Cards/CardsImage.dart';
 import 'package:gixt_worker/Components/Sketor/cardsImg.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/components/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
@@ -46,7 +46,7 @@ class _ServicioPageState extends State<ServicioPage> {
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: "No se pudo obtener la información",
@@ -66,7 +66,7 @@ class _ServicioPageState extends State<ServicioPage> {
     if (!ok) {
       if (!mounted) return;
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: "No se pudo obtener la información",
@@ -252,17 +252,31 @@ class _ServicioPageState extends State<ServicioPage> {
   Widget _buildTitle() {
     return Row(
       children: [
-        Icon(Icons.location_on_outlined, size: 15, color: colorsecundario),
+        Icon(Icons.location_on, size: 15, color: colorsecundario),
         const SizedBox(width: 4),
+        Expanded(child: 
         Text(
           serviciosById.servicios[0].worker_city,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.poppins(
             fontSize: 12,
             color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
           ),
-        ),
+        )),
         const Spacer(),
-        Icon(Icons.star_rounded, size: 16, color: Colors.amber),
+
+        Row(
+          children: List.generate(5, (index) {
+            return Icon(
+              index < serviciosById.servicios[0].rating.round()
+                  ? Icons.star
+                  : Icons.star_border,
+              color: Colors.amber,
+              size: 18,
+            );
+          }),
+        ),
         const SizedBox(width: 4),
         Text(
           '${serviciosById.servicios[0].rating}',
@@ -299,25 +313,11 @@ class _ServicioPageState extends State<ServicioPage> {
             color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
           ),
         ),
-
         const SizedBox(height: 20),
-        Text(
-          'Nota',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Cuando el trabajador llegue a su domicilio, supervisará el trabajo a realizar. El precio mostrado corresponde a la mano de obra y de ir al domicilio; el costo final puede variar según los materiales necesarios.',
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
+        _buildInfoCard(
+          icon: Icons.info_outline,
+          text:
+              'El precio mostrado corresponde a la mano de obra y de ir al domicilio; el costo final puede variar según los materiales necesarios.',
         ),
         const SizedBox(height: 20),
         Text(
@@ -329,6 +329,7 @@ class _ServicioPageState extends State<ServicioPage> {
             letterSpacing: -0.2,
           ),
         ),
+
         Column(
           children: [
             _buildPriceRow(
@@ -337,11 +338,11 @@ class _ServicioPageState extends State<ServicioPage> {
                   ' horas',
             ),
             _buildPriceRow(
-              'Mano de obra',
+              'Tarifa de mano de obra',
               '\$${serviciosById.servicios[0].price}',
             ),
             _buildPriceRow(
-              'Precio estimado de visita ',
+              'Visita y diagnostico',
               '\$${serviciosById.servicios[0].km_cost}',
             ),
           ],
@@ -403,8 +404,11 @@ class _ServicioPageState extends State<ServicioPage> {
                           ),
                         ),
                         const SizedBox(width: 8),
+                        Icon(Icons.verified, color: Colors.blue, size: 18),
+                        const SizedBox(width: 8),
                         Icon(Icons.star_rounded, color: Colors.amber, size: 15),
                         const SizedBox(width: 3),
+
                         Text(
                           '${serviciosById.servicios[0].worker_rating}',
                           style: GoogleFonts.poppins(
@@ -499,7 +503,7 @@ class _ServicioPageState extends State<ServicioPage> {
     );
   }
 
-   Widget _bottomBar(BuildContext context) {
+  Widget _bottomBar(BuildContext context) {
     return Container(
       height: 86,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -557,20 +561,24 @@ class _ServicioPageState extends State<ServicioPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Expanded(child: 
               Text(
                 label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w400,
                   color: Theme.of(
                     context,
                   ).colorScheme.surface.withOpacity(0.65),
                 ),
               ),
+              ),
               Text(
                 value,
                 style: GoogleFonts.poppins(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w500,
                   color: Theme.of(
                     context,
@@ -588,4 +596,33 @@ class _ServicioPageState extends State<ServicioPage> {
       ],
     );
   }
+
+  Widget _buildInfoCard({required IconData icon, required String text}) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: colorsecundario.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorsecundario.withOpacity(0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: colorsecundario),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }

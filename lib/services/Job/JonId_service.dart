@@ -45,7 +45,7 @@ class Job {
   bool is_active;
   String job_status;
   String payment_status;
-
+  double materials_cost; 
   // images
   String? image_1;
   String? image_2;
@@ -84,6 +84,7 @@ class Job {
     this.image_1,
     this.image_2,
     required this.images_evicence,
+    required this.materials_cost,
   });
 
   factory Job.fromJson(Map<String, dynamic> json) {
@@ -127,7 +128,7 @@ class Job {
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       payment_status: json['payment_status'] ?? '',
-
+      materials_cost: (json['payment']?['materials_cost']  as num?)?.toDouble() ?? 0.0,
       image_1: json['image_1'],
       image_2: json['image_2'],
       images_evicence: List<String>.from(json['evidence'] ?? []),

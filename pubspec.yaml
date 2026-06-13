@@ -66,6 +66,8 @@ dependencies:
   flutter_background_service: ^5.1.0
   flutter_polyline_points: ^3.1.0
   flutter_launcher_icons: ^0.13.1
+  curved_navigation_bar: ^1.0.6
+  hugeicons: ^1.1.7
 
 flutter_launcher_icons:
   android: true

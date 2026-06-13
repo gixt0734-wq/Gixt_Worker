@@ -3,7 +3,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/CrearCuenta.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/WelcomePage.dart';
@@ -77,7 +77,7 @@ class _LoginState extends State<LoginPage> {
       {
         Future.microtask(() async {
         
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Bienvenido, antes de comensar necesitamos que termines tu registro",
           message: message,
@@ -99,7 +99,7 @@ return;
           data['username'],
           data['img'],
         );
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Bienvenido",
           message: message,
@@ -111,7 +111,7 @@ return;
         );
       });
     } else {
-      mostrarAlerta(
+      Toast(
         context,
         title: "Error",
         message: result['message'],

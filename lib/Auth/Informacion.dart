@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:gixt_worker/Components/alert.dart';
+import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/WelcomePage.dart';
@@ -191,7 +191,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
           widget.data['username'],
           widget.data['img'],
         );
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Bienvenido",
           message: 'Datos de trabajador creados correctamente',
@@ -205,7 +205,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
       );
     } else {
       Future.microtask(() async {
-        await mostrarAlerta(
+        await Toast(
           context,
           title: "Error",
           message: result['message'],
@@ -800,7 +800,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
                         child: ElevatedButton(
                           onPressed: () {
                             if (calle == null) {
-                              mostrarAlerta(
+                              Toast(
                                 context,
                                 title: 'Ubicación requerida',
                                 message: 'Por favor selecciona tu ubicación',

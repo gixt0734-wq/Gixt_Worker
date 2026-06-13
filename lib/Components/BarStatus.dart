@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gixt_worker/Config/colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class Barstatus extends StatelessWidget {
@@ -13,7 +14,6 @@ class Barstatus extends StatelessWidget {
     'in_progress',
     'finalized',
     'completed',
-    'diagnosing'
   ];
 
   Color _colorForState(String state) {
@@ -100,7 +100,7 @@ class Barstatus extends StatelessWidget {
                 final filled = lineIdx < currentIdx;
                 return Expanded(
                   child: Container(
-                    height: 1.5,
+                    height: 5,
                     color: filled
                         ? activeColor.withOpacity(0.5)
                         : Theme.of(context).colorScheme.surface.withOpacity(0.12),
@@ -164,10 +164,10 @@ class Barstatus extends StatelessWidget {
         height: 30,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: activeColor.withOpacity(0.12),
+          color: activeColor,
           border: Border.all(color: activeColor, width: 1.5),
         ),
-        child: Icon(icon, size: 14, color: activeColor),
+        child: Icon(icon, size: 14, color: colorWhite),
       );
     }
 
@@ -177,9 +177,9 @@ class Barstatus extends StatelessWidget {
         height: 30,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: activeColor.withOpacity(0.08),
+          color: activeColor,
         ),
-        child: Icon(Icons.check, size: 14, color: activeColor.withOpacity(0.6)),
+        child: Icon(Icons.check, size: 14, color: colorWhite),
       );
     }
 
