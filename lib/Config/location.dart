@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -14,6 +14,12 @@ class LocationService {
   /// INITIALIZE
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
+
+    // Detener cualquier servicio que haya quedado activo de una sesión anterior
+    if (await service.isRunning()) {
+      service.invoke("stop");
+      await Future.delayed(const Duration(milliseconds: 800));
+    }
 
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
       'tracking_channel',
@@ -67,7 +73,7 @@ class LocationService {
     DartPluginRegistrant.ensureInitialized();
     await dotenv.load(fileName: ".env");
 
-    HubConnection? hubConnection;
+    HubConnection? hubConnectionGps;
     StreamSubscription<Position>? positionStream;
 
     final String hubUrl = "${dotenv.env['API_URL']}/gpsHub";
@@ -86,7 +92,8 @@ class LocationService {
     /// ================= SIGNALR =================
 
    Future<void> initSignalR() async {
-  hubConnection = HubConnectionBuilder()
+    print("🆔");
+  hubConnectionGps = HubConnectionBuilder()
       .withUrl(hubUrl)
       .withAutomaticReconnect(retryDelays: [
         0, 2000, 5000, 10000, 15000, 30000, 30000, 30000, // ← reintenta indefinido
@@ -94,32 +101,32 @@ class LocationService {
       .build();
 
   // ← Estos dos son los más importantes
-  hubConnection!.serverTimeoutInMilliseconds = 60000;
-  hubConnection!.keepAliveIntervalInMilliseconds = 15000;
+  hubConnectionGps!.serverTimeoutInMilliseconds = 60000;
+  hubConnectionGps!.keepAliveIntervalInMilliseconds = 15000;
 
-hubConnection!.onreconnecting(({Exception? error}) {
-  print("🔄 SignalR reconectando...");
+hubConnectionGps!.onreconnecting(({Exception? error}) {
+  print("🔄 SignalR GPS reconectando...");
   service.invoke("status", {"state": "reconectando"});   // 👈
 });
 
-hubConnection!.onreconnected(({String? connectionId}) {
-  print("✅ SignalR reconectado: $connectionId");
+hubConnectionGps!.onreconnected(({String? connectionId}) {
+  print("✅ SignalR GPS reconectado: $connectionId");
   service.invoke("status", {"state": "conectado"});      // 👈
 });
 
-hubConnection!.onclose(({Exception? error}) {
-  print("❌ SignalR desconectado");
+hubConnectionGps!.onclose(({Exception? error}) {
+  print("❌ SignalR GPS desconectado");
   service.invoke("status", {"state": "error"});          // 👈
 });
 
 
   try {
-    await hubConnection!.start();
-    print("✅ SignalR conectado");
+    await hubConnectionGps!.start();
+    print("✅ SignalR GPS conectado (2do plano)");
      service.invoke("status", {"state": "conectado"});
      
   } catch (e) {
-    print("🚫 Error SignalR: $e");
+    print("🚫 Error SignalR GPS : $e");
     await Future.delayed(const Duration(seconds: 5));
     FlutterBackgroundService().invoke("stop");
     service.invoke("status", {"state": "ubicando"});  
@@ -129,10 +136,10 @@ hubConnection!.onclose(({Exception? error}) {
 Future<void> _reconnectManual() async {
   await Future.delayed(const Duration(seconds: 5));
   try {
-    await hubConnection!.start();
-    print("✅ Reconectado manual");
+    await hubConnectionGps!.start();
+    print("✅ Reconectado GPS manual");
   } catch (e) {
-    print("🚫 Fallo reconexión manual: $e");
+    print("🚫 Fallo reconexión  GPS manual: $e");
     await _reconnectManual();
   }
 }
@@ -168,9 +175,9 @@ Future<void> _reconnectManual() async {
             ),
           ).listen((position) async {
             try {
-              if (hubConnection?.state == HubConnectionState.Connected &&
+              if (hubConnectionGps?.state == HubConnectionState.Connected &&
                   userId != null) {
-                await hubConnection!.invoke(
+                await hubConnectionGps!.invoke(
                   "SendLocation",
                   args: [userId!, position.latitude, position.longitude],
                 );
@@ -187,7 +194,7 @@ Future<void> _reconnectManual() async {
 
       if (service is AndroidServiceInstance) {
         service.setForegroundNotificationInfo(
-          title: "Tracking activo",
+          title: "Tracking activo GPS",
           content: "Enviando ubicación en tiempo real...",
         );
       }
@@ -206,7 +213,7 @@ Future<void> _reconnectManual() async {
 
       positionStream?.cancel();
 
-      hubConnection?.stop();
+      hubConnectionGps?.stop();
   service.invoke("status", {"state": "detenido"});
       service.stopSelf();
     });

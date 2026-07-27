@@ -5,11 +5,11 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-class SendPropuestaService {
+class SendPropuestaJobService {
   static Future<Map<String, dynamic>> Update({
-    required double km_cost,
+    required double diagnostic_cost,
     required String labor_price,
-    required String express_id
+    required String job_id
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
@@ -20,15 +20,15 @@ class SendPropuestaService {
       print("llamando a crear");
       print(id_user);
       try {
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Expresss/Send');
+        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Jobs/Send');
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
 
         // Campos de texto
         request.fields['worker'] = id_user!;
-        request.fields['id'] = express_id;
-        request.fields['km_cost'] = km_cost.toString();
+        request.fields['id'] = job_id;
+        request.fields['diagnostic_cost'] = diagnostic_cost.toString();
         request.fields['labor_price'] = labor_price.toString();
         print(request.fields);
         // Enviar request
@@ -37,7 +37,7 @@ class SendPropuestaService {
         // Convertir la respuesta a String
         final responseString = await streamedResponse.stream.bytesToString();
 
-        print('Error :${responseString}');
+        print('${responseString}');
 
         if (streamedResponse.statusCode == 200) {
           return {

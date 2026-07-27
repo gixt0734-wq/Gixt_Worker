@@ -7,7 +7,8 @@ class PreferencesService {
   static const String _idKey = 'id';
   static const String _imgKey = 'img';
   static const String _userKey = 'user';
-  
+  static const String _isworking = 'isworking';
+
   // Cargar los valores desde SharedPreferences
   Future<Map<String, dynamic>> loadPreferences() async {
     final prefs = await SharedPreferences.getInstance();
@@ -16,17 +17,25 @@ class PreferencesService {
     String? user = prefs.getString(_userKey);
     bool? inicio = prefs.getBool(_inicioKey);
     String? id = prefs.getString(_idKey);
+    bool? isworking = prefs.getBool(_isworking);
     return {
       'token': token,
       'inicio': inicio,
       'id': id,
-      'img' : img,
-      'user' : user
+      'img': img,
+      'user': user,
+      'isworking': isworking,
     };
   }
 
   // Guardar los valores en SharedPreferences
-  Future<void> savePreferences(String token, String inicio, String id ,String img, String user) async {
+  Future<void> savePreferences(
+    String token,
+    String inicio,
+    String id,
+    String img,
+    String user,
+  ) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_inicioKey, inicio);
@@ -35,12 +44,21 @@ class PreferencesService {
     await prefs.setString(_imgKey, img);
   }
 
-    Future<void> savePreferencesUser(String img, String user) async {
+  Future<void> savePreferencesUser(String img, String user) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_userKey, user);
     await prefs.setString(_imgKey, img);
   }
 
+  Future<void> savePreferencesWorking(bool isworking) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_isworking, isworking);
+  }
+
+  Future<void> clearPreferencesWorking() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_isworking);
+  }
 
   // Eliminar todos los datos de SharedPreferences (opcional)
   Future<void> clearPreferences() async {
@@ -50,8 +68,10 @@ class PreferencesService {
     await prefs.remove(_idKey);
     await prefs.remove(_imgKey);
     await prefs.remove(_userKey);
+    await prefs.remove(_isworking);
   }
-    Future<void> clearPreferencesUser() async {
+
+  Future<void> clearPreferencesUser() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_imgKey);
     await prefs.remove(_userKey);

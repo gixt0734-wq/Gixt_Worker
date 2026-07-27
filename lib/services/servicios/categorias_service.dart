@@ -39,9 +39,9 @@ class Categorias_service {
   static const String _cacheTimeKey = 'categorias_cache_time';
 
   set loading(bool loading) {}
-  Future<void> updatedata() async {
+  Future<bool> updatedata() async {
     print("📦 actualizando categorias");
-    await fetchFromApi();
+   return await fetchFromApi();
   }
 
   Future<bool> fetchCategoriasData() async {

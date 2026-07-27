@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Job/jobs_proposal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
@@ -10,6 +11,7 @@ class Job {
   // IDs
   String job_id;
   String client_id;
+  String category;
   
   // client
   String client_first_name;
@@ -17,22 +19,10 @@ class Job {
   String client_image;
 
   // location
-  String location_id;
-  String street;
-  String neighborhood;
-  String house_number;
-  String state;
   String maps_address;
-  String reference;
-  String location_image;
   double latitude;
   double longitude;
 
-  // service
-  String service_id;
-  String service_name;
-  String service_description;
-  String service_image;
 
   // job
   String job_date;
@@ -40,51 +30,43 @@ class Job {
   String description;
   String problem;
   double labor_cost;
-  double km_cost;
+  double worker_price;
   String payment_method;
   bool is_active;
   String job_status;
   String payment_status;
-  double materials_cost; 
+  double diagnostic_cost;
+   double materials;
   // images
-  String? image_1;
-  String? image_2;
+  String? image;
   List<String> images_evicence;
+  List<Jobs_proposal> jobs_proposal;
 
   Job({
     required this.job_id,
     required this.client_id,
+    required this.category,
     required this.client_first_name,
     required this.client_username,
     required this.client_image,
-    required this.location_id,
-    required this.street,
-    required this.neighborhood,
-    required this.house_number,
-    required this.state,
     required this.maps_address,
-    required this.reference,
-    required this.location_image,
     required this.latitude,
     required this.longitude,
-    required this.service_id,
-    required this.service_name,
-    required this.service_description,
-    required this.service_image,
     required this.job_date,
     required this.job_time,
     required this.description,
     required this.problem,
+    required this.diagnostic_cost,
     required this.labor_cost,
-    required this.km_cost,
+    required this.materials,
+    required this.worker_price,
     required this.payment_method,
     required this.is_active,
     required this.job_status,
     required this.payment_status,
-    this.image_1,
-    this.image_2,
+    this.image,
     required this.images_evicence,
-    required this.materials_cost,
+    required this.jobs_proposal
   });
 
   factory Job.fromJson(Map<String, dynamic> json) {
@@ -93,45 +75,40 @@ class Job {
 
     return Job(
       job_id: json['job_id'] ?? '',
-      client_id: json['client_id'] ?? '',
+      client_id: json['client_id']?? '',
 
       // client
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',
       client_image: json['client']?['image'] ?? '',
       // location
-      location_id: location['location_id'] ?? '',
-      street: location['street'] ?? '',
-      neighborhood: location['neighborhood'] ?? '',
-      house_number: location['house_number'] ?? '',
-      state: location['state'] ?? '',
-      latitude:  location['latitude'] ?? 0,
-      longitude: location['longitude'] ??0 ,
-      maps_address: location['maps_address'] ?? '',
-      reference: location['reference'] ?? '',
-      location_image: location['image'] ?? '',
 
-      // service
-      service_id: service['service_id'] ?? '',
-      service_name: service['service_name'] ?? '',
-      service_description: service['description'] ?? '',
-      service_image: service['image'] ?? '',
+      latitude:  json['latitude'] ?? 0,
+      longitude: json['longitude'] ??0 ,
+      maps_address: json['maps_address'] ?? '',
+      category: json['category'] ?? '',
+
+      // worker
+      worker_price : (json['worker'] ? ['diagnostic_cost']) ?? 0.0,
+
 
       // job
       job_date: json['job_date'] ?? '',
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-      labor_cost: (json['payment']?['labor_cost']  as num?)?.toDouble() ?? 0.0,
-      payment_method: json['payment']?['payment_method'] ?? '',
-      km_cost: (json['payment']?['km_cost']  as num?)?.toDouble() ?? 0.0,
+      diagnostic_cost : (json['payment'] ? ['diagnostic_cost']) ?? 0.0,
+      payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
+      labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
+      materials: (json['payment'] ? ['materials']) ?? 0.0,
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       payment_status: json['payment_status'] ?? '',
-      materials_cost: (json['payment']?['materials_cost']  as num?)?.toDouble() ?? 0.0,
-      image_1: json['image_1'],
-      image_2: json['image_2'],
+      image: json['image_url'],
       images_evicence: List<String>.from(json['evidence'] ?? []),
+      jobs_proposal: (json['proposal'] as List<dynamic>? ?? [])
+        .map((e) => Jobs_proposal.fromJson(e))
+        .toList(),
     );
   }
 }
@@ -150,7 +127,7 @@ class JobById_service {
 
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
-
+    String? id_user = prefs.getString('id');
     final headers = {'Authorization': 'Bearer $token'};
 
     try {
@@ -158,14 +135,14 @@ class JobById_service {
 
       final response = await http
           .get(
-            Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/id/${id}'),
+            Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/id/${id}?idworker=${id_user}'),
             headers: headers,
           )
           .timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> jsonResponse = json.decode(response.body);
-
+        print(jsonResponse);
         job
           ..clear()
           ..add(Job.fromJson(jsonResponse));

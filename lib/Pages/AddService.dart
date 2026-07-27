@@ -5,7 +5,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/InputTap.dart';
 import 'package:gixt_worker/Config/colors.dart';
-import 'package:gixt_worker/components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/categoriasoption.dart';
 import 'package:gixt_worker/components/inputs/Input.dart';
 import 'package:gixt_worker/components/inputs/Input_Description.dart';
@@ -196,12 +196,12 @@ class _AddServicePageState extends State<AddServicePage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true, //  deja solo la barra pequeña visible
       floating: false, //  NO aparece al subir
       snap: false, // NO animación automática
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
@@ -586,7 +586,7 @@ Widget _buidFormularioInfo() {
           nombre: categoria.name,
           img: categoria.image_url,
           id: categoria.category_id,
-          selectedId: _categoriaSeleccionada,
+          isSelected: true,
           onSelected: (id) {
             setState(() {
               _categoriaSeleccionada = id;
@@ -940,4 +940,5 @@ Widget _buidFormularioInfo() {
       ),
     );
   }
+
 }

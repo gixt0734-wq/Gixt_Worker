@@ -2,12 +2,13 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:gixt_worker/Components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
 import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
+import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/services/Evidence/Add_evidence_service.dart';
@@ -17,14 +18,10 @@ import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 class Evidencejobpage extends StatefulWidget {
   const Evidencejobpage({
     super.key,
-    required this.km_priece,
-    required this.price,
     required this.job_id,
     required this.isExpress
   });
-  final double km_priece;
   final String job_id;
-  final double price;
   final bool isExpress;
   @override
   State<Evidencejobpage> createState() => _EvidencejobpageState();
@@ -45,8 +42,6 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
   List<File?> _images = List.generate(2, (_) => null);
   double get _subtotalMateriales =>
       _materiales.fold(0, (sum, m) => sum + m.precio);
-
-  double get _total => widget.price + widget.km_priece + _subtotalMateriales;
 
   void _addMaterial() {
     final nombre = _nameController.text.trim();
@@ -135,6 +130,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
           {
             jobsStatusNotifierFinish.refresh();
           }
+              homeNotifier.refresh();
         Navigator.pop(context);
       });
     } else {
@@ -304,12 +300,12 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true,
       floating: false,
       snap: false,
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         color: Theme.of(context).colorScheme.surface,
@@ -353,34 +349,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
       child: Row(
         children: [
           // Precio
-          if (_paginaActual == 2)
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Total',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                    letterSpacing: 0.4,
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.surface.withOpacity(0.35),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '\$${_total.toStringAsFixed(0)}',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.8,
-                    color: Theme.of(context).colorScheme.surface,
-                  ),
-                ),
-              ],
-            ),
+        
 
           const SizedBox(width: 20),
 

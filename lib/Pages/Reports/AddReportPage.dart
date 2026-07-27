@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:gixt_worker/Components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Description.dart';
@@ -63,7 +63,7 @@ class _AddReportPageState extends State<AddReportPage> {
     );
 
     final result = await AddReportService.Create(
-      id: widget.id, 
+      id: widget.id,
       type: widget.type, 
       reason: _nameController.text, 
       description: _descriptionController.text,
@@ -304,12 +304,12 @@ class _AddReportPageState extends State<AddReportPage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true,
       floating: false,
       snap: false,
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       iconTheme: IconThemeData(
         color: Theme.of(context).colorScheme.surface, // 👈 color del ícono
       ),

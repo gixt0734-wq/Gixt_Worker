@@ -17,9 +17,10 @@ class AddEvidenceService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     final headers = {'Authorization': 'Bearer $token'};
-
+    String? id_user = prefs.getString('id');
+    
     while (attempts < maxAttempts) {
-      print("llamando a crear");
+      print("llamando a crear ${is_express}");
       try {
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Evidence');
 
@@ -28,6 +29,7 @@ class AddEvidenceService {
 
         // Campos de texto
         request.fields['job_id'] = job_id!;
+        request.fields['user_id'] = id_user!;
         request.fields['is_express'] = is_express.toString();
 
         for (int i = 0; i < images.length; i++) {

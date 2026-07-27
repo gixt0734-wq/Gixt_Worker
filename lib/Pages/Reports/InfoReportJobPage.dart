@@ -9,7 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/BarStatusReport.dart';
 import 'package:gixt_worker/Components/CircleImage.dart';
-import 'package:gixt_worker/Components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Config/Notifiers/reports_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
@@ -221,12 +221,12 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true, //  deja solo la barra pequeña visible
       floating: false, //  NO aparece al subir
       snap: false, // NO animación automática
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       iconTheme: IconThemeData(color: Theme.of(context).colorScheme.surface),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(0)),

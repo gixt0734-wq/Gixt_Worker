@@ -24,6 +24,7 @@ class CustomTextFormFieldfecha extends StatefulWidget {
   @override
   State<CustomTextFormFieldfecha> createState() => _CustomTextFormFieldState();
 }
+
 class _CustomTextFormFieldState extends State<CustomTextFormFieldfecha> {
   final FocusNode _focusNode = FocusNode();
   bool _isFocused = false;
@@ -42,7 +43,6 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldfecha> {
     super.dispose();
   }
 
-
   @override
   Widget build(BuildContext context) {
     final colorBase = Theme.of(context).colorScheme.surface;
@@ -60,9 +60,14 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldfecha> {
       ],
       decoration: InputDecoration(
         labelText: widget.label,
-
+        hintText: widget.hint,
         // 🔹 Label normal
         labelStyle: GoogleFonts.poppins(
+          fontSize: 13,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
+        ),
+
+        hintStyle: GoogleFonts.poppins(
           fontSize: 13,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
         ),
@@ -77,7 +82,10 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldfecha> {
         ),
         filled: true,
         fillColor: Theme.of(context).colorScheme.primary,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: BorderSide.none,
@@ -102,20 +110,14 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldfecha> {
         ),
 
         // 🔹 Línea cuando hay error
-       errorBorder: OutlineInputBorder(
+        errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(
-            color: Colors.red.withOpacity(0.5),
-            width: 1,
-          ),
+          borderSide: BorderSide(color: Colors.red.withOpacity(0.5), width: 1),
         ),
 
         focusedErrorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(
-            color: Colors.red,
-            width: 1.5,
-          ),
+          borderSide: const BorderSide(color: Colors.red, width: 1.5),
         ),
 
         // 🔹 Ícono
@@ -135,15 +137,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldfecha> {
           color: Colors.red.withOpacity(0.8),
         ),
       ),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Ingresa tu fecha de nacimiento';
-        }
-        if (value.length != 10) {
-          return 'Formato inválido (DD/MM/AAAA)';
-        }
-        return null;
-      },
+      validator: widget.validator,
     );
   }
 }

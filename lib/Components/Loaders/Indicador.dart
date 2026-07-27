@@ -1,6 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:gixt_worker/config/colors.dart';
+import 'package:gixt_worker/Config/colors.dart';
 
 class Indicador extends StatefulWidget {
   const Indicador({super.key});

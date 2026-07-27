@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/ServicioPage.dart';
-import 'package:gixt_worker/components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:google_fonts/google_fonts.dart';
 

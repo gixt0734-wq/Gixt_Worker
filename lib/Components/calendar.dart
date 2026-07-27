@@ -13,24 +13,24 @@ class Calendar extends StatefulWidget {
 class _CalendarState extends State<Calendar> {
   final DateTime _today = DateTime.now();
   String _dayName(int weekday) {
-    const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const names = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
     return names[weekday - 1];
   }
 
   String _monthAbbr(int month) {
     const names = [
-      'Jan',
+      'Ene',
       'Feb',
       'Mar',
-      'Apr',
+      'Abr',
       'May',
       'Jun',
       'Jul',
-      'Aug',
+      'Ago',
       'Sep',
       'Oct',
       'Nov',
-      'Dec',
+      'Dic',
     ];
     return names[month - 1];
   }

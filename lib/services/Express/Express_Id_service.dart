@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Express/Express_proposal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
@@ -10,7 +11,7 @@ class Express {
   // IDs
   String express_id;
   String client_id;
-
+  String category;
   // client
   String client_first_name;
   String client_username;
@@ -31,11 +32,11 @@ class Express {
   String job_status;
   String payment_status;
   double worker_price;
-  double km_cost;
+  double diagnostic_cost;
   double labor_cost;
   double materials;
   List<String> images_evicence;
-
+  List<Express_proposal> express_proposal;
   // images
   String? image;
 
@@ -45,6 +46,7 @@ class Express {
     required this.client_first_name,
     required this.client_username,
     required this.client_image,
+    required this.category,
     required this.maps_address,
     required this.latitude,
     required this.longitude,
@@ -58,19 +60,19 @@ class Express {
     required this.job_status,
     required this.payment_status,
     required this.worker_price,
-    required this.km_cost,
+    required this.diagnostic_cost,
     required this.labor_cost,
     required this.materials,
     required this.images_evicence,
     this.image,
-    
+    required this.express_proposal,
   });
 
   factory Express.fromJson(Map<String, dynamic> json) {
     return Express(
       express_id: json['express_id'] ?? '',
       client_id: json['client_id'] ?? '',
-
+      category: json['category'] ?? '',
       // client
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',
@@ -80,9 +82,9 @@ class Express {
       latitude: json['latitude'],
       longitude: json['longitude'],
       maps_address: json['maps_address'],
-      worker_price : (json['worker'] ? ['km_cost']) ?? 0.0,
+      worker_price : (json['worker'] ? ['diagnostic_cost']) ?? 0.0,
 
-      km_cost : (json['payment'] ? ['km_cost']) ?? 0.0,
+      diagnostic_cost : (json['payment'] ? ['diagnostic_cost']) ?? 0.0,
       payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
       labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
       materials: (json['payment'] ? ['materials']) ?? 0.0,
@@ -96,7 +98,11 @@ class Express {
       job_status: json['job_status'] ?? '',
       payment_status: json['payment_status'] ?? '',
       images_evicence: List<String>.from(json['evidence'] ?? []),
+      express_proposal: (json['proposal'] as List<dynamic>? ?? [])
+        .map((e) => Express_proposal.fromJson(e))
+        .toList(),
       image: json['image'],
+
     );
   }
 }
@@ -130,7 +136,7 @@ class ExpressById_service {
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));
-
+        print('response : ${response.statusCode}');
         if (response.statusCode == 200) {
           final Map<String, dynamic> jsonResponse = json.decode(response.body);
 

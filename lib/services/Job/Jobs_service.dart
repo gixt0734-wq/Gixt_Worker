@@ -8,7 +8,7 @@ import 'dart:convert'; // Para trabajar con JSON
 
 class Jobs {
   String job_id;
-
+  String category;
   // worker
   String client_user_id;
   String client_first_name;
@@ -18,11 +18,7 @@ class Jobs {
   // location
   String maps_address;
 
-  // service
-  String service_id;
-  String service_name;
-  String service_description;
-  String service_image;
+  String image_url;
 
   // job
   String job_date;
@@ -42,12 +38,10 @@ class Jobs {
     required this.client_username,
     required this.client_image,
     required this.maps_address,
-    required this.service_id,
-    required this.service_name,
-    required this.service_description,
-    required this.service_image,
+    required this.image_url,
     required this.job_date,
     required this.job_time,
+    required this.category,
     required this.description,
     required this.problem,
     required this.is_active,
@@ -64,19 +58,15 @@ class Jobs {
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',
       client_image: json['client']?['image'] ?? '',
-
+    category: json['category'] ?? '',
       maps_address: json['location']?['maps_address'] ?? '',
 
-      service_id: json['service']?['service_id'] ?? '',
-      service_name: json['service']?['service_name'] ?? '',
-      service_description: json['service']?['description'] ?? '',
-      service_image: json['service']?['image'] ?? '',
 
       job_date: json['job_date'] ?? '',
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-
+      image_url : json['image_url'] ?? '',
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
@@ -147,7 +137,7 @@ class Jobs_service {
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/$id_user'),
+ Uri.parse('${dotenv.env['API_URL']}/api/Jobs?iduser=${id_user}&latitude=2&longitude=2'),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

@@ -2,6 +2,7 @@ import 'package:curved_navigation_bar/curved_navigation_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/HomePage.dart';
+import 'package:gixt_worker/Pages/JobsPage.dart';
 import 'package:gixt_worker/Pages/PerfilworkerPage.dart';
 import 'package:gixt_worker/pages/AgendaPage.dart';
 import 'package:gixt_worker/pages/ConfigPage.dart';
@@ -10,8 +11,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hugeicons/hugeicons.dart';
 
 class AppBottomNavigation extends StatefulWidget {
-  const AppBottomNavigation({Key? key}) : super(key: key);
-
+  const AppBottomNavigation({Key? key, required this.index}) : super(key: key);
+  final  int index;
   @override
   State<AppBottomNavigation> createState() => _AppBottomNavigationState();
 }
@@ -24,11 +25,21 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
   final List<Widget> _pages = const [
     HomePage(),
     AgendaPage(),
-    AddServicePage(),
+    JobsPage(),
     PerfilWorkerPage(),
-
     ConfigPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+
+    if (mounted) {
+      setState(() {
+        _currentIndex = widget.index;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +52,7 @@ class _AppBottomNavigationState extends State<AppBottomNavigation> {
        
         child: CurvedNavigationBar(
           key: _bottomNavigationKey,
+          index: _currentIndex,
           // ⚠️ NO pases `index: _currentIndex` aquí — deja que el nav maneje su propio estado visual
           height: 75,
           backgroundColor: Colors.transparent,
@@ -70,18 +82,18 @@ Widget _buildNavIcon(dynamic icons, int index, {bool isCenter = false}) {
 }
 
   Future<void> _onTabTapped(int index) async {
-    // Si estamos saliendo de Express (2), confirmar primero
-    if (_currentIndex == 2 && index != 2) {
-      final salir = await _confirmarSalirExpress();
-      if (!salir) {
-        // Esperamos a que termine la animación actual antes de revertir
-        await Future.delayed(const Duration(milliseconds: 50));
-        if (mounted) {
-          _bottomNavigationKey.currentState?.setPage(2);
-        }
-        return;
-      }
-    }
+    // // Si estamos saliendo de Express (2), confirmar primero
+    // if (_currentIndex == 2 && index != 2) {
+    //   final salir = await _confirmarSalirExpress();
+    //   if (!salir) {
+    //     // Esperamos a que termine la animación actual antes de revertir
+    //     await Future.delayed(const Duration(milliseconds: 50));
+    //     if (mounted) {
+    //       _bottomNavigationKey.currentState?.setPage(2);
+    //     }
+    //     return;
+    //   }
+    // }
     if (mounted) {
       setState(() => _currentIndex = index);
     }

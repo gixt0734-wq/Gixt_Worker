@@ -35,8 +35,8 @@ class UpdateInfoService {
         request.fields['city'] = city;
         request.fields['latitude'] = latitude.toString();
         request.fields['longitude'] = longitude.toString();
-        request.fields['km_cost'] = labor_cost.toString();
-        request.fields['range_km'] = range_km.toString();
+        request.fields['diagnostic_cost'] = labor_cost.toString();
+        request.fields['service_radius_km'] = range_km.toString();
 
         // Enviar request
         var streamedResponse = await request.send().timeout(const Duration(seconds: 30));

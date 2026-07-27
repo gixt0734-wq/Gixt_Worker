@@ -8,6 +8,7 @@ class CustomTextFormFieldNumber extends StatefulWidget {
   final String label;
   final bool readOnly;
   final IconData icon;
+  final int? max;
   final String? Function(String?)? validator;
 
   const CustomTextFormFieldNumber({
@@ -17,9 +18,10 @@ class CustomTextFormFieldNumber extends StatefulWidget {
     required this.icon,
     this.readOnly = false,
     this.validator,
+    this.max,
   });
 
-    @override
+  @override
   State<CustomTextFormFieldNumber> createState() => _CustomTextFormFieldState();
 }
 
@@ -46,8 +48,9 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
     final colorBase = Theme.of(context).colorScheme.surface;
 
     return TextFormField(
-   controller: widget.controller,
+      controller: widget.controller,
       readOnly: widget.readOnly,
+      maxLength: widget.max,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       style: GoogleFonts.poppins(
         fontSize: 14,
@@ -63,6 +66,12 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
           fontSize: 13,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
         ),
+        // 🔹 contador de digitos
+        counterStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
+        ),
+
         // 🔹 Label cuando está seleccionado
         floatingLabelStyle: GoogleFonts.poppins(
           fontSize: 12,
@@ -129,13 +138,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
         ),
         // Hint con formato de ejemplo
         hintText: '0',
-        hintStyle: TextStyle(
-          color: colorBase.withOpacity(0.35),
-          fontSize: 13,
-        ),
-
-       
-       
+        hintStyle: TextStyle(color: colorBase.withOpacity(0.35), fontSize: 13),
 
         // Sufijo con la moneda (puedes cambiar MXN/USD según tu app)
         // suffix: Text(
@@ -147,15 +150,12 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldNumber> {
         //     letterSpacing: 1,
         //   ),
         // ),
-
         counterText: '', // Oculta el contador de caracteres
-
       ),
       validator: widget.validator,
     );
   }
 }
-
 
 /// Formateador que agrega separadores de miles y mantiene 2 decimales
 class PriceInputFormatter extends TextInputFormatter {

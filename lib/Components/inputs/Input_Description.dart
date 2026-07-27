@@ -10,6 +10,7 @@ class CustomDescriptionFormField extends StatefulWidget {
   final int maxLines;
   final bool enabled;
   final String hint;
+  final int? max;
   final String? Function(String?)? validator;
 
   const CustomDescriptionFormField({
@@ -22,6 +23,7 @@ class CustomDescriptionFormField extends StatefulWidget {
     this.enabled = true,
     this.validator,
     this.hint = '',
+    this.max,
   });
 
   @override
@@ -55,6 +57,7 @@ class _CustomTextFormFieldState extends State<CustomDescriptionFormField> {
       keyboardType: TextInputType.multiline,
       minLines: widget.minLines,
       maxLines: widget.maxLines,
+      maxLength: widget.max,
       style: GoogleFonts.poppins(
         fontSize: 14,
         color: Theme.of(context).colorScheme.surface,
@@ -68,6 +71,13 @@ class _CustomTextFormFieldState extends State<CustomDescriptionFormField> {
           fontSize: 13,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
         ),
+
+        // 🔹 contador de digitos
+        counterStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
+        ),
+
         hintStyle: GoogleFonts.poppins(
           fontSize: 11,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.25),

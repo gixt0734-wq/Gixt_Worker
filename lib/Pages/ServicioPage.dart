@@ -10,7 +10,7 @@ import 'package:gixt_worker/Components/Cards/CardsImage.dart';
 import 'package:gixt_worker/Components/Sketor/cardsImg.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Config/colors.dart';
-import 'package:gixt_worker/components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/services/servicios/favorite_service.dart';
 import 'package:gixt_worker/services/servicios/serviciosbyid_service.dart';

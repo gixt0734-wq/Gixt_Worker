@@ -68,41 +68,54 @@ class _WelcomePageState extends State<WelcomePage> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               SliverPadding(
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 20),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 0),
                     if (_paginaActual == 0)
                       _buildwelcome(
-                        'Hola, ',
-                        'Bienvenido',
-                        '¡Bienvenido! Es un gusto que estés en nuestra plataforma.',
-                        'assets/persona3.png',
+                        '¡Hola, ',
+                        'bienvenido',
+                        'Nos alegra darte la bienvenida a Gixt. Aquí encontrarás todas las herramientas que necesitas para gestionar tus servicios, conectar con clientes y hacer crecer tu negocio.',
+                        'assets/logo.png',
+                        0.76,
                         Icons.waving_hand_rounded,
                       ),
                     if (_paginaActual == 1)
                       _buildwelcome(
-                        'Servicios ',
-                        'Express',
-                        'Podrás solicitar servicios express con trabajadores cuando tengas una emergencia.',
-                        'assets/persona3.png', // TODO: cambia a imagen única por paso
-                        Icons.flash_on_rounded,
+                        'Trabajos ',
+                        'Exprés',
+                        'Recibe solicitudes de clientes cercanos a ti en tiempo real y acepta los trabajos que más te convengan al instante, sin complicaciones ni esperas.',
+                        'assets/express.png', // TODO: cambia a imagen única por paso
+                        0.56,
+                        Icons.bolt_rounded,
                       ),
                     if (_paginaActual == 2)
                       _buildwelcome(
-                        'Gestiona tu ',
-                        'Agenda',
-                        'Podrás gestionar tus servicios con nuestra agenda y guardar varias ubicaciones.',
-                        'assets/persona3.png', // TODO: cambia a imagen única por paso
-                        Icons.calendar_month_rounded,
+                        'Elige a tu ',
+                        'Cliente',
+                        'Compara perfiles, valoraciones y detalles de cada solicitud antes de aceptar. Tú decides con quién trabajar, cuándo y en qué condiciones.',
+                        'assets/selectworker.png', // TODO: cambia a imagen única por paso
+                        0.66,
+                        Icons.fact_check_rounded,
                       ),
                     if (_paginaActual == 3)
                       _buildwelcome(
-                        'Pedir ',
-                        'Servicio',
-                        'Puedes seleccionar entre varias categorías de trabajadores para solicitar y agendar un servicio.',
-                        'assets/persona3.png', // TODO: cambia a imagen única por paso
-                        Icons.handyman_rounded,
+                        'Explora ',
+                        'categorías',
+                        'Descubre todas nuestras categorías de servicios y encuentra rápidamente el tipo de trabajo que mejor se adapta a tus habilidades y experiencia.',
+                        'assets/category.png', // TODO: cambia a imagen única por paso
+                        0.86,
+                        Icons.category_rounded,
+                      ),
+                      if (_paginaActual == 4)
+                      _buildwelcome(
+                        'Modo ',
+                        'Descanso',
+                        'Activa o desactiva tu disponibilidad cuando lo necesites para dejar de recibir solicitudes de trabajo. Tú tienes el control total de tu tiempo y tu descanso.',
+                        'assets/active.png', // TODO: cambia a imagen única por paso
+                        0.66,
+                        Icons.bedtime_rounded,
                       ),
                   ]),
                 ),
@@ -119,14 +132,45 @@ class _WelcomePageState extends State<WelcomePage> {
     String highlight,
     String description,
     String image,
+    double width,
     IconData icon,
   ) {
     final size = MediaQuery.of(context).size;
     return SizedBox(
+      key: ValueKey<int>(_paginaActual),
       height: size.height,
       child: Stack(
         children: [
           // Imagen persona (hero)
+           Positioned(
+              top: size.height * 0.18,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  width: size.width * 1.12,
+                  height: size.width * 1.12,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(
+                      colors: [
+                        colorsecundario.withOpacity(0.18),
+                        colorsecundario.withOpacity(0.0),
+                      ],
+                      stops: const [0.0, 1.0],
+                    ),
+                  ),
+                )
+                    .animate(onPlay: (c) => c.repeat(reverse: true))
+                    .scale(
+                      duration: 3200.ms,
+                      begin: const Offset(0.92, 0.92),
+                      end: const Offset(1.06, 1.06),
+                      curve: Curves.easeInOut,
+                    ),
+              ),
+            ),
+
           Positioned(
             top: 0,
             left: 0,
@@ -135,13 +179,21 @@ class _WelcomePageState extends State<WelcomePage> {
             child: Align(
               alignment: Alignment.bottomCenter,
               child: Hero(
-                tag: 'logo',
-                child: Image.asset(
-                  image,
-                  width: size.width * 0.65,
-                  fit: BoxFit.contain,
-                ),
-              ),
+                    tag: 'logo',
+                    child: Image.asset(
+                      image,
+                      width: size.width * width,
+                      fit: BoxFit.contain,
+                    ),
+                  )
+                  .animate()
+                  .fadeIn(duration: 450.ms, curve: Curves.easeOut)
+                  .scale(
+                    begin: const Offset(0.9, 0.9),
+                    end: const Offset(1, 1),
+                    duration: 450.ms,
+                    curve: Curves.easeOutBack,
+                  ),
             ),
           ),
 
@@ -151,62 +203,98 @@ class _WelcomePageState extends State<WelcomePage> {
             left: 0,
             right: 0,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(28, 0, 28, 72),
+              padding: const EdgeInsets.fromLTRB(28, 0, 28, 52),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: colorsecundario.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon, color: colorsecundario, size: 22),
-                  ),
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: colorsecundario.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(icon, color: colorsecundario, size: 22),
+                      )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 100.ms)
+                      .slideY(
+                        begin: 0.4,
+                        end: 0,
+                        duration: 400.ms,
+                        delay: 100.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
 
                   const SizedBox(height: 18),
 
                   RichText(
-                    text: TextSpan(
-                      style: GoogleFonts.inter(
-                        fontSize: 38,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                        color: Theme.of(context).colorScheme.surface,
-                      ),
-                      children: [
-                        TextSpan(text: title),
-                        TextSpan(
-                          text: highlight,
-                          style: TextStyle(color: colorsecundario),
+                        text: TextSpan(
+                          style: GoogleFonts.inter(
+                            fontSize: 38,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            color: Theme.of(context).colorScheme.surface,
+                          ),
+                          children: [
+                            TextSpan(text: title),
+                            TextSpan(
+                              text: highlight,
+                              style: TextStyle(color: colorsecundario),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
+                      )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 180.ms)
+                      .slideY(
+                        begin: 0.4,
+                        end: 0,
+                        duration: 400.ms,
+                        delay: 180.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
                   const SizedBox(height: 14),
                   Text(
-                    description,
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w300,
-                      height: 1.75,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withOpacity(0.5),
-                    ),
-                  ),
+                        description,
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w300,
+                          height: 1.75,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withOpacity(0.5),
+                        ),
+                      )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 260.ms)
+                      .slideY(
+                        begin: 0.4,
+                        end: 0,
+                        duration: 400.ms,
+                        delay: 260.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
                   const SizedBox(height: 36),
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildDots(),
-                      _paginaActual == 3
-                          ? _buildStartButton()
-                          : _buildNextButton(),
-                    ],
-                  ),
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildDots(),
+                          _paginaActual == 4
+                              ? _buildStartButton()
+                              : _buildNextButton(),
+                        ],
+                      )
+                      .animate()
+                      .fadeIn(duration: 400.ms, delay: 340.ms)
+                      .slideY(
+                        begin: 0.4,
+                        end: 0,
+                        duration: 400.ms,
+                        delay: 340.ms,
+                        curve: Curves.easeOutCubic,
+                      ),
                 ],
               ),
             ),
@@ -287,7 +375,7 @@ class _WelcomePageState extends State<WelcomePage> {
   Widget _buildDots() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(4, (i) {
+      children: List.generate(5, (i) {
         final isActive = _paginaActual == i;
         return AnimatedContainer(
           duration: const Duration(milliseconds: 300),

@@ -8,21 +8,23 @@
             "name": "Flutter (Device 1)",
             "request": "launch",
             "type": "dart",
-            "deviceId": "10AF3E24X50023J"
+            "deviceId": "ZY32CN6HT9"
         },
         {
             "name": "Flutter (Device A14)",
             "request": "launch",
             "type": "dart",
-            "deviceId": "RF8W90R1L8T"
+            "deviceId": "RF8W90R1L8T",
+            // "flutterMode": "release"
         },
         {
             "name": "Flutter (A31)",
             "request": "launch",
             "type": "dart",
-            "deviceId": "RF8N83145BZ"
+            "deviceId": "RF8N83145BZ",
+            // "flutterMode": "release"
         },
-                {
+        {
             "name": "Flutter (Device 3)",
             "request": "launch",
             "type": "dart",
@@ -32,7 +34,7 @@
     "compounds": [
     {
       "name": "Run All Devices",
-      "configurations": ["Flutter (Device 1)", "Flutter (Device 2)"]
+      "configurations": ["Flutter (A31)", "Flutter (Device A14555)"]
     }
   ]
 }

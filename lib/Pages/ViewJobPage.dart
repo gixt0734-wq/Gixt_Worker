@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -16,6 +18,8 @@ import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/alert_bar.dart';
+import 'package:gixt_worker/Components/inputs/Input_Price.dart';
+import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
@@ -23,10 +27,12 @@ import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayjobPage.dart';
 import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
 import 'package:gixt_worker/components/BarStatus.dart';
-import 'package:gixt_worker/components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/config/location.dart';
+import 'package:gixt_worker/services/Job/Cancel_Job_Service.dart';
 import 'package:gixt_worker/services/Job/JonId_service.dart';
+import 'package:gixt_worker/services/Job/Send_Propuesta_service.dart';
 import 'package:gixt_worker/services/Job/Update_Job_service.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
@@ -46,55 +52,17 @@ class ViewJobPage extends StatefulWidget {
   State<ViewJobPage> createState() => _ViewJobPageState();
 }
 
-class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixin {
-  bool isLoading = false;
-  bool hasMore = true;
-  final JobById_service job = JobById_service();
-  final ScrollController _scrollController = ScrollController();
-  final PreferencesService _preferencesService = PreferencesService();
-  bool _tracking = false;
-  bool _hubConnected = false;
-  HubConnection? _hubConnection;
-  double? _price;
-  GoogleMapController? mapController;
-  bool isactive = false;
-  bool isaccept = false;
-  bool isSearch = false;
-  bool timeout = false;
-  bool loadig = true;
-  Set<Polyline> polylines = {};
-  HubConnection? hubConnection;
-  Set<Marker> markers = {};
-  List<LatLng> polylineCoordinates = [];
-  double longitude = 0;
-  double latitude = 0;
-  File? _image;
-  String? calle;
-  String? ciudad;
-  String? estado;
-  String? pais;
-  String distanceText = "";
-  String durationText = "";
-  String? colonia;
-  LatLng positionActual = const LatLng(20.9674, -89.5926);
-  LatLng positionclient = LatLng(20.9674, -89.5926);
-  bool onlocation = false;
-  String status = 'pending';
-  StreamSubscription<Position>? _positionStreamSubscription;
-  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
-  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
-  AnimationController? _markerAnimController;
-  LatLng? posicionAnterior;
-  StreamSubscription? _statusSub;
-  String _StatusGps = 'desconocido';
-
+class _ViewJobPageState extends State<ViewJobPage>
+    with TickerProviderStateMixin , WidgetsBindingObserver{
   @override
   void initState() {
     super.initState();
     print("Entré a Mi trabajo");
     marker();
     _initial();
+    WidgetsBinding.instance.addObserver(this);
     jobsStatusNotifierFinish.addListener(_Refresh);
+    canceljobNotifier.addListener(_cancelreload);
     jobsStatusNotifier.addListener(_Refresh);
     FlutterBackgroundService().isRunning().then((running) {
       print("🔍 Servicio corriendo: $running");
@@ -122,43 +90,112 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _statusSub?.cancel();
+    _positionStreamSubscription?.cancel();
+    _markerAnimController?.stop();
+    _markerAnimController?.dispose();
+    _mapController?.dispose();
+    _mapController = null;
     super.dispose();
   }
 
-  void _Refresh() async {
-    print('nose');
-    if (job.job[0].job_status == 'in_progress') {
-      _stopTracking();
-      _onRefresh();
-    }
-    _onRefresh();
-  }
 
-  Future<void> marker() async {
-    const ImageConfiguration configuration = ImageConfiguration(
-      size: Size(80, 80),
-    );
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    print("Entrando otravez a express");
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
+        // sin que el widget se reconstruya: verificamos y reconectamos.
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // La app pasó a segundo plano: mantenemos la conexión abierta para
+        // no perder notificaciones mientras el SO no la mate, pero evitamos
+        // mostrar la pantalla de "sin conexión" mientras el usuario no la ve.
+    _initial();
+        break;
+      case AppLifecycleState.detached:
+        // La app se está cerrando por completo: cerramos el hub de forma
+        // ordenada (best-effort, el proceso puede terminar antes de que
+        // esta llamada asíncrona complete).
 
-    final BitmapDescriptor icon = await BitmapDescriptor.fromAssetImage(
-      configuration,
-      "assets/marker.png",
-    );
-    final BitmapDescriptor iconworker = await BitmapDescriptor.fromAssetImage(
-      configuration,
-      "assets/worker.png",
-    );
-
-    if (mounted) {
-      setState(() {
-        markericon = icon;
-        workericon = iconworker;
-      });
+        break;
+      case AppLifecycleState.hidden:
+    _initial();
+        break;
     }
   }
+
+  // cache
+  final PreferencesService _preferencesService = PreferencesService();
+
+  // servicios
+  final JobById_service job = JobById_service();
+  String? motivoSeleccionado;
+
+  // Datos que se mandan en el formulario
+  double? _diagnostic_cost;
+  TextEditingController _priceController = TextEditingController();
+
+  // Datos del renderizado del mapa
+  GoogleMapController? _mapController;
+  List<LatLng> polylineCoordinates = [];
+  Set<Marker> markers = {};
+  Set<Polyline> polylines = {};
+  AnimationController? _markerAnimController;
+
+  // Controllers
+  final ScrollController _scrollController = ScrollController();
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+  late ScrollController _sheetScrollController;
+
+  // Variables de mapa
+  String get _mapsKey => dotenv.env['MAPS_API_KEY'] ?? '';
+  LatLng positionActual = const LatLng(20.9674, -89.5926);
+  LatLng? positionclient = LatLng(20.9674, -89.5926);
+  LatLng? posicionAnterior;
+  double longitude = 0;
+  double latitude = 0;
+  String? street;
+  String? city;
+  String? state;
+  String? country;
+  String? colonia;
+  String distanceText = "";
+  String durationText = "";
+
+  Timer? _timer;
+  Duration _remaining = Duration.zero;
+  DateTime? _countdownExpiresAt;
+
+  // Estados de express
+  bool isLoading = false;
+  bool hasMore = true;
+  bool isactive = false;
+  bool isaccept = false;
+  bool isSearch = false;
+  bool timeout = false;
+  bool loadig = true;
+  bool _tracking = false;
+  bool onlocation = false;
+  String status = 'pending';
+  String _StatusGps = 'desconocido';
+
+  // Geolocalizacion
+  HubConnection? hubConnection;
+  StreamSubscription<Position>? _positionStreamSubscription;
+  StreamSubscription? _statusSub;
 
   Future<void> _startTracking() async {
-      final excludedStatuses = ['pending', 'canceled', 'completed', 'finalized','accepted'];
+    final excludedStatuses = [
+      'pending',
+      'accepted',
+      'canceled',
+      'completed',
+      'finalized',
+    ];
 
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
@@ -177,6 +214,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
       return;
     }
 
+    await _positionStreamSubscription?.cancel();
     _positionStreamSubscription =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
@@ -187,10 +225,9 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
           if (!mounted) return; // ← CHECK MOUNTED PRIMERO
           final nuevaPosicion = LatLng(position.latitude, position.longitude);
           final anterior = positionActual; // ← guardar ANTES
-          
+
           try {
             setState(() {
-              
               positionActual = nuevaPosicion;
               _animarMovimiento(anterior, nuevaPosicion);
             });
@@ -200,14 +237,15 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
         });
     if (_StatusGps == 'desconocido' &&
         !excludedStatuses.contains(job.job[0].job_status)) {
-      setState(() {
-        _tracking = true;
-      });
+      if (mounted) setState(() => _tracking = true);
       await LocationService.start(widget.id_trabajo);
     }
-
   }
 
+  Future<void> _stopTracking() async {
+    if (mounted) setState(() => _tracking = false);
+    await LocationService.stop();
+  }
 
   void _animarMovimiento(LatLng desde, LatLng hasta) {
     _markerAnimController?.dispose();
@@ -237,157 +275,11 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
         ),
       );
       // Fuera del setState
-      mapController?.animateCamera(CameraUpdate.newLatLng(positionActual!));
+      _mapController?.animateCamera(CameraUpdate.newLatLng(positionActual!));
       if (mounted) setState(() {});
     });
 
     _markerAnimController!.forward();
-  }
-
-  Future<void> _stopTracking() async {
-    await LocationService.stop();
-  }
-
-  Future<void> _initial() async {
-    bool ok = await job.fetchServicioData(widget.id_trabajo);
-    if (!ok) {
-      if (!mounted) return;
-      Future.microtask(() async {
-        await Toast(
-          context,
-          title: "Error",
-          message: "No se pudo obtener la información",
-          type: alert_type.error,
-        );
-
-        Navigator.pop(context);
-      });
-    }
-    GetRute();
-    setState(() {});
-  }
-
-  Future<void> _onRefresh() async {
-    if (!mounted) return;
-    setState(() {
-      print('Actualizando datos...');
-      hasMore = true;
-    });
-    bool ok = await job.fetchServicioData(widget.id_trabajo);
-    if (!ok) {
-      if (!mounted) return;
-      Future.microtask(() async {
-        await Toast(
-          context,
-          title: "Error",
-          message: "No se pudo obtener la información",
-          type: alert_type.error,
-        );
-
-        Navigator.pop(context);
-      });
-    }
-    setState(() {});
-  }
-
-  Future<void> abrirGoogleMaps(double lat, double lng) async {
-    final Uri googleMapsUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng");
-
-    if (await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication)) {
-      return;
-    }
-
-    final Uri webUrl = Uri.parse(
-      "https://www.google.com/maps/search/?api=1&query=$lat,$lng",
-    );
-
-    if (!await launchUrl(webUrl, mode: LaunchMode.externalApplication)) {
-      throw 'No se pudo abrir Google Maps';
-    }
-  }
-
-  Future<void> _Update(String actions) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Indicador(),
-    );
-
-    final result = await UpdateJobsService.Update(
-      action: actions,
-      job_id: widget.id_trabajo,
-    );
-
-    Navigator.pop(context);
-
-    if (result['success'] == true) {
-      final data = result['data'];
-      Toast(
-        context,
-        title: "Trabajo Actualizado",
-        message: 'se notificara a tu cliente',
-        type: alert_type.exito,
-      );
-      jobsStatusNotifier.refresh();
-      _onRefresh();
-      _startTracking();
-    } else {
-      Toast(
-        context,
-        title: "Error",
-        message: result['message'],
-        type: alert_type.error,
-      );
-    }
-  }
-
-  Future<void> GetStreet() async {
-    GeocodingHelper.obtenerCiudadDesdeCoordenadas(
-      latitud: latitude,
-      longitud: longitude,
-      onResult:
-          (ciudadResult, calleResult, estadoResult, paisResult, coloniaResult) {
-            setState(() {
-              ciudad = ciudadResult;
-              calle = calleResult;
-              estado = estadoResult;
-              colonia = coloniaResult;
-              pais = paisResult;
-            });
-          },
-    );
-  }
-
-  Future<void> _GoMyLocation() async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Indicador(),
-    );
-    try {
-      Position pos = await GeoLocationService.obtenerUbicacion(context);
-      latitude = pos.latitude;
-      longitude = pos.longitude;
-      setState(() {
-        positionActual = LatLng(pos.latitude, pos.longitude);
-        mapController?.animateCamera(
-          CameraUpdate.newCameraPosition(
-            CameraPosition(target: positionActual!, zoom: 17),
-          ),
-        );
-      });
-      
-        GetRoute();
-      
-    } catch (e) {
-      print(e);
-    }
-
-    await GetStreet();
-    setState(() {
-      loadig = false;
-    });
-    Navigator.pop(context);
   }
 
   Future<void> getDistanceAndTime() async {
@@ -396,7 +288,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
         "?origins=${positionActual!.latitude},${positionActual!.longitude}"
         "&destinations=${positionclient!.latitude},${positionclient!.longitude}"
         "&mode=driving"
-        "&key=AIzaSyD_Hw4Izij6u7r5lv0RqukDOfft6tExN64";
+        "&key=$_mapsKey";
 
     final response = await http.get(Uri.parse(url));
 
@@ -425,11 +317,8 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
 
     final workerPos = LatLng(position.latitude, position.longitude);
     final clientPos = LatLng(job.job[0].latitude, job.job[0].longitude);
-    mapController?.animateCamera(
-      CameraUpdate.newCameraPosition(
-        CameraPosition(target: clientPos, zoom: 17),
-      ),
-    );
+
+    if (!mounted) return;
     setState(() {
       positionActual = workerPos;
       positionclient = clientPos;
@@ -470,26 +359,26 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
       ),
     );
 
-    mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+    _mapController?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 100));
+
+    _startTracking();
 
     /// obtener dirección
-    GetStreet();
+    await GetStreet();
 
     /// dibujar ruta
     await GetRoute();
   }
 
   Future<void> GetRoute() async {
-    PolylinePoints polylinePoints = PolylinePoints(
-      apiKey: "AIzaSyD_Hw4Izij6u7r5lv0RqukDOfft6tExN64",
-    );
+    PolylinePoints polylinePoints = PolylinePoints(apiKey: _mapsKey);
 
     PolylineRequest request = PolylineRequest(
-      origin: PointLatLng(
-        positionActual!.latitude,
-        positionActual!.longitude,
+      origin: PointLatLng(positionActual!.latitude, positionActual!.longitude),
+      destination: PointLatLng(
+        positionclient!.latitude,
+        positionclient!.longitude,
       ),
-      destination: PointLatLng(positionclient!.latitude, positionclient!.longitude),
       mode: TravelMode.driving,
     );
 
@@ -498,11 +387,9 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
     );
 
     if (result.points.isNotEmpty) {
-      polylineCoordinates.clear();
-
-      for (var point in result.points) {
-        polylineCoordinates.add(LatLng(point.latitude, point.longitude));
-      }
+      polylineCoordinates
+        ..clear()
+        ..addAll(result.points.map((p) => LatLng(p.latitude, p.longitude)));
       if (!mounted) return;
       await createPolyline();
       await getDistanceAndTime();
@@ -521,6 +408,335 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
     );
   }
 
+  // Traer datos de ubicacion
+
+  Future<void> _GoMyLocation() async {
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    try {
+      Position pos = await GeoLocationService.obtenerUbicacion(context);
+      latitude = pos.latitude;
+      longitude = pos.longitude;
+
+      setState(() {
+        positionActual = LatLng(pos.latitude, pos.longitude);
+        _mapController?.animateCamera(
+          CameraUpdate.newCameraPosition(
+            CameraPosition(target: positionActual!, zoom: 17),
+          ),
+        );
+      });
+      await GetRoute();
+    } catch (e) {
+      print(e);
+    }
+
+    await GetStreet();
+    if (mounted) setState(() => loadig = false);
+    if (mounted) Navigator.pop(context);
+  }
+
+  Future<void> GetStreet() async {
+    GeocodingHelper.obtenerCiudadDesdeCoordenadas(
+      latitud: latitude,
+      longitud: longitude,
+      onResult:
+          (ciudadResult, calleResult, estadoResult, paisResult, coloniaResult) {
+            if (!mounted) return;
+            setState(() {
+              city = ciudadResult;
+              street = calleResult;
+              state = estadoResult;
+              colonia = coloniaResult;
+              country = paisResult;
+            });
+          },
+    );
+  }
+
+  Future<void> abrirGoogleMaps(double lat, double lng) async {
+    final Uri googleMapsUri = Uri.parse("geo:$lat,$lng?q=$lat,$lng");
+
+    if (await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication)) {
+      return;
+    }
+
+    final Uri webUrl = Uri.parse(
+      "https://www.google.com/maps/search/?api=1&query=$lat,$lng",
+    );
+
+    if (!await launchUrl(webUrl, mode: LaunchMode.externalApplication)) {
+      throw 'No se pudo abrir Google Maps';
+    }
+  }
+
+  //Inconos de marker mapa
+  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
+
+  Future<BitmapDescriptor> getMarkerIcon(
+  String imagePath,
+  int width,
+) async {
+  final ByteData data = await rootBundle.load(imagePath);
+
+  final ui.Codec codec = await ui.instantiateImageCodec(
+    data.buffer.asUint8List(),
+    targetWidth: width,
+  );
+
+  final ui.FrameInfo fi = await codec.getNextFrame();
+
+  final ByteData? bytes = await fi.image.toByteData(
+    format: ui.ImageByteFormat.png,
+  );
+
+  return BitmapDescriptor.fromBytes(
+    bytes!.buffer.asUint8List(),
+  );
+}
+  
+  Future<void> marker() async {
+    const ImageConfiguration configuration = ImageConfiguration(
+      size: Size(80, 80),
+    );
+
+      markericon = await getMarkerIcon(
+        "assets/marker.png",
+        100,
+      );
+
+      workericon = await getMarkerIcon(
+        "assets/worker.png",
+        100,
+      );
+
+    if (mounted) {
+      setState(() {
+        markericon ;
+        workericon;
+      });
+    }
+  }
+
+  // Validacion inicial
+  Future<void> _initial() async {
+    bool ok = await job.fetchServicioData(widget.id_trabajo);
+    if (!ok) {
+      if (!mounted) return;
+      Future.microtask(() async {
+        await Toast(
+          context,
+          title: "Error",
+          message: "No se pudo obtener la información",
+          type: alert_type.error,
+        );
+      });
+      Navigator.pop(context);
+    }
+
+    await GetRute();
+    await _GoMyLocation();
+    _startTracking();
+    setState(() {});
+  }
+
+
+  Future<void> _cancelreload() async {
+    await _stopTracking();
+    await _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
+
+    if (!mounted) return;
+    Future.microtask(() async {
+      await Toast(
+        context,
+        title: "Trabajo cancelado",
+        message: 'se el usuario cancelo el trabajo',
+        type: alert_type.error,
+      );
+      Navigator.pop(context);
+    });
+  }
+
+  // Fetchs de datos
+  Future<void> _onRefresh() async {
+    if (!mounted) return;
+    setState(() {
+      hasMore = true;
+    });
+
+    bool ok = await job.fetchServicioData(widget.id_trabajo);
+
+    if (!ok) {
+      if (!mounted) return;
+      Future.microtask(() async {
+        await Toast(
+          context,
+          title: "Error",
+          message: "No se pudo obtener la información",
+          type: alert_type.error,
+        );
+      });
+    }
+    if (!mounted) return;
+    setState(() {});
+    _startTracking();
+  }
+
+  void _Refresh() async {
+    if (job.job[0].images_evicence.isNotEmpty) {
+      _stopTracking();
+    }
+    _onRefresh();
+  }
+
+  // Funciones principales
+  void _Send() async {
+    if (_priceController.text.isEmpty) {
+      Toast(
+        context,
+        title: 'Precio requerido',
+        message: 'Ingresa el precio de los materiales',
+        type: alert_type.error,
+      );
+      return;
+    }
+    if (_diagnostic_cost == null) {
+      Toast(
+        context,
+        title: 'Selecciona un precio',
+        message: 'Selecciona una opcion',
+        type: alert_type.error,
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await SendPropuestaJobService.Update(
+      job_id: widget.id_trabajo,
+      diagnostic_cost: _diagnostic_cost?.roundToDouble() ?? 0.0,
+      labor_price: _priceController.text,
+    );
+
+    if (mounted) Navigator.pop(context);
+
+    if (result['success'] == true) {
+      final data = result['data'];
+      if (!mounted) return;
+      Toast(
+        context,
+        title: "Trabajo Actualizado",
+        message: 'se notificara a tu cliente',
+        type: alert_type.exito,
+      );
+
+      _priceController.clear();
+      if (mounted) Navigator.pop(context);
+      _onRefresh();
+    } else {
+      Toast(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+    }
+  }
+
+  Future<void> _Update(String actions) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await UpdateJobsService.Update(
+      action: actions,
+      job_id: widget.id_trabajo,
+    );
+
+    if (mounted) Navigator.pop(context);
+
+    if (result['success'] == true) {
+      final data = result['data'];
+      Toast(
+        context,
+        title: "Trabajo Actualizado",
+        message: 'se notificara a tu cliente',
+        type: alert_type.exito,
+      );
+      _onRefresh();
+      _startTracking();
+    } else {
+      Toast(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+    }
+  }
+
+void _Cancelar() async {
+    bool? ok = await ActionAlert(
+      context,
+      title: 'Cancelar solicitud',
+      message:
+          '¿Estás seguro de que deseas cancelar esta solicitud? Las cancelaciones frecuentes o injustificadas pueden generar sanciones en tu cuenta.',
+      type: action_type.advertencia,
+    );
+    if (ok!) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Indicador(),
+      );
+
+      final result = await CancelJobService.CancelJob(
+        jop_id: widget.id_trabajo,
+        reason: motivoSeleccionado!,
+      );
+
+      if (mounted) Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
+      if (result['success'] == true) {
+        
+        _cancelreload();    
+        homeNotifier.refresh();
+        if (!mounted) return;
+        if (mounted) Navigator.pop(context);
+        Future.microtask(() async {
+          await Toast(
+            context,
+            title: "Trabajo cancelado",
+            message: "Trabajo cancelado exitosamente",
+            type: alert_type.exito,
+          );
+        });
+      } else {
+        Toast(
+          context,
+          title: "Error",
+          message: result['message'],
+          type: alert_type.error,
+        );
+      }
+    }
+  }
+  // Imagenes
   void _showFullImage(String imageUrl) {
     showDialog(
       context: context,
@@ -545,6 +761,35 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
     );
   }
 
+  void _startCountdown(DateTime expiresAt) {
+    _timer?.cancel();
+    _countdownExpiresAt = expiresAt;
+    _remaining = expiresAt.difference(DateTime.now());
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final difference = expiresAt.difference(DateTime.now());
+
+      if (difference.isNegative) {
+        timer.cancel();
+        setState(() {
+          _remaining = Duration.zero;
+        });
+      } else {
+        setState(() {
+          _remaining = difference;
+        });
+      }
+    });
+  }
+
+  String _formatTime(Duration duration) {
+    String two(int n) => n.toString().padLeft(2, '0');
+
+    return "${two(duration.inHours)}:"
+        "${two(duration.inMinutes.remainder(60))}:"
+        "${two(duration.inSeconds.remainder(60))}";
+  }
+
   @override
   Widget build(BuildContext context) {
     if (job.job.isEmpty) {
@@ -557,7 +802,6 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        floatingActionButton: ['canceled', 'completed','in_progress','finalized'].contains(job.job[0].job_status)? _buttonDelete(context) :null ,
         body: Stack(
           children: [
             // 🗺️ MAPA DE FONDO
@@ -620,7 +864,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
             zoomGesturesEnabled: true,
             rotateGesturesEnabled: true,
             tiltGesturesEnabled: !isactive,
-            onMapCreated: (controller) => mapController = controller,
+            onMapCreated: (controller) => _mapController = controller,
             gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
               Factory<OneSequenceGestureRecognizer>(
                 () => EagerGestureRecognizer(),
@@ -662,12 +906,43 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
           ),
         ),
         Positioned(
+          top: MediaQuery.of(context).padding.top + 160,
+          right: 12,
+          child: GestureDetector(
+            onTap: () {
+              abrirGoogleMaps(
+                job.job[0].latitude,
+                job.job[0].longitude,
+              );
+            },
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: colorsecundario,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.15),
+                    blurRadius: 8,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.directions_rounded,
+                color: colorWhite,
+                size: 20,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
           top: MediaQuery.of(context).padding.top + 110,
           right: 12,
           child: GestureDetector(
             onTap: () {
               if (positionclient != null) {
-                mapController?.animateCamera(
+                _mapController?.animateCamera(
                   CameraUpdate.newCameraPosition(
                     CameraPosition(target: positionclient!, zoom: 17),
                   ),
@@ -695,11 +970,32 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
             ),
           ),
         ),
-        // chip de dirección
-        if (calle != null)
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 12,
+          child: GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).scaffoldBackgroundColor.withOpacity(0.92),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 17,
+                color: Theme.of(context).colorScheme.surface,
+              ),
+            ),
+          ),
+        ),
+        if (street != null)
           Positioned(
             top: MediaQuery.of(context).padding.top + 12,
-            left: 12,
+            left: 65,
             right: 64,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -723,6 +1019,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
                         ),
                       ),
                       const SizedBox(width: 8),
+                      Expanded(child: 
                       Text(
                         'Ubicación seleccionada',
                         style: GoogleFonts.poppins(
@@ -731,12 +1028,12 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
                           color: colorsecundario,
                           letterSpacing: 0.3,
                         ),
-                      ),
+                      )),
                     ],
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "${calle} ${ciudad} a ${job.job[0].maps_address}",
+                    "${street} ${city} a ${job.job[0].maps_address}",
                     style: GoogleFonts.poppins(
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
@@ -745,7 +1042,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (estado != null || ciudad != null)
+                  if (state != null || city != null)
                     Text(
                       "${distanceText} en ${durationText}",
                       style: GoogleFonts.poppins(
@@ -762,193 +1059,171 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
             ),
           ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
 
+
         // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],
     );
   }
 
- Widget _buildInformacion() {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
-    child: Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        const SizedBox(height: 20),
-
-        // Título: entrada protagónica desde arriba con scale sutil
-        _buildTitle()
-            .animate()
-            .fadeIn(duration: 500.ms, curve: Curves.easeOut)
-            .slideY(begin: -0.2, curve: Curves.easeOutCubic)
-            .scale(
-              begin: const Offset(0.95, 0.95),
-              end: const Offset(1, 1),
-              duration: 500.ms,
-              curve: Curves.easeOutCubic,
+  Widget _buildInformacion() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(height: 20),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
+          ),
 
-        const SizedBox(height: 20),
+          // Título: entrada protagónica desde arriba con scale sutil
+          _buildTitle()
+              .animate()
+              .fadeIn(duration: 500.ms, curve: Curves.easeOut)
+              .slideY(begin: -0.2, curve: Curves.easeOutCubic)
+              .scale(
+                begin: const Offset(0.95, 0.95),
+                end: const Offset(1, 1),
+                duration: 500.ms,
+                curve: Curves.easeOutCubic,
+              ),
 
-        // Status bar: entra "expandiéndose" horizontalmente — refuerza que es un indicador de progreso
-        Barstatus(
-          estadoTrabajo: job.job[0].job_status.isEmpty
-              ? ''
-              : job.job[0].job_status,
-        )
-            .animate(delay: 200.ms)
-            .fadeIn(duration: 450.ms)
-            .scaleX(
-              begin: 0.7,
-              end: 1,
-              alignment: Alignment.centerLeft,
-              curve: Curves.easeOutCubic,
-              duration: 600.ms,
-            ),
+          const SizedBox(height: 20),
 
-        const SizedBox(height: 20),
+          // Status bar: entra "expandiéndose" horizontalmente — refuerza que es un indicador de progreso
+          Barstatus(
+                estadoTrabajo: job.job[0].job_status.isEmpty
+                    ? ''
+                    : job.job[0].job_status,
+              )
+              .animate(delay: 200.ms)
+              .fadeIn(duration: 450.ms)
+              .scaleX(
+                begin: 0.7,
+                end: 1,
+                alignment: Alignment.centerLeft,
+                curve: Curves.easeOutCubic,
+                duration: 600.ms,
+              ),
 
-        // Bloque "Trabajo": desliza desde la izquierda
-        _buildTrabajo()
-            .animate(delay: 350.ms)
-            .fadeIn(duration: 500.ms)
-            .slideX(begin: -0.15, curve: Curves.easeOutCubic),
+          const SizedBox(height: 20),
 
-        // Evidence: desliza desde la derecha (efecto espejo con el anterior)
-        _buildEvidence()
-            .animate(delay: 450.ms)
-            .fadeIn(duration: 500.ms)
-            .slideX(begin: 0.15, curve: Curves.easeOutCubic),
-
-        // Client: vuelve desde la izquierda (zigzag visual)
-        _buildClient()
-            .animate(delay: 550.ms)
-            .fadeIn(duration: 500.ms)
-            .slideX(begin: -0.15, curve: Curves.easeOutCubic),
-
-        const SizedBox(height: 20),
-
-        // Servicio: entrada con blur (cambio de "sección")
-        _buildServicio()
-            .animate(delay: 700.ms)
-            .fadeIn(duration: 550.ms)
-            .blurXY(begin: 6, end: 0, duration: 550.ms)
-            .slideY(begin: 0.1, curve: Curves.easeOut),
-
-        const SizedBox(height: 20),
-
-        // Imagen: scale + fade (protagonismo visual)
-        _buildImg()
-            .animate(delay: 850.ms)
-            .fadeIn(duration: 600.ms)
-            .scale(
-              begin: const Offset(0.88, 0.88),
-              end: const Offset(1, 1),
-              curve: Curves.easeOutBack,
-              duration: 700.ms,
-            ),
-
-        const SizedBox(height: 20),
-
-        // Ubicación: sube desde abajo (cierre natural de la lista)
-        _buildUbicacion()
-            .animate(delay: 1000.ms)
-            .fadeIn(duration: 500.ms)
-            .slideY(begin: 0.25, curve: Curves.easeOutCubic),
-
-        const SizedBox(height: 20),
-      ],
-    ),
-  );
-}
+          // Bloque "Trabajo": desliza desde la izquierda
+          _buildTrabajo()
+              .animate(delay: 350.ms)
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: -0.15, curve: Curves.easeOutCubic),
+          const SizedBox(height: 20),
+          // Client: vuelve desde la izquierda (zigzag visual)
+          _buildClient()
+              .animate(delay: 550.ms)
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: -0.15, curve: Curves.easeOutCubic),
+          const SizedBox(height: 20),
+          // Evidence: desliza desde la derecha (efecto espejo con el anterior)
+          _buildEvidence()
+              .animate(delay: 450.ms)
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: 0.15, curve: Curves.easeOutCubic),
+          const SizedBox(height: 20),
+          _buildActionsSection()
+          .animate(delay: 450.ms)
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: 0.15, curve: Curves.easeOutCubic),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
 
   Widget _buildTitle() {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(Icons.location_on_outlined, size: 13, color: colorsecundario),
-        const SizedBox(width: 4),
-        Expanded(
-          child: Text(
-            job.job[0].maps_address,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.poppins(
-              fontSize: 11,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
+        Text(
+          'Trabajo para ${job.job[0].client_username}',
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.dmSans(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.4,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          children: [
+            _infoChip(
+              Icons.location_on_outlined,
+              job.job[0].maps_address,
+              colorsecundario,
             ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Icon(
-          Icons.event_outlined,
-          size: 13,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.35),
-        ),
-        const SizedBox(width: 3),
-        Text(
-          job.job[0].job_date,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Icon(
-          Icons.access_time_outlined,
-          size: 13,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.35),
-        ),
-        const SizedBox(width: 3),
-        Text(
-          job.job[0].job_time,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
-          ),
+            _infoChip(
+              Icons.event_outlined,
+              job.job[0].job_date,
+              Colors.transparent,
+            ),
+            _infoChip(
+              Icons.access_time_outlined,
+              job.job[0].job_time,
+              Colors.transparent,
+            ),
+            _infoChip(
+              Icons.handyman_rounded,
+              job.job[0].category.toUpperCase(),
+              colorsecundario,
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget imageBox(String? imagen) {
-    return SizedBox(
-      width: 130,
-      height: 150,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
+  Widget _infoChip(IconData icon, String label, Color accent) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          imagen == null
-              ? Container(
-                  decoration: BoxDecoration(
-                    color: Color.fromARGB(255, 177, 177, 177),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  width: double.infinity,
-                  height: double.infinity,
-                  child: Icon(Icons.person, color: Colors.white, size: 65),
-                )
-              : GestureDetector(
-                  onTap: () {
-                    _showFullImage(imagen);
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    width: double.infinity,
-                    height: double.infinity,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: CachedNetworkImage(
-                        imageUrl: imagen,
-                        fit: BoxFit.cover,
-                        placeholder: (context, url) =>
-                            Container(color: Colors.white24),
-                      ),
-                    ),
-                  ),
-                ),
+          Icon(
+            icon,
+            size: 12,
+            color: accent == Colors.transparent
+                ? surface.withValues(alpha: 0.4)
+                : accent,
+          ),
+          const SizedBox(width: 5),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 380),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: surface.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -967,7 +1242,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-              width: 1,
+              width: 0,
             ),
           ),
           child: Row(
@@ -1001,44 +1276,37 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
                 ),
               ),
 
-               GestureDetector(
-            onTap: () {
-               Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AddReportPage(type: 'client', id: job.job[0].client_id,user: "${job.job[0].client_username}".trim(),type_job: null,),
-              ));
-            },
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: colorError,
-                borderRadius: BorderRadius.circular(50),
-               
+              GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => AddReportPage(
+                        type: 'client',
+                        id: job.job[0].client_id,
+                        user: "${job.job[0].client_username}".trim(),
+                        type_job: null,
+                      ),
+                    ),
+                  );
+                },
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: colorError.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                  child: Icon(
+                    Icons.report_outlined,
+                    color: colorWhite,
+                    size: 20,
+                  ),
+                ),
               ),
-              child: Icon(
-                Icons.report_outlined,
-                color: colorWhite,
-                size: 20,
-              ),
-            ),
-          ),
             ],
           ),
         ),
-      ],
-    );
-  }
-
-  Widget _buildServicio() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _fieldLabel('Servicio solicitado:   ${job.job[0].service_name}'),
-        const SizedBox(height: 20),
-        _fieldText(job.job[0].service_description),
       ],
     );
   }
@@ -1056,139 +1324,250 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
         SizedBox(height: 20),
         _fieldText(job.job[0].description),
         SizedBox(height: 20),
-        _fieldLabel('Pago y método de pago'),
-        SizedBox(height: 20),
-        Column(
-          children: [
-            _buildPriceRow('Mano de obra', '\$${job.job[0].labor_cost}'),
-            _buildPriceRow(
-              'Precio estimado de visita ',
-              '\$${job.job[0].km_cost}',
-            ),
-             _buildPriceRow(
-              'Precio estimado de materiales',
-              '\$${job.job[0].materials_cost > 0 ? job.job[0].materials_cost : '0.0'}',
-            ),
-          ],
+        _buildInfoCard(
+          icon: Icons.info_outline,
+          text:
+              'El precio mostrado corresponde a la mano de obra y de ir al domicilio; el costo final puede variar según los materiales necesarios.',
         ),
+        SizedBox(height: 20),
+         _fieldLabel('Pago y método de pago'),
+         SizedBox(height: 20),
+        if (job.job[0].job_status != 'pending') ...[
+          SizedBox(height: 20),
+          _buildPriceBreakdown(),
+        ],
         SizedBox(height: 20),
         _buildPaymentMethodCard(),
       ],
     );
   }
 
-  Widget _buildUbicacion() {
-    return Column(
-      children: [
-        _fieldLabel('Ubicación del trabajo'),
-        SizedBox(height: 20),
-        Row(
+  Widget _buildPriceBreakdown() {
+      final surface = Theme.of(context).colorScheme.surface;
+      final labor = _toNum(job.job[0].labor_cost);
+      final diagnostic = _toNum(job.job[0].diagnostic_cost);
+      final materials = _toNum(job.job[0].materials);
+      final total = labor + diagnostic + materials;
+
+      return Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
           children: [
-            imageBox(job.job[0].location_image),
-            SizedBox(width: 20),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    '${job.job[0].maps_address}',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      height: 1.75,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withOpacity(0.9),
-                    ),
-                  ),
-                  Text(
-                    '${job.job[0].state} ${job.job[0].neighborhood} ',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      height: 1.75,
-                      color: Theme.of(
-                        context,
-                      ).colorScheme.surface.withOpacity(0.55),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () => abrirGoogleMaps(
-                        job.job[0].latitude,
-                        job.job[0].longitude,
-                      ),
-                      icon: const Icon(
-                        Icons.directions_rounded,
-                        color: colorWhite,
-                      ),
-                      label: Text(
-                        'Cómo llegar',
-                        style: GoogleFonts.poppins(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: colorWhite,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: colorsecundario,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+            _priceLine('Mano de obra', labor),
+            const SizedBox(height: 12),
+            _priceLine('Visita / diagnóstico', diagnostic),
+            const SizedBox(height: 12),
+            _priceLine('Materiales (estimado)', materials),
+            const SizedBox(height: 16),
+            Divider(
+              height: 1,
+              thickness: 0.7,
+              color: surface.withValues(alpha: 0.1),
             ),
-            const SizedBox(width: 20),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(child: 
+                Text(
+                  'Total estimado',
+                  style: GoogleFonts.poppins(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: surface,
+                  ),
+                )),
+                Text(
+                  '\$${total.toStringAsFixed(2)}',
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: colorsecundario,
+                  ),
+                ),
+              ],
+            ),
           ],
+        ),
+      );
+    }
+
+  Widget _priceLine(String label, double value) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(child: 
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w400,
+            color: surface.withValues(alpha: 0.6),
+          ),
+        )),
+        Text(
+          '\$${value.toStringAsFixed(2)}',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: surface.withValues(alpha: 0.9),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildImg() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _fieldLabel('Imagenes del cliente'),
-        SizedBox(height: 20),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              imageBox(job.job[0].image_1),
-              const SizedBox(width: 20),
-              imageBox(job.job[0].image_2),
-            ],
-          ),
-        ),
-      ],
+  double _toNum(dynamic v) {
+    if (v == null) return 0;
+    if (v is num) return v.toDouble();
+    return double.tryParse(v.toString()) ?? 0;
+  }
+ 
+  Widget image(String? imagen, String type, IconData badgeIcon) {
+    return SizedBox(
+      width: 140,
+      height: 170,
+      child: Stack(
+        alignment: Alignment.center,
+        clipBehavior: Clip.none,
+        children: [
+          imagen == null
+              ? Container(
+                  decoration: BoxDecoration(
+                    color: Color.fromARGB(255, 177, 177, 177),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: IconButton(
+                    onPressed: () {},
+                    icon: const Icon(
+                      Icons.person,
+                    ), // Usa un icono de calendario
+                    color: const Color.fromARGB(255, 255, 255, 255),
+                    iconSize: 65,
+                  ),
+                )
+              : GestureDetector(
+                  onTap: () {
+                    _showFullImage(imagen);
+                  },
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Color.fromARGB(0, 103, 10, 10),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: CachedNetworkImage(
+                            imageUrl: imagen!,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) =>
+                                Center(child: Indicador()),
+                            errorWidget: (context, url, error) =>
+                                const Icon(Icons.broken_image),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 12,
+                        left: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: colorsecundario,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                 Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(badgeIcon, size: 12, color: colorWhite),
+                                  const SizedBox(width: 5),
+                                  Expanded(child: 
+                                  Text(
+                                    type,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: GoogleFonts.poppins(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: colorWhite,
+                                    ),
+                                  )),
+                                ],
+                              ),
+                              ],
+                       
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+        ],
+      ),
     );
   }
 
   Widget _buildEvidence() {
-    if (job.job[0].images_evicence.isEmpty) {
-      return SizedBox.shrink();
-    }
+    final evidence = job.job[0].images_evicence;
+    final total = 1 + evidence.length;
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(height: 20),
-        _fieldLabel('Evidencias del trabajador'),
+        Row(
+          children: [
+            Expanded(child: _fieldLabel('Evidencia')),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: colorsecundario.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                '$total foto${total != 1 ? 's' : ''}',
+                style: GoogleFonts.poppins(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: colorsecundario,
+                ),
+              ),
+            ),
+          ],
+        ),
         SizedBox(height: 20),
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              imageBox(job.job[0].images_evicence[0]),
+              image(job.job[0].image, 'Cliente', Icons.person_rounded)
+                  .animate()
+                  .fade(duration: 450.ms, delay: 60.ms)
+                  .slideX(begin: -0.2),
               const SizedBox(width: 20),
-              imageBox(job.job[0].images_evicence[1]),
-              const SizedBox(width: 10),
+              for (final img in evidence) ...[
+                image(img, 'Trabajador', Icons.handyman_rounded),
+                const SizedBox(width: 20),
+              ],
             ],
           ),
         ),
@@ -1197,116 +1576,76 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
     );
   }
 
-  Widget _buildPriceRow(String label, String value) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(child: 
-              Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.65),
-                ),
+  Widget _buildInfoCard({required IconData icon, required String text}) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorsecundario.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorsecundario.withOpacity(0.15)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: colorsecundario),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                height: 1.5,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
               ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.85),
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
-        Divider(
-          height: 1,
-          thickness: 0.5,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.1),
-        ),
-      ],
+        ],
+      ),
     );
   }
- 
+
   Widget _buildPaymentMethodCard() {
+    final isCash = job.job[0].payment_method == 'cash';
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
+        color: Theme.of(context).colorScheme.primary,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-        ),
       ),
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
       child: Row(
         children: [
           Container(
-            width: 32,
-            height: 32,
+            width: 36,
+            height: 36,
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
+              color: colorsecundario,
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              Icons.payments_rounded,
-              color: Theme.of(context).scaffoldBackgroundColor,
-              size: 16,
+              isCash ? Icons.payments_outlined : Icons.credit_card_rounded,
+              size: 18,
+              color: colorWhite,
             ),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 14),
           Expanded(child: 
           Text(
             'Método de pago',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: GoogleFonts.dmSans(
-              fontSize: 13,
+            style: GoogleFonts.poppins(
+              fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.85),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface
             ),
           )),
           const Spacer(),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.08)),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.money_rounded,
-                  color: Theme.of(
-                    context,
-                  ).scaffoldBackgroundColor.withOpacity(0.85),
-                  size: 15,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  '${job.job[0].payment_method == 'cash' ? 'Efectivo' : 'Tarjeta'} ',
-                  style: GoogleFonts.dmSans(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(
-                      context,
-                    ).scaffoldBackgroundColor.withOpacity(0.85),
-                  ),
-                ),
-              ],
+          Text(
+            isCash ? 'Efectivo' : 'Tarjeta',
+                        style: GoogleFonts.poppins(
+              fontSize: 14,
+                    fontWeight: FontWeight.w800,
+              color: colorsecundario,
             ),
           ),
         ],
@@ -1315,7 +1654,7 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
   }
 
   Widget _bottomBar(BuildContext context) {
-    final jobStatus = job.job[0].job_status.toLowerCase();
+    final expressStatus = job.job[0].job_status.toLowerCase();
 
     IconData icon = Icons.info;
     String text = '';
@@ -1323,70 +1662,99 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
     Color bgColor = colorsecundario;
     action = () async {
       print(job.job[0].job_status);
-
-     if (job.job[0].job_status == 'in_progress') {
+      if (job.job[0].job_status == 'pending') {
+        // _Send();
+        _showofferSheet();
+        return;
+      } else if (job.job[0].job_status != 'in_progress') {
+        await _Update(job.job[0].job_status);
+        _startTracking();
+      } else if (job.job[0].job_status == 'in_progress') {
         if (job.job[0].images_evicence.isEmpty) {
           bool? ok = await ActionAlert(
             context,
-            title: 'Evidencia requerida',
+            title: 'Evidencia',
             message:
-                'Antes de finalizar, envía la evidencia de que el trabajo ya fue terminado.',
+                'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
             type: action_type.advertencia,
           );
           if (ok!) {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => Evidencejobpage(
-                  isExpress: false,
-                  job_id: job.job[0].job_id,
-                  price: job.job[0].labor_cost,
-                  km_priece: job.job[0].km_cost,
-                ),
+                builder: (context) =>
+                    Evidencejobpage(isExpress: false, job_id: job.job[0].job_id),
               ),
             );
+
             return;
           }
         }
-        
-      } else if (job.job[0].job_status != 'in_progress') {
-        await _Update(job.job[0].job_status);
-        _startTracking();
       }
     };
-    switch (jobStatus) {
-      case 'pending':
-        icon = Icons.check_circle_outline;
-        text = 'Aceptar trabajo';
+    switch (expressStatus) {
+   case 'pending':
+        final proposals =job.job[0].jobs_proposal;
+        if (proposals.length == 1) {
+          final createdAt = DateTime.parse(proposals[0].created_at);
+          print(createdAt);
+          final expiresAt = createdAt.add(const Duration(minutes: 5));
+
+          if (_countdownExpiresAt != expiresAt) {
+            _startCountdown(expiresAt);
+          }
+
+          if (_remaining.inSeconds > 0) {
+            icon = Icons.timer;
+            text = "Espera ${_formatTime(_remaining)}";
+            bgColor = Colors.grey;
+            action = null;
+          } else {
+            icon = Icons.send_rounded;
+            text = "Enviar propuesta";
+            action = () {
+              _showofferSheet();
+            };
+          }
+        } else if (proposals.length >= 2) {
+          icon = Icons.block;
+          text = "Propuestas completas";
+          bgColor = Colors.grey;
+          action = null;
+        } else {
+          icon = Icons.hourglass_empty;
+          text = "Enviar propuesta";
+        }
+
         break;
 
       case 'accepted':
-        icon = Icons.directions_bike;
-        text = 'Voy en camino';
+        icon = Icons.delivery_dining_outlined;
+        text = 'Estoy llendo';
         break;
 
       case 'going':
-        icon = Icons.location_on_outlined;
-        text = 'Ya llegué';
+        icon = Icons.house_rounded;
+        text = 'Ya llegue';
         break;
 
       case 'arrived':
         icon = Icons.search;
         text = 'Iniciar diagnóstico';
-         action = () {
+        action = () {
           _startTracking();
 
           Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => PayJobPage(
-              isExpress: false,
-              job_id: job.job[0].job_id,
-              price: job.job[0].labor_cost,
-              km_priece: job.job[0].km_cost,
+            context,
+            MaterialPageRoute(
+              builder: (context) => PayJobPage(
+                isExpress: false,
+                job_id: job.job[0].job_id,
+                price: job.job[0].labor_cost,
+                km_priece: job.job[0].diagnostic_cost,
+              ),
             ),
-          ),
-        );
+          );
         };
         break;
 
@@ -1398,23 +1766,23 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
         break;
 
       case 'in_progress':
-        icon = Icons.task_alt;
-        text = 'Finalizar trabajo';
+        icon = Icons.home_repair_service;
+        text = 'Finalizar';
         break;
       case 'finalized':
-        icon = Icons.schedule;
-        text = 'Esperando pago';
+        icon = Icons.home_repair_service;
+        text = 'Esperando Pago';
         action = null;
         break;
       case 'completed':
-        icon = Icons.verified;
-        text = 'Trabajo completado';
+        icon = Icons.payment;
+        text = 'Completado';
         action = null;
         break;
 
       default:
-        icon = Icons.help_outline;
-        text = jobStatus;
+        icon = Icons.help;
+        text = expressStatus;
         bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
     }
 
@@ -1424,24 +1792,27 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
         border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
-            width: 1,
-          ),
+          // top: BorderSide(
+          //   color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
+          //   width: 1,
+          // ),
         ),
       ),
-      child: ElevatedButton.icon(
-        onPressed: action,
-        icon: Icon(icon, color: colorWhite, size: 25),
-        label: Text(
-          text,
-          style: const TextStyle(fontSize: 18, color: colorWhite),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(10),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: action,
+          icon: Icon(icon, color: colorWhite, size: 25),
+          label: Text(
+            text,
+            style: const TextStyle(fontSize: 18, color: colorWhite),
+          ),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bgColor,
+            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
         ),
       ),
@@ -1451,15 +1822,15 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
   Widget _fieldLabel(String label) {
     return Row(
       children: [
-        Container(
-          width: 3,
-          height: 18,
-          decoration: BoxDecoration(
-            color: colorsecundario,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 10),
+        // Container(
+        //   width: 3,
+        //   height: 18,
+        //   decoration: BoxDecoration(
+        //     color: colorsecundario,
+        //     borderRadius: BorderRadius.circular(2),
+        //   ),
+        // ),
+        // const SizedBox(width: 10),
         Expanded(
           child: Text(
             label,
@@ -1478,8 +1849,6 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
   Widget _fieldText(String text) {
     return Text(
       text,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
       style: GoogleFonts.poppins(
         fontSize: 13,
         height: 1.6,
@@ -1488,23 +1857,573 @@ class _ViewJobPageState extends State<ViewJobPage>  with TickerProviderStateMixi
     );
   }
 
- Widget _buttonDelete(BuildContext context) {
-  
-    return FloatingActionButton(
-      onPressed: () {
-         Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => AddReportPage(type: 'job', id: widget.id_trabajo,user: "${job.job[0].problem}" ,type_job: 'job',),
-              ));
+  void _showofferSheet() {
+    // Estado local del sheet: índice del chip seleccionado
+    int? selectedChipIndex;
+
+    // Multiplicadores y su valor base
+    final basePrice = job.job[0].worker_price;
+    final multipliers = [1.10, 1.20, 2, 3];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 8),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withValues(alpha: 0.18),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Enviar propuesta',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.surface,
+                          letterSpacing: -0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withValues(alpha: 0.45),
+                          height: 1.5,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      Text(
+                        'Tarifa de visita y diagnóstico',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: List.generate(multipliers.length, (index) {
+                            final value = basePrice * multipliers[index];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                right: index == multipliers.length - 1 ? 0 : 10,
+                              ),
+                              child: _paymentChip(
+                                value: value,
+                                label: '\$${value.toStringAsFixed(0)}',
+                                icon: Icons.attach_money_rounded,
+                                isSelected: selectedChipIndex == index,
+                                onTap: () => setModalState(() {
+                                  _diagnostic_cost = value;
+                                  selectedChipIndex = index;
+                                }),
+                              ),
+                            );
+                          }),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Tarifa de mano de obra',
+                        style: GoogleFonts.poppins(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withValues(alpha: 0.6),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      CustomTextFormFieldPrice(
+                        controller: _priceController,
+                        label: '\$ 0.00',
+                        validator: (value) {
+                          if (value == null || value.isEmpty)
+                            return 'Ingresa el precio';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 52,
+                        child: ElevatedButton.icon(
+                          onPressed: _Send,
+                          icon: const Icon(Icons.send_rounded, size: 18),
+                          label: Text(
+                            'Enviar propuesta',
+                            style: GoogleFonts.dmSans(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: colorsecundario,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
       },
-      backgroundColor: colorError,
-      elevation: 6,
-      child: const Icon(
-        Icons.report,
-        color: Colors.white,
-        size: 28,
+    );
+  }
+
+  Widget _paymentChip({
+    required double value,
+    required String label,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? colorsecundario : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected
+                ? colorsecundario
+                : Theme.of(context).colorScheme.surface.withOpacity(0.12),
+            width: isSelected ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isSelected
+                  ? colorWhite
+                  : Theme.of(context).colorScheme.surface.withOpacity(0.4),
+            ),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? colorWhite
+                    : Theme.of(context).colorScheme.surface.withOpacity(0.55),
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+  
+  Widget _buildActionsSection() {
+    final status = job.job[0].job_status.toLowerCase();
+    final bool canCancel = ['pending', 'canceled','finalized','completed'].contains(status);
+    final bool canReport = [
+      'canceled',
+      'completed',
+      'finalized',
+    ].contains(status);
+
+    if (canCancel && !canReport) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _fieldLabel('Acciones'),
+        const SizedBox(height: 16),
+        if (!canCancel) _cancelButton(),
+        if (!canCancel && canReport) const SizedBox(height: 12),
+        if (canReport) _reportButton(),
+      ],
+    );
+  }
+
+  Widget _cancelButton() {
+    return GestureDetector(
+      onTap: _showcancelSheet,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorError.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.cancel_rounded, color: colorError, size: 24),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Cancelar solicitud',
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: Theme.of(context).colorScheme.surface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Esta acción no se puede deshacer',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: colorError.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colorError.withValues(alpha: 0.6),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _reportButton() {
+    final surface = Theme.of(context).colorScheme.surface;
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AddReportPage(
+              type: 'job',
+              id: widget.id_trabajo,
+              user: "${job.job[0].problem}",
+              type_job: 'job',
+            ),
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorsecundario,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(Icons.flag_rounded, color: colorWhite, size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Reportar un problema',
+                    style: GoogleFonts.poppins(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: surface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Cuéntanos si algo salió mal',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      color: surface.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: surface.withValues(alpha: 0.35),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+void _showcancelSheet() {
+    // 👇 Opciones de motivo de cancelación
+    const List<String> motivos = [
+      'No puedo acudir al servicio',
+      'Tuve una emergencia personal',
+      'El cliente no responde',
+      'La ubicación es incorrecta',
+      'El servicio está fuera de mi zona',
+      'No cuento con las herramientas necesarias',
+      'Surgió un imprevisto',
+      'El horario ya no es compatible',
+      'No puedo realizar este tipo de trabajo',
+    ];
+
+    // 👇 Motivo seleccionado (null = ninguno → botón deshabilitado)
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final surface = Theme.of(context).colorScheme.surface;
+            final bool habilitado = motivoSeleccionado != null;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle bar centrado
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: surface.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '¿Por qué cancelas el servicio?',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                          color: surface,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Selecciona un motivo para continuar',
+                        style: GoogleFonts.dmSans(
+                          fontSize: 13,
+                          color: surface.withOpacity(0.5),
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // 👇 Lista de opciones seleccionables
+                      ...motivos.map((motivo) {
+                        final bool seleccionado = motivoSeleccionado == motivo;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: GestureDetector(
+                            onTap: () {
+                              setModalState(() {
+                                motivoSeleccionado = motivo;
+                              });
+                            },
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              curve: Curves.easeInOut,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 16,
+                              ),
+                              decoration: BoxDecoration(
+                                color: seleccionado
+                                    ? colorsecundario.withOpacity(0.1)
+                                    : surface.withOpacity(0.04),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: seleccionado
+                                      ? colorsecundario
+                                      : surface.withOpacity(0.12),
+                                  width: seleccionado ? 1.6 : 1,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      motivo,
+                                      style: GoogleFonts.dmSans(
+                                        fontSize: 15,
+                                        fontWeight: seleccionado
+                                            ? FontWeight.w600
+                                            : FontWeight.w500,
+                                        color: seleccionado
+                                            ? colorsecundario
+                                            : surface.withOpacity(0.8),
+                                        letterSpacing: -0.2,
+                                      ),
+                                    ),
+                                  ),
+                                  // 👇 Indicador tipo radio
+                                  AnimatedContainer(
+                                    duration: const Duration(milliseconds: 200),
+                                    width: 22,
+                                    height: 22,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: seleccionado
+                                          ? colorsecundario
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: seleccionado
+                                            ? colorsecundario
+                                            : surface.withOpacity(0.3),
+                                        width: 2,
+                                      ),
+                                    ),
+                                    child: seleccionado
+                                        ? const Icon(
+                                            Icons.check,
+                                            size: 14,
+                                            color: Colors.white,
+                                          )
+                                        : null,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: 22),
+
+                      // 👇 Botón: habilitado solo si hay motivo seleccionado
+                      ElevatedButton(
+                        onPressed: habilitado
+                            ? () {
+                                _Cancelar();
+                              }
+                            : null, // 👈 null = deshabilitado
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: colorsecundario,
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: surface.withOpacity(0.12),
+                          disabledForegroundColor: surface.withOpacity(0.4),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.send, size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Cancelar servicio',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

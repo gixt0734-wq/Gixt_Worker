@@ -3,7 +3,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:gixt_worker/Components/ActionAlert%20.dart';
-import 'package:gixt_worker/Components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Description.dart';
@@ -11,6 +11,7 @@ import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
 import 'package:gixt_worker/Components/inputs/input_number.dart';
 import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
+import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/services/Evidence/Add_evidence_service.dart';
@@ -37,6 +38,7 @@ class PayJobPage extends StatefulWidget {
 
 class _PayPageState extends State<PayJobPage> {
   int _paginaActual = 0;
+  final _formKey = GlobalKey<FormState>();
   final TextEditingController _priceMatController = TextEditingController();
   final TextEditingController _priceController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
@@ -46,6 +48,10 @@ class _PayPageState extends State<PayJobPage> {
 
   double get _subtotalMateriales =>
       _materiales.fold(0, (sum, m) => sum + m.cost);
+
+  final List<String> _descriptionOptions = [
+    'Se realizara el trabajo como lo pidio el cliente',
+  ];
 
   double get _total {
     double price = double.tryParse(_priceController.text) ?? 0.0;
@@ -94,12 +100,12 @@ class _PayPageState extends State<PayJobPage> {
   }
 
   void _Send() async {
+     if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
     bool? ok = await ActionAlert(
       context,
-      title: 'Finalizar',
-      message:
-          'Asegurate que los precios esten correctos ya que no se pueden modificar despues de finalizar',
+      title: 'Diagnostico',
+      message:'Asegurate que los precios esten correctos ya que no se pueden modificar despues de finalizar',
       type: action_type.advertencia,
     );
     if (ok!) {
@@ -135,11 +141,11 @@ class _PayPageState extends State<PayJobPage> {
             type: alert_type.exito,
           );
           if (widget.isExpress) {
-            finishexpressNotifier.refresh();
+            expressNotifier.refresh();
           } else {
             jobsStatusNotifierFinish.refresh();
           }
-
+          homeNotifier.refresh();
           Navigator.pop(context);
         });
       } else {
@@ -184,10 +190,15 @@ class _PayPageState extends State<PayJobPage> {
   }
 
   Widget _buildPay() {
-    return Column(
+    return Form(
+    key: _formKey,
+    child: 
+     Column(
       children: [
         _buildSectionHeader(number: '1',title:  'Descripcion del diagnostico',subtitle: 'Agrega una descripción detallada del trabajo realizado'),
-        const SizedBox(height: 20),
+        const SizedBox(height: 12),
+        _buildDescriptionChips(),
+        const SizedBox(height: 12),
         CustomDescriptionFormField(
           controller: _descriptionController,
           label: 'Descripción final',
@@ -248,6 +259,42 @@ class _PayPageState extends State<PayJobPage> {
         const SizedBox(height: 28),
 
       ],
+     )
+    );
+  }
+
+  Widget _buildDescriptionChips() {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: _descriptionOptions.map((option) {
+        return GestureDetector(
+          onTap: () {
+            setState(() {
+              _descriptionController.text = option;
+            });
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+                width: 1,
+              ),
+            ),
+            child: Text(
+              option,
+              style: GoogleFonts.dmSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 

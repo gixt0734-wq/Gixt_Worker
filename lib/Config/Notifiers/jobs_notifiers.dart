@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gixt_worker/Config/location.dart';
 
 class JobsNotifier extends ChangeNotifier {
   String? _id;
@@ -28,6 +29,15 @@ class JobsStatusNotifierFinish extends ChangeNotifier {
   }
 }
 
+class CancelJobsNotifier extends ChangeNotifier {
+  void refresh() async {
+    print('canceladop');
+    notifyListeners();
+    await LocationService.stop();
+  }
+}
+
 final jobsNotifier = JobsNotifier();
+final canceljobNotifier = CancelJobsNotifier();
 final jobsStatusNotifier = JobsStatusNotifier();
 final jobsStatusNotifierFinish = JobsStatusNotifierFinish();

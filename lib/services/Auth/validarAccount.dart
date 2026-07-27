@@ -2,11 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:gixt_worker/config/device.dart';
-import 'package:gixt_worker/services/Auth/auth_service.dart';
 import 'package:http/http.dart' as http;
 
-class ValidarService {
+class ValidarAccounthService {
   static Future<Map<String, dynamic>> Crear({
     required String email,
   }) async {
@@ -16,7 +14,7 @@ class ValidarService {
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Users/verification');
+      final uri = Uri.parse('${dotenv.env['API_URL']}/api/Users/verification/user');
 
         var request = http.MultipartRequest('POST', uri);
 

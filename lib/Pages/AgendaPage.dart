@@ -10,7 +10,7 @@ import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/components/cards/cardsAgenda.dart';
 import 'package:gixt_worker/components/sketor/cardsCategoria.dart';
-import 'package:gixt_worker/services/Job/Job_service.dart';
+import 'package:gixt_worker/services/Job/Jobs_worker_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 import 'package:signalr_netcore/hub_connection.dart';
@@ -23,7 +23,7 @@ class AgendaPage extends StatefulWidget {
 }
 
 class _AgendaPageState extends State<AgendaPage> {
-  final Jobs_service api = Jobs_service();
+  final Jobs_worker_service api = Jobs_worker_service();
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
 
@@ -131,12 +131,12 @@ class _AgendaPageState extends State<AgendaPage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true, //  deja solo la barra pequeña visible
       floating: false, //  NO aparece al subir
       snap: false, // NO animación automática
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       automaticallyImplyLeading: false,
       iconTheme: const IconThemeData(
         color: Colors.white, // 👈 color del ícono
@@ -169,7 +169,7 @@ class _AgendaPageState extends State<AgendaPage> {
   Widget _buildData() {
     return Column(
       children: [
-        if (timeout) ...[CardsSN(img: 'assets/Banner2.png')],
+        if (timeout) ...[_buildEmptyState()],
         if (!timeout) ...[_buildServicios(_category)],
       ],
     );
@@ -190,6 +190,51 @@ class _AgendaPageState extends State<AgendaPage> {
             value: 'pending',
             label: 'Pendiente',
             icon: Icons.pending_actions_outlined,
+          ),
+          const SizedBox(width: 10),
+          _categoryChip(
+            value: 'accepted',
+            label: 'Aceptado',
+            icon: Icons.check_circle_outline,
+          ),
+          const SizedBox(width: 10),
+          _categoryChip(
+            value: 'in_progress',
+            label: 'En progreso',
+            icon: Icons.work_outline,
+          ),
+          const SizedBox(width: 10),
+          _categoryChip(
+            value: 'finalized',
+            label: 'Finalizado',
+            icon: Icons.done_outline,
+          ),
+          const SizedBox(width: 10),
+          _categoryChip(
+            value: 'completed',
+            label: 'Completado',
+            icon: Icons.thumb_up_outlined,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFiltrosType() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _categoryChip(
+            value: 'express',
+            label: 'Express',
+            icon: Icons.pending_actions_outlined,
+          ),
+          const SizedBox(width: 10),
+          _categoryChip(
+            value: 'todos',
+            label: 'Todos',
+            icon: Icons.list_alt_outlined,
           ),
           const SizedBox(width: 10),
           _categoryChip(
@@ -270,8 +315,8 @@ class _AgendaPageState extends State<AgendaPage> {
   }
 
   Widget _buildServicios(String tipo) {
-    // Filtrar por estado
-    final List<Jobs> filtrados = api.jobs.where((a) {
+
+    final List<Jobs_Worker> filtrados = api.jobs.where((a) {
       if (tipo.toLowerCase() == 'in_progress') {
         // cuando llamas "in_progress" incluimos los 3 estados
         return a.job_status == 'in_progress' ||
@@ -291,6 +336,7 @@ class _AgendaPageState extends State<AgendaPage> {
       alignment: Alignment.topLeft,
       child: Column(
         children: [
+          
           Row(
             children: [
               Text(
@@ -328,16 +374,10 @@ class _AgendaPageState extends State<AgendaPage> {
             ],
           ),
           SizedBox(height: 20),
-          GridView.builder(
-            scrollDirection: Axis.vertical,
+ListView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 1,
-              mainAxisSpacing: 20,
-              childAspectRatio: 2.5,
-            ),
+            padding: EdgeInsets.zero,
             itemCount: isLoading ? 3 : filtrados.length,
             itemBuilder: (context, index) {
               if (isLoading && !timeout) {
@@ -346,9 +386,12 @@ class _AgendaPageState extends State<AgendaPage> {
 
               final agenda = filtrados[index];
 
-              return CardsAgenda(
-                    image_url: agenda.service_image,
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 20),
+                child: CardsAgenda(
+                    image_url: agenda.image_url,
                     name: agenda.problem,
+                    type: agenda.type,
                     client_image: agenda.client_image,
                     job_id: agenda.job_id,
                     client: agenda.client_first_name,
@@ -358,7 +401,7 @@ class _AgendaPageState extends State<AgendaPage> {
                     description: agenda.description,
                     address: agenda.maps_address,
                     status: agenda.job_status,
-                  )
+                  ))
                   .animate()
                   .fade(duration: 400.ms)
                   .slideY(begin: 0.15)
@@ -369,4 +412,49 @@ class _AgendaPageState extends State<AgendaPage> {
       ),
     );
   }
+  
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 32),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              Icons.inbox_outlined,
+              size: 38,
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+           'Aún no tienes trabajos asignados',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.35),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Las nuevas solicitudes aparecerán en el botón central. ¡Mantente atento para no perder ninguna oportunidad!',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.25),
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    ).animate().fade(duration: 400.ms);
+  }
+
 }

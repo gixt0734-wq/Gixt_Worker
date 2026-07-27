@@ -6,12 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 class CustomPasswordFormField extends StatefulWidget {
   final TextEditingController controller;
   final String label;
+  final int? max;
   final String? Function(String?)? validator;
 
   const CustomPasswordFormField({
     super.key,
     required this.controller,
     this.label = 'Contraseña',
+    this.max,
     this.validator,
   });
 
@@ -45,6 +47,7 @@ class _CustomPasswordFormFieldState extends State<CustomPasswordFormField> {
     return TextFormField(
       controller: widget.controller,
       obscureText: _isObscured,
+      maxLength: widget.max,
       style: TextStyle(color: Theme.of(context).colorScheme.surface),
       cursorColor: Theme.of(context).colorScheme.surface,
       autofillHints: const [AutofillHints.password],
@@ -56,7 +59,10 @@ class _CustomPasswordFormFieldState extends State<CustomPasswordFormField> {
           fontSize: 13,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
         ),
-
+        counterStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
+        ),
         // 🔹 Label cuando está seleccionado
         floatingLabelStyle: GoogleFonts.poppins(
           fontSize: 12,

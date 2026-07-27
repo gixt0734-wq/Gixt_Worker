@@ -15,28 +15,63 @@ class InfoService {
     required double longitude,
     required double labor_cost,
     required double range_km,
+    required String? id,
+    List<File?> images = const [],
+    List<int?> cat = const [],
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
      final prefs = await SharedPreferences.getInstance();
-    String? id_user = prefs.getString('id');
+
 
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
+        print(id);
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/info');
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
 
         // Campos de texto
-        request.fields['user_id'] = id_user!;
+        request.fields['user_id'] = id!;
         request.fields['description'] = description;
         request.fields['city'] = city;
         request.fields['latitude'] = latitude.toString();
         request.fields['longitude'] = longitude.toString();
-        request.fields['labor_cost'] = labor_cost.toString();
-        request.fields['range_km'] = range_km.toString();
+        request.fields['diagnostic_cost'] = labor_cost.toString();
+        request.fields['service_radius_km'] = range_km.toString();
+        
+        // for (int i = 0; i < images.length; i++) {
+        //   if (images[i] != null) {
+        //     request.files.add(
+        //       await http.MultipartFile.fromPath(
+        //         'images', // mismo nombre que el DTO
+        //         images[i]!.path,
+        //       ),
+        //     );
+        //   }
+        // }
+        for (File? img in images)
+        {
+         if (img != null) {
+         request.files.add(
+              await http.MultipartFile.fromPath(
+                'images', // mismo nombre que el DTO
+                img!.path,
+              ),
+            );
+         }
+        }
+
+        int catIndex = 0;
+        for (int? catid in cat) {
+          if (catid != null) {
+            request.fields['category_id[$catIndex]'] = catid.toString();
+            print(catid);
+            catIndex++;
+          }
+        }
 
         // Enviar request
         var streamedResponse = await request.send().timeout(const Duration(seconds: 30));

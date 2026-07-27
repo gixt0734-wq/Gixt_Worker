@@ -16,7 +16,10 @@ class CuentaService {
     required String phone,
     required String gender,
     required String  birth_date,
-    required bool terms
+    required bool terms,
+    required String deviceId,
+    required String deviceName,
+    required String tokenFcm,
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
@@ -36,7 +39,13 @@ class CuentaService {
         request.fields['last_name'] = lastName;
         request.fields['phone'] = phone;
         request.fields['gender'] = gender;
-        request.fields['birth_date'] = birth_date;
+        request.fields['deviceId'] = deviceId;
+        request.fields['deviceName'] = deviceName;
+        request.fields['tokenFcm'] = tokenFcm;
+       final parts = birth_date.split('/');
+
+request.fields['birth_date'] =
+    '${parts[2]}-${parts[1]}-${parts[0]}';
         request.fields['terms'] = terms.toString();
 
         // Archivo
@@ -56,22 +65,11 @@ class CuentaService {
         print(responseString);
 
         if (streamedResponse.statusCode == 200) {
-          var device = await DeviceService.getDeviceData();
-          final result = await AuthService.login(
-            email: email,
-            password: password, 
-            deviceId: device["deviceId"] ?? '',
-            deviceName: device["deviceName"] ?? '', 
-            tokenFcm: device["tokenFcm"] ?? '',
-            
-          );
-
+          final result = jsonDecode(responseString);
           if (result['success'] == true) {
-            final data = result['data'];
-            print(data);
             return {
               'success': true,
-              'data': data,
+              'data':  jsonDecode(responseString),
             };
           } else {
             return {

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:gixt_worker/Components/CircleImage.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Pages/ViewJobPage.dart';
 import 'package:gixt_worker/main.dart';
 import 'package:gixt_worker/pages/ExpressPage.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -23,6 +24,7 @@ class _AlertaData {
   final String title;
   final String message;
   final String img;
+  final String type;
   Timer? autoCloseTimer;
   // 👇 Momento en que se creó la alerta, para calcular el progreso de la barra
   final DateTime createdAt;
@@ -31,15 +33,17 @@ class _AlertaData {
     required this.title,
     required this.message,
     required this.img,
+    required this.type
   }) : createdAt = DateTime.now();
 }
 
 /// MOSTRAR ALERTA
-Future<void> mostrarDialogExpress({
+Future<void> mostrarDialogNewjob({
   required String id,
   required String title,
   required String message,
   required String img,
+  required String type
 }) async {
   final overlayState = navigatorKey.currentState?.overlay;
 
@@ -48,7 +52,7 @@ Future<void> mostrarDialogExpress({
   // Evitamos duplicados
   if (_alertas.any((a) => a.id == id)) return;
 
-  final alerta = _AlertaData(id: id, title: title, message: message, img: img);
+  final alerta = _AlertaData(id: id, title: title, message: message, img: img, type: type);
 
   // Timer de auto-cierre
   alerta.autoCloseTimer = Timer(_kDuracionAlerta, () {
@@ -333,17 +337,33 @@ class _AlertaExpressState extends State<AlertaExpress>
                                           Expanded(
                                             child: ElevatedButton(
                                               onPressed: () {
-                                                final expressId = alerta.id;
+                                                final Id = alerta.id;
                                                 cerrarTodasAlertas();
-                                                Navigator.push(
-                                                  context,
-                                                  MaterialPageRoute(
-                                                    builder: (context) =>
-                                                        ExpressPage(
-                                                      express_id: expressId,
-                                                    ),
+                                                if(alerta.type == 'express')
+                                                {
+                                                  Navigator.push(
+                                                    context,
+                                                    MaterialPageRoute(
+                                                      builder: (context) =>
+                                                          ExpressPage(
+                                                        express_id: Id,
+                                                      ),
                                                   ),
                                                 );
+                                                }
+                                                else
+                                                {
+                                                   Navigator.push(
+                                                      context,
+                                                      MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            ViewJobPage(
+                                                          id_trabajo: Id,
+                                                        ),
+                                                      ),
+                                                    );
+
+                                                }
                                               },
                                               style: ElevatedButton.styleFrom(
                                                 elevation: 0,

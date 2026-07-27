@@ -15,7 +15,7 @@ String formatDateTime(String? date) {
   return DateFormat('dd/MM/yyyy HH:mm').format(parsed);
 }
 
-class ReportClient {
+class ReportWorker {
   String report_id;
   String description;
   String reason;
@@ -27,11 +27,10 @@ class ReportClient {
   String? type_job;
   String evidence_image;
   String client_id;
-  String client_username;
+  String username;
+  String client_image;
 
-  String worker_image;
-
-  ReportClient({
+  ReportWorker({
     required this.report_id,
     required this.description,
     required this.reason,
@@ -43,13 +42,14 @@ class ReportClient {
     required this.type_job,
     required this.evidence_image,
     required this.client_id,
-    required this.client_username,
-    required this.worker_image
+    required this.username,
+    required this.client_image
+
 
   });
 
-  factory ReportClient.fromJson(Map<String, dynamic> json) {
-    return ReportClient(
+  factory ReportWorker.fromJson(Map<String, dynamic> json) {
+    return ReportWorker(
       report_id: json['report_id'] ?? '',
       description: json['description'] ?? '',
       reason: json['reason'] ?? '',
@@ -61,8 +61,8 @@ class ReportClient {
       updated_at: formatDateTime(json['updated_at']),
       evidence_image: json['image_url'] ?? '',
       client_id: json['client']? ['user_id'] ?? '',
-      client_username: json['client'] ? ['username']?? 0,
-      worker_image: json['client'] ? ['image_url']?? '',
+      username: json['client']? ['username'] ?? '',
+      client_image: json['client'] ? ['image_url']?? '',
 
     );
   }
@@ -70,7 +70,7 @@ class ReportClient {
 
 
 class ReportsServiceClient {
-  List<ReportClient> report = []; // Lista de empresas
+  List<ReportWorker> report = []; // Lista de empresas
   int pageNumber = 1;
   bool isLoading = false;
   bool hasMore = true;
@@ -78,7 +78,7 @@ class ReportsServiceClient {
   set loading(bool loading) {}
 
   Future<bool> fetchData( String id,{bool forceRefresh = false}) async {
-    print("fetch report client");
+    print("fetch servicios");
 
     final prefs = await SharedPreferences.getInstance();
     print("🌐 Llamando API");
@@ -86,6 +86,7 @@ class ReportsServiceClient {
     final headers = {'Authorization': 'Bearer $token'};
 
     try {
+      print(id);
       isLoading = true;
       final response = await http
       
@@ -103,7 +104,7 @@ class ReportsServiceClient {
         print(jsonResponse);
         report
           ..clear()
-          ..add(ReportClient.fromJson(jsonResponse));
+          ..add(ReportWorker.fromJson(jsonResponse));
 
         return true;
       }

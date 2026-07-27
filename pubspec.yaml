@@ -68,6 +68,10 @@ dependencies:
   flutter_launcher_icons: ^0.13.1
   curved_navigation_bar: ^1.0.6
   hugeicons: ^1.1.7
+  camera: ^0.12.0+1
+  permission_handler: ^12.0.3
+  file_picker: ^11.0.2
+  pdfx: ^2.9.2
 
 flutter_launcher_icons:
   android: true
@@ -98,16 +102,26 @@ flutter:
   - assets/correcto.png
   - assets/alerta.png
   - assets/error.png
+  - assets/express.png
   - assets/logo.png
+  - assets/logo2d.png
+  - assets/category.png
+  - assets/info.png
+  - assets/gxt.png
   - assets/persona.png
   - assets/Banner1.png
-  - assets/Banner2.png
-  - assets/Banner3.png
-  - assets/Banner4.png
-  - assets/Banner5.png
+  - assets/selectworker.png
+  - assets/support.png
   - assets/persona2.png
   - assets/persona3.png
   - assets/google.png
   - assets/worker.png
   - assets/marker.png
   - assets/apple.png
+  - assets/ine.png
+  - assets/carpeta.png
+  - assets/docts.png
+  - assets/work.png
+  - assets/aprosupport.png
+  - assets/active.png
+  - assets/bye.png

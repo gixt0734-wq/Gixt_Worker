@@ -3,11 +3,16 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:gixt_worker/Auth/DeleteAccount.dart';
 import 'package:gixt_worker/Auth/Login.dart';
+import 'package:gixt_worker/Auth/UpdatePassword.dart';
 import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/CircleImage.dart';
-import 'package:gixt_worker/Components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
+import 'package:gixt_worker/Components/registro_loader.dart';
+import 'package:gixt_worker/Config/SignalRService.dart';
+import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/Reports/ReportsPage.dart';
 import 'package:gixt_worker/Pages/UpdatePerfilPage.dart';
@@ -31,6 +36,7 @@ class _ConfigPageState extends State<ConfigPage> {
   bool hasMore = true;
   final User_service user = User_service();
   final ScrollController _scrollController = ScrollController();
+  final PreferencesService _preferencesService = PreferencesService();
   String? _gender;
   String? _imageUrl;
   File? _image;
@@ -78,11 +84,16 @@ class _ConfigPageState extends State<ConfigPage> {
     );
     if (!continuar!) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => LoginPage()),
-    );
+
+    bool ok = await SignalRService.disconnectServer();
+    if (ok) {
+      await prefs.clear();
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
+      return;
+    }
   }
 
   void _showFullImage(String imageUrl) {
@@ -110,6 +121,8 @@ class _ConfigPageState extends State<ConfigPage> {
   }
 
   void _active() async {
+    await _preferencesService.clearPreferencesWorking();
+    await _preferencesService.savePreferencesWorking(!is_working!);
     setState(() {
       is_working = !is_working!;
     });
@@ -162,7 +175,11 @@ class _ConfigPageState extends State<ConfigPage> {
                       duration: 400.ms,
                       delay: 200.ms,
                     ),
-
+                    const SizedBox(height: 20),
+                    _buildActionsListDelete().animate().fadeIn(
+                      duration: 400.ms,
+                      delay: 200.ms,
+                    ),
                     const SizedBox(height: 100),
                   ]),
                 ),
@@ -180,12 +197,12 @@ class _ConfigPageState extends State<ConfigPage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true,
       floating: false,
       snap: false,
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       automaticallyImplyLeading: false,
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
@@ -350,13 +367,14 @@ class _ConfigPageState extends State<ConfigPage> {
 
   Widget _buildActionsList() {
     return Container(
+      clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         children: [
-          _actionRow(
+          _actionRowscroll(
             icon: is_working! ? Icons.work_outline : Icons.bedtime_outlined,
             iconBgColor: is_working!
                 ? const Color(0xFF10B981).withOpacity(0.12)
@@ -370,7 +388,7 @@ class _ConfigPageState extends State<ConfigPage> {
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, child) {
               final isDark = themeProvider.themeMode == ThemeMode.dark;
-              return _actionRow(
+              return _actionRowscroll(
                 icon: isDark
                     ? Icons.dark_mode_outlined
                     : Icons.light_mode_outlined,
@@ -383,7 +401,7 @@ class _ConfigPageState extends State<ConfigPage> {
             },
           ),
           _rowDivider(),
-           _actionRow(
+          _actionRow(
             icon: Icons.report_outlined,
             iconBgColor: colorsecundario.withOpacity(0.12),
             iconColor: colorsecundario,
@@ -432,7 +450,13 @@ class _ConfigPageState extends State<ConfigPage> {
             title: 'Cambiar contraseña',
             subtitle: 'Actualiza tu seguridad',
             onTap: () {
-              // TODO: Navegar a cambiar contraseña
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      Updatepassword(email: user.user[0].email),
+                ),
+              );
             },
           ),
           _rowDivider(),
@@ -443,6 +467,36 @@ class _ConfigPageState extends State<ConfigPage> {
             title: 'Cerrar sesión',
             subtitle: 'Salir de tu cuenta',
             onTap: _logout,
+            isDestructive: true,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionsListDelete() {
+    return Container(
+      clipBehavior: Clip.hardEdge,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+         
+          _rowDivider(),
+          _actionRow(
+            icon: Icons.delete_forever,
+            iconBgColor: colorError.withOpacity(0.12),
+            iconColor: colorError,
+            title: 'Borrar Cuenta',
+            subtitle: 'borrar tu cuenta',
+            onTap: () {
+                Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => Deleteaccount(email: user.user[0].email,img : user.user[0].image_url)),
+              );
+            },
             isDestructive: true,
           ),
         ],
@@ -512,6 +566,92 @@ class _ConfigPageState extends State<ConfigPage> {
                 color: Theme.of(context).colorScheme.surface.withOpacity(0.3),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _actionRowscroll({
+    required IconData icon,
+    required Color iconBgColor,
+    required Color iconColor,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    bool isDestructive = false,
+  }) {
+    return Dismissible(
+      key: UniqueKey(),
+      direction: DismissDirection.endToStart, // o startToEnd
+      // 👇 ESTO evita que se elimine el item
+      confirmDismiss: (direction) async {
+        onTap?.call(); // acción del swipe
+        return false; // NO elimina el widget
+      },
+      onDismissed: (direction) {
+        onTap(); // o tu función de swipe
+      },
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        color: colorsecundario,
+        child: const Icon(Icons.refresh_outlined, color: Colors.white),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 20, color: iconColor),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: GoogleFonts.poppins(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: isDestructive
+                              ? colorError
+                              : Theme.of(context).colorScheme.surface,
+                          letterSpacing: -0.1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withOpacity(0.5),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  size: 20,
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.3),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -25,7 +25,6 @@ class AddReportService {
     final headers = {'Authorization': 'Bearer $token'};
 
     while (attempts < maxAttempts) {
-      print(id_user );
       try {
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Report');
 

@@ -7,6 +7,7 @@ class CustomTextFormField extends StatefulWidget {
   final String label;
   final IconData icon;
   final bool readOnly;
+  final int? max;
   final String? Function(String?)? validator;
   final TextInputType keyboardType;
   final String hint;
@@ -17,6 +18,7 @@ class CustomTextFormField extends StatefulWidget {
     required this.label,
     required this.icon,
     required this.readOnly,
+    this.max,
     this.validator,
     this.hint = '',
     this.keyboardType = TextInputType.text,
@@ -50,6 +52,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
       controller: widget.controller,
       keyboardType: widget.keyboardType,
       readOnly: widget.readOnly,
+      maxLength: widget.max,
       style: GoogleFonts.poppins(
         fontSize: 14,
         color: Theme.of(context).colorScheme.surface,
@@ -61,6 +64,11 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
         hintStyle: GoogleFonts.poppins(
           fontSize: 11,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.25),
+        ),
+        // 🔹 contador de digitos
+        counterStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
         ),
 
         // 🔹 Label normal

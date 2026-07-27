@@ -1,0 +1,182 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http; // Importar el paquete http
+import 'dart:convert'; // Para trabajar con JSON
+
+class Jobs_Worker {
+  String job_id;
+  String type;
+  // worker
+  String client_user_id;
+  String client_first_name;
+  String client_username;
+  String client_image;
+
+  // location
+  String maps_address;
+
+  String image_url;
+
+  // job
+  String job_date;
+  String job_time;
+  String description;
+  String problem;
+
+  bool is_active;
+  String job_status;
+  double price;
+  
+
+  Jobs_Worker({
+    required this.job_id,
+    required this.type,
+    required this.client_user_id,
+    required this.client_first_name,
+    required this.client_username,
+    required this.client_image,
+    required this.maps_address,
+    required this.image_url,
+    required this.job_date,
+    required this.job_time,
+    required this.description,
+    required this.problem,
+    required this.is_active,
+    required this.job_status,
+    required this.price,
+
+  });
+
+  factory Jobs_Worker.fromJson(Map<String, dynamic> json) {
+    return Jobs_Worker(
+    job_id: json['id'] ?? '',
+      type :json['type'] ?? '',
+      client_user_id: json['client']?['user_id'] ?? '',
+      client_first_name: json['client']?['first_name'] ?? '',
+      client_username: json['client']?['username'] ?? '',
+      client_image: json['client']?['image'] ?? '',
+
+      maps_address: json['location']?['maps_address'] ?? '',
+
+
+      job_date: json['job_date'] ?? '',
+      job_time: json['job_time'] ?? '',
+      description: json['description'] ?? '',
+      problem: json['problem'] ?? '',
+      image_url : json['image_url'] ?? '',
+      is_active: json['is_active'] ?? false,
+      job_status: json['job_status'] ?? '',
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+     
+    );
+  }
+}
+
+class Jobs_worker_service {
+  List<Jobs_Worker> jobs = []; // Lista de empresas
+  int pageNumber = 1;
+  bool isLoading = false;
+  bool hasMore = true;
+  static const String _cacheKey = 'agenda_cache';
+  static const String _cacheTimeKey = 'agenda_cache_time';
+
+  set loading(bool loading) {}
+  Future<void> updatedata() async {
+    print("📦 actualizando agenda");
+    await fetchFromApi();
+  }
+
+  Future<bool> fetchAgendaData() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    // config cache
+    const cacheDuration = Duration(seconds: 1);
+
+    // leer cache
+    final cachedData = prefs.getString(_cacheKey);
+    final cachedTime = prefs.getInt(_cacheTimeKey);
+
+    final now = DateTime.now();
+
+    //  validar cache
+    if (cachedData != null &&
+        cachedTime != null &&
+        now.difference(DateTime.fromMillisecondsSinceEpoch(cachedTime)) <
+            cacheDuration) {
+      print("📦 Usando cache agenda");
+
+      final List<dynamic> jsonData = json.decode(cachedData);
+      jobs
+        ..clear()
+        ..addAll(jsonData.map((e) => Jobs_Worker.fromJson(e)));
+
+      return true;
+    }
+
+    print("🚫 Cache inválido → API agenda");
+    return await fetchFromApi();
+  }
+
+  Future<bool> fetchFromApi() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    print("🌐 Llamando API agenda");
+
+    final token = prefs.getString('token');
+    String? id_user = prefs.getString('id');
+
+    final headers = {'Authorization': 'Bearer $token'};
+    int attempts = 0;
+    const int maxAttempts = 2;
+    while (attempts < maxAttempts) {
+      try {
+        isLoading = true;
+
+        final response = await http
+            .get(
+              Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/$id_user'),
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final List<dynamic> jsonResponse = json.decode(response.body);
+          print(jsonResponse);
+          jobs
+            ..clear()
+            ..addAll(jsonResponse.map((e) => Jobs_Worker.fromJson(e)));
+
+          await prefs.setString(_cacheKey, response.body);
+          await prefs.setInt(
+            _cacheTimeKey,
+            DateTime.now().millisecondsSinceEpoch,
+          );
+          return true;
+        }
+        print(" Error HTTP: ${response.statusCode}");
+        return false;
+      } on TimeoutException {
+        print(" Timeout de la API");
+        return false;
+      } on SocketException {
+        print(" Sin conexión a internet");
+        return false;
+      } catch (e) {
+        print(" Error inesperado: $e");
+        return false;
+      } finally {
+        isLoading = false;
+      }
+    }
+    attempts++;
+
+    if (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    return false;
+  }
+}

@@ -33,7 +33,7 @@ class AuthService {
             )
             .timeout(const Duration(seconds: 30));
 
-
+        print('status ${response}');
         if (response.statusCode == 200) {
           return {
             'success': true,

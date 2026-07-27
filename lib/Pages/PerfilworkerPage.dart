@@ -10,33 +10,23 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:gixt_worker/Auth/Login.dart';
+import 'package:gixt_worker/Components/CircleImage.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
+import 'package:gixt_worker/Components/Sketor/opciones.dart';
 import 'package:gixt_worker/Components/Toast.dart';
+import 'package:gixt_worker/Components/OptionsCategoriasView.dart';
 import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
-import 'package:gixt_worker/GPS/gps_tracking_page.dart';
-import 'package:gixt_worker/components/Indicador.dart';
-import 'package:gixt_worker/components/inputs/Input.dart';
-import 'package:gixt_worker/components/inputs/Input_Fecha.dart';
-import 'package:gixt_worker/components/inputs/Input_Phone.dart';
-import 'package:gixt_worker/components/inputs/Pick_Image.dart';
-import 'package:gixt_worker/providers/theme_provider.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
-import 'package:gixt_worker/services/user/User_service.dart';
 import 'package:gixt_worker/services/user/Worker_service.dart';
 import 'package:gixt_worker/services/user/update_info_service.dart';
-import 'package:gixt_worker/services/user/update_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:image_cropper/image_cropper.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
-import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:shimmer/shimmer.dart';
 
 class PerfilWorkerPage extends StatefulWidget {
   const PerfilWorkerPage({super.key});
@@ -64,6 +54,10 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   String? estado;
   String? pais;
   String? colonia;
+
+  String? img;
+  String? username;
+  bool isworking = false;
 
   GoogleMapController? mapController;
   LatLng? posicionActual = LatLng(20.9674, -89.5926);
@@ -164,24 +158,89 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
         _paginaActual--; // vuelve al formulario
       });
       return false;
-    } else {
-      Navigator.pop(context);
-      return true;
     }
+    return false;
   }
 
   @override
   void initState() {
     super.initState();
     marker();
+    _loadPrefs();
     _Initial();
   }
 
+  Future<void> _loadPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      img = prefs.getString('img');
+      username = prefs.getString('user');
+      isworking = prefs.getBool('isworking') ?? false;
+    });
+  }
+
   Future<void> _onRefresh() async {
+    await worker.updatedata();
+        Navigator.pop(context);
+        setState(() {
+        
+      });
+      if(_paginaActual == 1)
+      {
+         setState(() {
+            
+          _paginaActual--;
+        });
+      }
+     Toast(
+        context,
+        title: '¡Perfil actualizado!',
+        message: 'Tu información se guardó correctamente.',
+        type: alert_type.exito,
+      );
+      
     setState(() {
       print('Actualizando datos...');
-      worker.updatedata();
       hasMore = true;
+      _descriptionController.text = worker.worker[0].description;
+      _rangoKm = worker.worker[0].range_km.toDouble();
+      _priceController.text = worker.worker[0].km_cost.toString();
+      latitude = worker.worker[0].latitude;
+      longitude = worker.worker[0].longitude;
+      hasMore = true;
+
+      posicionActual = LatLng(latitude, longitude);
+      mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: posicionActual!, zoom: 17),
+        ),
+      );
+      GetStreet();
+    });
+  }
+
+  Future<void> _Refresh() async {
+    await worker.updatedata();
+
+      
+    setState(() {
+      print('Actualizando datos...');
+      hasMore = true;
+      _descriptionController.text = worker.worker[0].description;
+      _rangoKm = worker.worker[0].range_km.toDouble();
+      _priceController.text = worker.worker[0].km_cost.toString();
+      latitude = worker.worker[0].latitude;
+      longitude = worker.worker[0].longitude;
+      hasMore = true;
+
+      posicionActual = LatLng(latitude, longitude);
+      mapController?.animateCamera(
+        CameraUpdate.newCameraPosition(
+          CameraPosition(target: posicionActual!, zoom: 17),
+        ),
+      );
+      GetStreet();
     });
   }
 
@@ -216,8 +275,8 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     });
   }
 
- void _Update() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+  void _Update() async {
+   
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -225,25 +284,19 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     );
 
     final result = await UpdateInfoService.Send(
-      description: _descriptionController.text, 
-      city: ciudad ?? '', 
-      latitude: latitude, 
-      longitude: longitude, 
-      labor_cost: double.parse(_priceController.text), 
-      range_km: _rangoKm 
+      description: _descriptionController.text,
+      city: ciudad ?? '',
+      latitude: latitude,
+      longitude: longitude,
+      labor_cost: double.parse(_priceController.text),
+      range_km: _rangoKm,
     );
 
-    Navigator.pop(context);
+
 
     if (result['success'] == true) {
       final data = result['data'];
-      Toast(
-        context,
-        title: "Datos Actualizados",
-        message: 'tus datos se actualizo correctamente',
-        type: alert_type.exito,
-      );
-      _onRefresh();
+     await  _onRefresh();
     } else {
       Toast(
         context,
@@ -270,7 +323,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
         child: Scaffold(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           body: RefreshIndicator(
-            onRefresh: _onRefresh,
+            onRefresh: _Refresh,
             child: CustomScrollView(
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
@@ -284,7 +337,12 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
                       if (_paginaActual == 1) _buildMapa(),
-                      if (_paginaActual == 0) _buildForm(),
+                      if (_paginaActual == 0) ...[
+                        _buildEditHint(),
+                        _buildWorking(),
+                        _buildWorkingCategory(),
+                        const SizedBox(height: 100),
+                      ],
                     ]),
                   ),
                 ),
@@ -299,33 +357,19 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 50,
+      expandedHeight: 70,
       pinned: true, //  deja solo la barra pequeña visible
       floating: false, //  NO aparece al subir
       snap: false, // NO animación automática
       elevation: 0,
-      toolbarHeight: 50,
+      toolbarHeight: 70,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.only(
           bottomLeft: Radius.circular(0),
           bottomRight: Radius.circular(0),
         ),
       ),
-      leading: IconButton(
-        icon: const Icon(Icons.arrow_back),
-        color: Theme.of(context).colorScheme.surface,
-        onPressed: () {
-          salir();
-        },
-      ),
-      // bottom: PreferredSize(
-      //   preferredSize: const Size.fromHeight(1),
-      //   child: Divider(
-      //     height: 1,
-      //     thickness: 0.5,
-      //     color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-      //   ),
-      // ),
+      
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
@@ -340,37 +384,261 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     );
   }
 
-  Widget _PageHeader(String title, String subtitle) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
+  // ─────────────────────────────────────────────────────────────
+  // 🆕 Banner-guía: avisa al usuario que las tarjetas son editables
+  // ─────────────────────────────────────────────────────────────
+  Widget _buildEditHint() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: colorsecundario.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorsecundario.withOpacity(0.15)),
         ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          style: GoogleFonts.poppins(
-            fontSize: 12,
-            height: 1.6,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
+        child: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: colorsecundario.withOpacity(0.14),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.info_outline_rounded,
+                size: 16,
+                color: colorsecundario,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Toca cualquier sección para editar y guardar tu información.',
+                style: GoogleFonts.poppins(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w500,
+                  height: 1.3,
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.surface.withOpacity(0.7),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 400.ms).slideY(begin: -0.2),
+    );
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // 🆕 Badge reutilizable "Editar" para las esquinas de las tarjetas
+  // ─────────────────────────────────────────────────────────────
+  Widget _editBadge({String label = 'Editar'}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: colorsecundario.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.edit_rounded, size: 11, color: colorsecundario),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: colorsecundario,
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileCard() {
+    return GestureDetector(
+      onTap: () => _showofferSheetDescription(),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Circleimage(image_url: img, w: 60, h: 60),
+                    if (isworking)
+                      Positioned(
+                        bottom: -2,
+                        right: -6,
+                        child: Container(
+                          width: 20,
+                          height: 20,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF10B981),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: Theme.of(context).scaffoldBackgroundColor,
+                              width: 3,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        username ?? 'Trabajador',
+                        style: GoogleFonts.inter(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w700,
+                          color: Theme.of(context).colorScheme.surface,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _descriptionController.text.isEmpty
+                                  ? 'Toca aquí para agregar tu descripción profesional'
+                                  : _descriptionController.text,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.surface.withValues(alpha: 0.5),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // 🆕 ícono lápiz a la derecha
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: colorsecundario.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.edit_rounded,
+                    size: 16,
+                    color: colorsecundario,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStats() {
+    if (worker.worker.isEmpty) return const SizedBox();
+    final w = worker.worker[0];
+    return Row(
+      children: [
+        _miniStat(
+          Icons.monetization_on_rounded,
+          '\$${w.km_cost.toStringAsFixed(0)} MXN',
+          'Tarifa por visita',
+          () => _showofferSheetDiagnostic(_Update),
+        ),
+        const SizedBox(width: 10),
+        _miniStat(
+          Icons.social_distance_rounded,
+          '${w.range_km} km',
+          'Radio de trabajo',
+          () {
+            setState(() {
+              _paginaActual++;
+            });
+          },
         ),
       ],
     );
   }
 
+  Widget _miniStat(
+    IconData icon,
+    String value,
+    String label,
+    VoidCallback ontap,
+  ) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => ontap(),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.primary,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: colorsecundario),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      value,
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.surface,
+                      ),
+                    ),
+                    Text(
+                      label,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.45),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 🆕 ícono de editar/ajustar al final
+              Icon(
+                Icons.edit_rounded,
+                size: 13,
+                color: colorsecundario.withOpacity(0.7),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _fieldLabel(String label) {
-     return Row(
+    return Row(
       children: [
         Text(
           label,
@@ -422,7 +690,6 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
               target: posicionActual!,
               zoom: 16,
             ),
-
             onMapCreated: (controller) {
               mapController = controller;
             },
@@ -445,18 +712,15 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
 
               GetStreet();
             },
-
             circles: _buildCirculoRango(),
             markers: {
-              
-                Marker(
-                  markerId: MarkerId("ubicacion"),
-                  position: posicionActual!,
-                  icon: markericon,
-                ),
+              Marker(
+                markerId: MarkerId("ubicacion"),
+                position: posicionActual!,
+                icon: markericon,
+              ),
             },
           ),
-
           Positioned(
             top: 12,
             left: 15,
@@ -533,7 +797,6 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
               ),
             ),
           ),
-
           Positioned(
             top: MediaQuery.of(context).padding.top + 80,
             right: 12,
@@ -602,6 +865,8 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
+                          Expanded(
+                            child: 
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -613,6 +878,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                                   color: Theme.of(context).colorScheme.surface,
                                 ),
                               ),
+                           
                               Text(
                                 'Distancia máxima a la que te desplazas',
                                 style: GoogleFonts.poppins(
@@ -623,7 +889,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                                 ),
                               ),
                             ],
-                          ),
+                          ),),
                           // ─── Badge con el valor ───
                           Container(
                             padding: const EdgeInsets.symmetric(
@@ -642,7 +908,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                                 color: colorsecundario,
                               ),
                             ),
-                          ),
+                          )
                         ],
                       ),
                       const SizedBox(height: 12),
@@ -712,19 +978,18 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
+                          onPressed: ()  {
                             if (calle == null) {
                               Toast(
                                 context,
                                 title: 'Ubicación requerida',
-                                message: 'Por favor selecciona tu ubicación',
+                                message: 'Toca el mapa para seleccionar tu punto de trabajo.',
                                 type: alert_type.advertencia,
                               );
                               return;
                             }
-                            setState(() {
-                              _paginaActual--;
-                            });
+                            _Update();
+
                           },
                           style: ElevatedButton.styleFrom(
                             elevation: 0,
@@ -738,16 +1003,16 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              const Icon(Icons.location_on_rounded, size: 20),
+                              const SizedBox(width: 8),
                               Text(
-                                'Guardar y continuar',
+                                'Confirmar ubicación',
                                 style: GoogleFonts.poppins(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
                                   color: colorWhite,
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              const Icon(Icons.arrow_forward_rounded, size: 20),
                             ],
                           ),
                         ),
@@ -776,8 +1041,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     };
   }
 
-  Widget _buildForm() {
-    final screenHeight = MediaQuery.of(context).size.height;
+  Widget _buildWorking() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Form(
@@ -786,219 +1050,182 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildSectionHeader(number: '1', title: 'Información laboral', subtitle: 'Cuéntanos sobre tu experiencia y servicios'),
-            const SizedBox(height: 20),
-            _fieldLabel('Descripción como trabajador'),
-            const SizedBox(height: 20),
-            CustomDescriptionFormField(
-              controller: _descriptionController,
-              label: 'Descripción como trabajador',
-              hint: 'Ej: Electricista con 5 años de experiencia...',
-              minLines: 2,
-              maxLines: 5,
-              validator: (value) {
-                if (value == null || value.isEmpty)
-                  return 'Por favor agrega una descripción';
-                return null;
-              },
+            _buildSectionHeader(
+              number: '1',
+              title: 'Información laboral',
+              subtitle: 'Tu perfil visible para los clientes',
             ),
             const SizedBox(height: 20),
-            _fieldLabel('Tarifa por visita y diagnóstico',),
-            const SizedBox(height: 10),
-            CustomTextFormFieldPrice(
-              controller: _priceController,
-              label: 'Precio a proponer',
-              validator: (value) {
-                if (value == null || value.isEmpty) return 'Ingresa el precio';
-                return null;
-              },
-            ),
-            const SizedBox(height: 20),
-            _buildInfoCard(
-              icon: Icons.tips_and_updates_outlined,
-              text:'Consejo: Investiga precios de servicios similares '
-                  'en tu zona para ser competitivo.',
-            ),
-            const SizedBox(height: 20),
-            _buildSectionHeader(number: '2', title: 'Ubicacion y rango de trabajo', subtitle: 'Define tu área de servicio y distancia máxima de desplazamiento'),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: colorsecundario.withOpacity(0.08),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: colorsecundario.withOpacity(0.5),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header con título y botón actualizar
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Ubicación',
-                        style: GoogleFonts.poppins(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.surface.withOpacity(0.8),
-                        ),
-                      ),
-                      _buildRefreshButton(),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // Ubicación
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.place_outlined,
-                        size: 16,
-                        color: colorsecundario,
-                      ),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          calle != null
-                              ? '$calle, ${colonia ?? ''}, ${ciudad ?? ''}'
-                              : 'No seleccionada',
-                          style: GoogleFonts.poppins(
-                            fontSize: 12,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surface.withOpacity(0.6),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Rango
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.radar_rounded,
-                        size: 16,
-                        color: colorsecundario.withOpacity(0.8),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        'Rango: ${_rangoKm.toStringAsFixed(1)} km',
-                        style: GoogleFonts.poppins(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Theme.of(context).colorScheme.surface,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            _nextButton('Actualizar', () {
-              if (!(_formKey.currentState?.validate() ?? false)) return;
-              _Update();
-            }),
-            const SizedBox(height: 100),
+            _buildProfileCard(),
+            const SizedBox(height: 12),
+            _buildQuickStats(),
+            const SizedBox(height: 12),
+            _buildLocationCard(),
+            const SizedBox(height: 4),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildRefreshButton() {
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _paginaActual++;
-        });
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: colorsecundario,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.refresh_rounded,
-              size: 14,
-              color: colorWhite,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              'Actualizar',
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: colorWhite,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFormHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorsecundario.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: colorsecundario.withOpacity(0.5),
-        ),
-      ),
-      child: Row(
+  Widget _buildWorkingCategory() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: colorsecundario.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(13),
-            ),
-            child: const Icon(
-              Icons.work_outline_rounded,
-              color: colorsecundario,
-              size: 22,
-            ),
+          _buildSectionHeader(
+            number: '2',
+            title: 'Categorías de trabajo',
+            subtitle: 'Áreas en las que ofreces tus servicios',
           ),
-          const SizedBox(width: 14),
-          Expanded(
+          const SizedBox(height: 20),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(20),
+
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Tu perfil laboral',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.surface,
+                // 🆕 cabecera con badge "Editar"
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 2, 4, 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(child: 
+                      Text(
+                        'MIS CATEGORÍAS',
+                        style: GoogleFonts.poppins(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.3,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withOpacity(0.45),
+                        ),
+                      )),
+                      _editBadge(label: 'Administrar'),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Esta informacion es visible para los clientes que te buscan',
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    height: 1.5,
-                    color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.5),
-                  ),
+                SizedBox(
+                  height: 150, // 👈 altura fija
+                  child: GridView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 0,
+                      vertical: 0,
+                    ),
+                    scrollDirection: Axis.horizontal,
+                    shrinkWrap: true,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 1,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.2,
+                    ),
+                    itemCount: isLoading
+                        ? 3 //  skeletons visibles
+                        : worker.worker[0].listcatworker.length,
+                    itemBuilder: (context, index) {
+                      if (isLoading) {
+                        return const OptionsSkeleton();
+                      }
+                      final categoria = worker.worker[0].listcatworker[index];
+                      return OptionsCategoriasView(
+                        name: categoria.name,
+                        img: categoria.image,
+                      );
+                    },
+                  ).animate().fade().slideX(begin: -0.2),
                 ),
               ],
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLocationCard() {
+    final hasLocation = calle != null || ciudad != null;
+    return GestureDetector(
+      onTap: () => setState(() => _paginaActual++),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: colorsecundario.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.location_on_rounded,
+                color: colorsecundario,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Zona de trabajo',
+                    style: GoogleFonts.poppins(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.2,
+                      color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.45),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasLocation
+                        ? (calle ?? ciudad ?? 'Sin dirección')
+                        : 'Toca para definir tu zona de trabajo',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.poppins(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.surface,
+                    ),
+                  ),
+                  if (hasLocation && (colonia != null || ciudad != null))
+                    Text(
+                      [colonia, ciudad].where((e) => e != null).join(', '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.poppins(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.45),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colorsecundario.withValues(alpha: 0.7),
+              size: 20,
+            ),
+          ],
+        ),
+      ).animate().fadeIn(duration: 350.ms).slideY(begin: 0.1),
     );
   }
 
@@ -1080,6 +1307,225 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showofferSheetDiagnostic(VoidCallback onPressed) {
+    final formKey = GlobalKey<FormState>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _fieldLabel('Tarifa por visita y diagnóstico'),
+                        const SizedBox(height: 10),
+                        CustomTextFormFieldPrice(
+                          controller: _priceController,
+                          label: 'Ingresa tu tarifa por visita',
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Por favor ingresa una tarifa';
+                            }
+                            final precio = double.tryParse(value.trim());
+                            if (precio == null) {
+                              return 'Ingresa un número válido';
+                            }
+                            if (precio < 50) {
+                              return 'La tarifa mínima es de \$50';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        _buildInfoCard(
+                          icon: Icons.lightbulb_outline_rounded,
+                          text:
+                              'Consejo: Investiga los precios de servicios similares '
+                              'en tu zona para ser más competitivo.',
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (formKey.currentState?.validate() ?? false) {
+                                onPressed();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorsecundario,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              'Guardar tarifa',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showofferSheetDescription() {
+    final formKey = GlobalKey<FormState>();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _fieldLabel('Tu presentación profesional'),
+                        const SizedBox(height: 20),
+                        CustomDescriptionFormField(
+                          controller: _descriptionController,
+                          label: 'Cuéntanos sobre tu experiencia',
+                          hint: 'Ej: Electricista con 5 años de experiencia en instalaciones residenciales...',
+                          minLines: 2,
+                          maxLines: 5,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Por favor agrega una descripción';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              if (formKey.currentState?.validate() ?? false) {
+                                _Update();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorsecundario,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              'Guardar descripción',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

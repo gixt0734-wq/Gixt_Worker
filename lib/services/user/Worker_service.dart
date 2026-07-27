@@ -6,6 +6,19 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
 
+class Worker_Category {
+  String name;
+  String image;
+
+  Worker_Category({required this.name, required this.image});
+
+  factory Worker_Category.fromJson(Map<String, dynamic> json) {
+    return Worker_Category(
+      name: json['name'] ?? '',
+      image: (json['image_url'] ?? ''),
+    );
+  }
+}
 class Worker {
   String description;
   String city;
@@ -13,25 +26,30 @@ class Worker {
   double latitude;
   int range_km;
   double km_cost;
-
+  List<Worker_Category> listcatworker;
   Worker({
     required this.description,
     required this.longitude,
     required this.latitude,
     required this.km_cost,
     required this.range_km,
-    required this.city
+    required this.city,
+    required this.listcatworker
   });
 
   factory Worker.fromJson(Map<String, dynamic> json) {
     return Worker(
    
       description: json['description'],
-      km_cost: json['km_cost'],
-      range_km: json['range_km'],
+      km_cost: json['diagnostic_cost'],
+      range_km: json['service_radius_km'],
       city: json['city'],
       latitude: json['latitude'],
       longitude: json['longitude'],
+      listcatworker: (json['categories'] as List<dynamic>? ?? [])
+              .map((e) => Worker_Category.fromJson(e))
+              .toList(),
+
     );
   }
 

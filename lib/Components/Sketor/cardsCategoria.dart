@@ -11,12 +11,12 @@ class CardsCategoriaSkeleton extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 0),
       child: Card(
         elevation: 0,
-        color: colorprimario,
+        color: Theme.of(context).colorScheme.primary,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
         ),
         child: SizedBox(
-          height: 110,
+        child: IntrinsicHeight(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -29,7 +29,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                 child: Container(
                   width: 110,
                   height: double.infinity,
-                  color: Colors.white24,
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                 ),
               ),
 
@@ -48,7 +48,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                         height: 18,
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: Colors.white24,
+                          color:  Theme.of(context).colorScheme.surface.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(6),
                         ),
                       ),
@@ -62,7 +62,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                             width: 20,
                             height: 20,
                             decoration: BoxDecoration(
-                              color: Colors.white24,
+                              color:  Theme.of(context).colorScheme.surface.withOpacity(0.5),
                               borderRadius: BorderRadius.circular(5),
                             ),
                           ),
@@ -71,7 +71,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                             child: Container(
                               height: 14,
                               decoration: BoxDecoration(
-                                color: Colors.white24,
+                                color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -79,7 +79,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                         ],
                       ),
 
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 12),
 
                       // Rating
                       Row(
@@ -88,7 +88,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                             width: 20,
                             height: 20,
                             decoration: BoxDecoration(
-                              color: Colors.white24,
+                              color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                               borderRadius: BorderRadius.circular(5),
                             ),
                           ),
@@ -97,7 +97,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                             child: Container(
                               height: 14,
                               decoration: BoxDecoration(
-                                color: Colors.white24,
+                                color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -105,17 +105,18 @@ class CardsCategoriaSkeleton extends StatelessWidget {
                         ],
                       ),
 
-                      const Spacer(),
+                      const SizedBox(height: 30),
 
                       // Línea decorativa
                       Container(
                         height: 2,
                         width: 80,
                         decoration: BoxDecoration(
-                          color: Colors.white24,
+                          color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(2),
                         ),
                       ),
+                      const SizedBox(height: 12),
                     ],
                   ),
                 ),
@@ -123,6 +124,7 @@ class CardsCategoriaSkeleton extends StatelessWidget {
             ],
           ),
         ),
+        )
       ),
     )
         // ================= ANIMACIÓN =================

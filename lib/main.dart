@@ -10,6 +10,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Config/Notification.dart';
+import 'package:gixt_worker/Config/SignalRService.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/config/location.dart';
 import 'package:gixt_worker/routes/root.dart';
@@ -23,6 +24,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 /// 🔔 BACKGROUND HANDLER
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -30,25 +32,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 }
 
 Future<void> main() async {
-    WidgetsFlutterBinding.ensureInitialized();
-  
-  SystemChrome.setEnabledSystemUIMode(
-    SystemUiMode.immersiveSticky,
-  );
-  
+  WidgetsFlutterBinding.ensureInitialized();
+
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details); // muestra en consola pero no crashea
   };
-  
+
   WidgetsFlutterBinding.ensureInitialized();
 
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
   await dotenv.load(fileName: ".env");
-  await LocationService.initialize();
+
   /// 🔥 FIREBASE INIT
   await Firebase.initializeApp();
-
+  await LocationService.initialize();
   /// 🔔 CONFIG FOREGROUND IOS (MUY IMPORTANTE)
   await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
     alert: true,
@@ -57,9 +57,7 @@ Future<void> main() async {
   );
 
   /// 🔔 BACKGROUND
-  FirebaseMessaging.onBackgroundMessage(
-    _firebaseMessagingBackgroundHandler,
-  );
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   /// 🔔 LOCAL NOTIFICATIONS INIT
   const AndroidInitializationSettings initializationSettingsAndroid =
@@ -67,13 +65,12 @@ Future<void> main() async {
 
   const DarwinInitializationSettings initializationSettingsIOS =
       DarwinInitializationSettings(
-    requestAlertPermission: true,
-    requestBadgePermission: true,
-    requestSoundPermission: true,
-  );
+        requestAlertPermission: true,
+        requestBadgePermission: true,
+        requestSoundPermission: true,
+      );
 
-  const InitializationSettings initializationSettings =
-      InitializationSettings(
+  const InitializationSettings initializationSettings = InitializationSettings(
     android: initializationSettingsAndroid,
     iOS: initializationSettingsIOS,
   );
@@ -119,7 +116,7 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
+class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver {
   double _opacity = 0.0;
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   StreamSubscription<List<ConnectivityResult>>? _subscription;
@@ -127,7 +124,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-
+  WidgetsBinding.instance.addObserver(this);
     // _subscription = Connectivity()
     //     .onConnectivityChanged
     //     .listen(_onConnectivityChange);
@@ -137,25 +134,35 @@ class _SplashScreenState extends State<SplashScreen> {
     _startAnimation();
   }
 
-  /// 🔥 INIT FIREBASE NOTIFICATIONS
- Future<void> _initFirebaseMessaging() async {
-  await _requestPermission();
+  @override
+void didChangeAppLifecycleState(AppLifecycleState state) async {
+  if (state == AppLifecycleState.resumed) {
+    NotificationSettings settings =
+        await FirebaseMessaging.instance.getNotificationSettings();
 
-  /// APP ABIERTA DESDE NOTIFICACION TERMINATED
-  RemoteMessage? initialMessage =
-      await FirebaseMessaging.instance.getInitialMessage();
-
-  if (initialMessage != null) {
-    if (initialMessage.data['serviceType'] == 'express') {
-      Future.delayed(const Duration(seconds: 1), () {
-       
-      });
-    }
+    print(
+      'Estado notificaciones: ${settings.authorizationStatus}',
+    );
   }
-
-  /// FOREGROUND
-  _listenForeground();
 }
+
+  /// 🔥 INIT FIREBASE NOTIFICATIONS
+  Future<void> _initFirebaseMessaging() async {
+    await _requestPermission();
+
+    /// APP ABIERTA DESDE NOTIFICACION TERMINATED
+    RemoteMessage? initialMessage = await FirebaseMessaging.instance
+        .getInitialMessage();
+
+    if (initialMessage != null) {
+      if (initialMessage.data['serviceType'] == 'express') {
+        Future.delayed(const Duration(seconds: 1), () {});
+      }
+    }
+
+    /// FOREGROUND
+    _listenForeground();
+  }
 
   // void _onConnectivityChange(List<ConnectivityResult> results) {
   //   if (results.contains(ConnectivityResult.none)) {
@@ -174,56 +181,44 @@ class _SplashScreenState extends State<SplashScreen> {
     );
   }
 
- void _listenForeground() {
-  FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+  void _listenForeground() {
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      final notification = message.notification;
+      final data = message.data;
 
-    final notification = message.notification;
-    final data = message.data;
+      /// Mostrar notificación local solo si hay contenido
+      if (notification != null) {
+        const AndroidNotificationDetails androidDetails =
+            AndroidNotificationDetails(
+              'canal',
+              'Notificaciones',
+              channelDescription: 'Notificaciones',
+              importance: Importance.max,
+              priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
+            );
 
- 
-final context = navigatorKey.currentContext;
+        const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+          presentAlert: true,
+          presentBadge: true,
+          presentSound: true,
+        );
 
-    if (context != null) {
-      handleNotification(context, data, notification);
-    }
+        const NotificationDetails notificationDetails = NotificationDetails(
+          android: androidDetails,
+          iOS: iosDetails,
+        );
 
-    /// Mostrar notificación local solo si hay contenido
-    if (notification != null) {
-
-      const AndroidNotificationDetails androidDetails =
-          AndroidNotificationDetails(
-        'canal',
-        'Notificaciones',
-        channelDescription: 'Notificaciones',
-        importance: Importance.max,
-        priority: Priority.high,
-        icon: '@mipmap/ic_launcher',
-      );
-
-      const DarwinNotificationDetails iosDetails =
-          DarwinNotificationDetails(
-        presentAlert: true,
-        presentBadge: true,
-        presentSound: true,
-      );
-
-      const NotificationDetails notificationDetails =
-          NotificationDetails(
-        android: androidDetails,
-        iOS: iosDetails,
-      );
-
-      await flutterLocalNotificationsPlugin.show(
-  id: notification.hashCode,
-  title: notification.title,
-  body: notification.body,
-  notificationDetails: notificationDetails,
-  payload: data.toString(),
-);
-
-    }
-  });
-}
+        await flutterLocalNotificationsPlugin.show(
+          id: notification.hashCode,
+          title: notification.title,
+          body: notification.body,
+          notificationDetails: notificationDetails,
+          payload: data.toString(),
+        );
+      }
+    });
+  }
 
   void _startAnimation() async {
     await Future.delayed(const Duration(milliseconds: 1000));
@@ -245,11 +240,13 @@ final context = navigatorKey.currentContext;
     if (!mounted) return;
 
     if (inicio == 'true') {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => RootPage()),
-      );
-   
+      bool ok = await SignalRService.connectServer();
+        if(ok){Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => RootPage()),
+        );
+        return;
+      }
     } else {
       Navigator.pushReplacement(
         context,
@@ -260,7 +257,8 @@ final context = navigatorKey.currentContext;
 
   @override
   void dispose() {
-     _subscription?.cancel();
+    _subscription?.cancel();
+      WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
@@ -273,17 +271,14 @@ final context = navigatorKey.currentContext;
           duration: const Duration(seconds: 3),
           opacity: _opacity,
           child: Image.asset(
-            'assets/logo.png',
+            'assets/logo2d.png',
             width: 250,
             height: 250,
             fit: BoxFit.contain,
-            color:  colorsecundario,
+            color: colorsecundario,
           ),
         ),
       ),
     );
   }
 }
-
-
-

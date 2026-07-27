@@ -64,6 +64,11 @@ class _CustomTextFormFieldState extends State<CustomTextFormFieldPhone> {
           fontSize: 13,
           color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
         ),
+        // 🔹 contador de digitos
+        counterStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          color: Theme.of(context).colorScheme.surface.withOpacity(0.4),
+        ),
         // 🔹 Label cuando está seleccionado
         floatingLabelStyle: GoogleFonts.poppins(
           fontSize: 12,

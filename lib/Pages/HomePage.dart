@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/SinDatos/cardsServicios.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/calendar.dart';
+import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/NotificationPage.dart';
 import 'package:gixt_worker/components/cards/CardsExpress.dart';
@@ -18,8 +19,10 @@ import 'package:gixt_worker/components/cards/cardsServicios.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/components/sketor/cardsCategoria.dart';
 import 'package:gixt_worker/components/sketor/cardsServicios.dart';
-import 'package:gixt_worker/services/Job/Express_service.dart';
-import 'package:gixt_worker/services/Job/Job_service.dart';
+import 'package:gixt_worker/routes/BottomNavigationBar.dart';
+import 'package:gixt_worker/services/Express/Express_service.dart';
+import 'package:gixt_worker/services/Job/Jobs_service.dart';
+import 'package:gixt_worker/services/Job/Jobs_worker_service.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 import 'package:gixt_worker/services/servicios/categorias_service.dart';
@@ -39,8 +42,8 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final Servicios_service api = Servicios_service();
-  final Jobs_service jobs = Jobs_service();
+  // final Servicios_service api = Servicios_service();
+  final Jobs_worker_service jobs = Jobs_worker_service();
   final ServiciosFav_service fav = ServiciosFav_service();
   final Categorias_service categorias = Categorias_service();
   final Express_service express = Express_service();
@@ -62,6 +65,7 @@ class _HomePageState extends State<HomePage> {
   bool hasMore = true;
   bool timeout = false;
   bool hayNotificacion = false;
+  bool? isworking = false;
 
   void initState() {
     super.initState();
@@ -73,8 +77,8 @@ class _HomePageState extends State<HomePage> {
       });
     });
     // 👇 SE EJECUTA AL ENTRAR A LA PÁGINA
-    print("Entré a Restaurantes");
-
+    print("Entré a Home");
+    homeNotifier.addListener(_Refresh);
     _loadUserId();
     _Initial();
     _GoMyLocation();
@@ -87,6 +91,7 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       img = prefs.getString('img');
       username = prefs.getString('user');
+      isworking = prefs.getBool('isworking') ?? false;
     });
   }
 
@@ -102,11 +107,21 @@ class _HomePageState extends State<HomePage> {
       timeout = false;
     });
 
-    await api.updatedata();
     await categorias.updatedata();
     await express.updatedata();
     await jobs.updatedata();
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+    });
     _Validation();
+  }
+  Future<void> _Refresh() async {
+    await express.updatedata();
+    await jobs.updatedata();
+    if (!mounted) return;
+    setState(() {
+    });
   }
 
   Future<void> _Initial() async {
@@ -114,13 +129,14 @@ class _HomePageState extends State<HomePage> {
       isLoading = true;
       timeout = false;
     });
-    bool ok = await api.fetchServicioData();
     bool okData = await categorias.fetchCategoriasData();
     bool okEx = await express.fetchFromApi();
     bool okjob = await jobs.fetchAgendaData();
-    if (!okData || !ok || !okEx) {
-      if (!mounted) return;
-      setState(() {});
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+    });
+    if (!okData || !okEx) {
       Toast(
         context,
         title: "Error",
@@ -137,15 +153,16 @@ class _HomePageState extends State<HomePage> {
       if (isLoading) {
         setState(() {
           timeout = true;
+          isLoading = false;
         });
         print('terminando contador');
       }
     });
     if (!mounted) return;
     setState(() {
-      if (api.servicios.isNotEmpty) {
-        isLoading = false;
-      }
+      // if (api.servicios.isNotEmpty) {
+      //   isLoading = false;
+      // }
     });
   }
 
@@ -177,6 +194,13 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+    String _getGreeting() {
+      final hour = DateTime.now().hour;
+      if (hour < 12) return 'Buenos días';
+      if (hour < 19) return 'Buenas tardes';
+      return 'Buenas noches';
+    }
+
   @override
   Widget build(BuildContext context) {
     return KeyboardDismisser(
@@ -199,15 +223,23 @@ class _HomePageState extends State<HomePage> {
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     Calendar(),
+                    const SizedBox(height: 16),
+                    _buildStatsRow(),
                     const SizedBox(height: 20),
-                    if (express.express.isNotEmpty) ...[
-                      _buildExpress(),
-                    ],
-                    if (jobs.jobs.isNotEmpty) ...[_buildServiciosjob()],
-                    _buildDivider(),
-                    _buildServicios(),
-                    _buildDivider(),
-                    
+                    _buildServiciosjob(),
+                    if (!isLoading &&
+                        jobs.jobs
+                            .where(
+                              (j) =>
+                                  j.job_status == 'in_progress' ||
+                                  j.job_status == 'going' ||
+                                  j.job_status == 'arrived',
+                            )
+                            .isEmpty &&
+                        express.express
+                            .where((e) => e.job_status != 'completed')
+                            .isEmpty)
+                      _buildEmptyState(),
                     const SizedBox(height: 100),
                   ]),
                 ),
@@ -222,7 +254,7 @@ class _HomePageState extends State<HomePage> {
   SliverAppBar _buildSliverAppBar() {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      expandedHeight: 120,
+      expandedHeight: 150,
       elevation: 0,
       pinned: false,
       floating: false, // 👈 sin efecto raro
@@ -254,25 +286,26 @@ class _HomePageState extends State<HomePage> {
                             color: Theme.of(context).colorScheme.surface,
                           ),
                           const SizedBox(width: 6),
-                          Expanded(child: 
-                          Text(
-                            ciudad.isEmpty
-                                ? 'Obteniendo ubicación…'
-                                : '$ciudad, $estado',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Theme.of(context).colorScheme.surface,
-                              fontWeight: FontWeight.w400,
+                          Expanded(
+                            child: Text(
+                              ciudad.isEmpty
+                                  ? 'Obteniendo ubicación…'
+                                  : '$ciudad, $estado',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: Theme.of(context).colorScheme.surface,
+                                fontWeight: FontWeight.w400,
+                              ),
                             ),
                           ),
-                          )
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Hola, ${username ?? ''}',
+                          '${_getGreeting()}, ${username ?? ''}',
+                        maxLines: 2,
                         style: GoogleFonts.inter(
                           fontSize: 22,
                           fontWeight: FontWeight.w800,
@@ -320,7 +353,42 @@ class _HomePageState extends State<HomePage> {
                 ),
 
                 // Avatar
-                Circleimage(w: 48, h: 48, image_url: img),
+                InkWell(
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AppBottomNavigation(index: 4),
+                      ),
+                    );
+                  },
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Circleimage(w: 48, h: 48, image_url: img),
+
+                      if (isworking!)
+                        Positioned(
+                          bottom: -5,
+                          right: 0,
+                          child: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF10B981),
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                width: 3,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),
@@ -358,22 +426,22 @@ class _HomePageState extends State<HomePage> {
               ),
           ],
         ),
-        Spacer(),
-        InkWell(
-          onTap: () {},
-          child: Icon(
-            Icons.arrow_forward_ios,
-            size: 20,
-            color: Theme.of(context).colorScheme.surface,
-          ),
-        ),
+        // Spacer(),
+        // InkWell(
+        //   onTap: () {},
+        //   child: Icon(
+        //     Icons.arrow_forward_ios,
+        //     size: 20,
+        //     color: Theme.of(context).colorScheme.surface,
+        //   ),
+        // ),
       ],
     ).animate().fade().slideX(begin: -0.1);
   }
 
   Widget _buildServiciosjob() {
     // Filtrar por estado
-    final List<Jobs> filtrados = jobs.jobs.where((a) {
+    final List<Jobs_Worker> filtrados = jobs.jobs.where((a) {
       return a.job_status == 'in_progress' ||
           a.job_status == 'going' ||
           a.job_status == 'arrived';
@@ -393,26 +461,21 @@ class _HomePageState extends State<HomePage> {
               sub: 'Servicios Programados Activos',
             ),
 
-            GridView.builder(
-            scrollDirection: Axis.vertical,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 1,
-              mainAxisSpacing: 20,
-              childAspectRatio: 2.5,
-            ),
-            itemCount: isLoading ? 1 : filtrados.length,
-            itemBuilder: (context, index) {
-                if (isLoading && !timeout) {
+               ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.zero,
+              itemCount: isLoading ? 2 : filtrados.length,
+              itemBuilder: (context, index) {
+                if (isLoading) {
                   return const CardsCategoriaSkeleton();
                 }
 
                 final agenda = filtrados[index];
 
                 return CardsAgenda(
-                      image_url: agenda.service_image,
+                      image_url: agenda.image_url,
+                      type: agenda.type,
                       name: agenda.problem,
                       client_image: agenda.client_image,
                       job_id: agenda.job_id,
@@ -436,81 +499,81 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildServicios() {
-    final isLoading = api.servicios.isEmpty;
-    
-    if (timeout) {
-      return CardsSN(img: 'assets/Banner1.png');
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 0),
-      child: Container(
-        alignment: Alignment.topLeft,
-        child: Column(
-          children: [
-            _sectionHeader(
-              'Servicios Creados',
-              sub: 'Estos servicos ven los usuario',
-            ),
+  // Widget _buildServicios() {
+  //   final isLoading = api.servicios.isEmpty;
 
-            SizedBox(
-              height: 370,
-              child: GridView.builder(
-                controller: _scrollController,
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 0,
-                  vertical: 30,
-                ),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 1,
-                  mainAxisSpacing: 30,
-                  childAspectRatio: 1.45,
-                ),
-                itemCount: isLoading
-                    ? 3 //  skeletons visibles
-                    : api.servicios.length,
-                itemBuilder: (context, index) {
-                  if (isLoading && !timeout) {
-                    return const CardsEmpresaSkeleton();
-                  }
-                  try {
-                    final servicio = api.servicios[index];
+  //   if (timeout) {
+  //     return CardsSN(img: 'assets/Banner1.png');
+  //   }
+  //   return Padding(
+  //     padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 0),
+  //     child: Container(
+  //       alignment: Alignment.topLeft,
+  //       child: Column(
+  //         children: [
+  //           _sectionHeader(
+  //             'Servicios Creados',
+  //             sub: 'Estos servicos ven los usuario',
+  //           ),
 
-                    return CardsServicios(
-                          image_url: servicio.image,
-                          name: servicio.service_name,
-                          worker_image: servicio.userImage,
-                          service_id: servicio.service_id,
-                          worker: servicio.first_name,
-                          category: servicio.category,
-                          stars: servicio.rating,
-                          price: servicio.price,
-                          description: servicio.description,
-                          favorito: false,
-                        )
-                        .animate()
-                        .fade(duration: 400.ms)
-                        .slideY(begin: 0.15)
-                        .scale(begin: const Offset(0.96, 0.96));
-                  } catch (e) {
-                    return const SizedBox(); // widget vacío
-                  }
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  //           SizedBox(
+  //             height: 370,
+  //             child: GridView.builder(
+  //               controller: _scrollController,
+  //               scrollDirection: Axis.horizontal,
+  //               padding: const EdgeInsets.symmetric(
+  //                 horizontal: 0,
+  //                 vertical: 30,
+  //               ),
+  //               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+  //                 crossAxisCount: 1,
+  //                 mainAxisSpacing: 30,
+  //                 childAspectRatio: 1.45,
+  //               ),
+  //               itemCount: isLoading
+  //                   ? 3 //  skeletons visibles
+  //                   : api.servicios.length,
+  //               itemBuilder: (context, index) {
+  //                 if (isLoading && !timeout) {
+  //                   return const CardsEmpresaSkeleton();
+  //                 }
+  //                 try {
+  //                   final servicio = api.servicios[index];
+
+  //                   return CardsServicios(
+  //                         image_url: servicio.image,
+  //                         name: servicio.service_name,
+  //                         worker_image: servicio.userImage,
+  //                         service_id: servicio.service_id,
+  //                         worker: servicio.first_name,
+  //                         category: servicio.category,
+  //                         stars: servicio.rating,
+  //                         price: servicio.price,
+  //                         description: servicio.description,
+  //                         favorito: false,
+  //                       )
+  //                       .animate()
+  //                       .fade(duration: 400.ms)
+  //                       .slideY(begin: 0.15)
+  //                       .scale(begin: const Offset(0.96, 0.96));
+  //                 } catch (e) {
+  //                   return const SizedBox(); // widget vacío
+  //                 }
+  //               },
+  //             ),
+  //           ),
+  //         ],
+  //       ),
+  //     ),
+  //   );
+  // }
 
   Widget _buildExpress() {
     final List<Express> filtrados = express.express.where((a) {
-      return a.job_status != 'completed';
+      return a.job_status != 'completed' && a.job_status != 'canceled';
     }).toList();
-    
-   if (filtrados.isEmpty && !isLoading) {
+
+    if (filtrados.isEmpty && !isLoading) {
       return Container();
     }
     return Padding(
@@ -526,18 +589,18 @@ class _HomePageState extends State<HomePage> {
             ),
 
             GridView.builder(
-            scrollDirection: Axis.vertical,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 1,
-              mainAxisSpacing: 20,
-              childAspectRatio: 2.5,
-            ),
-            itemCount: isLoading ? 1 : filtrados.length,
-            itemBuilder: (context, index) {
-                if (isLoading && !timeout) {
+              scrollDirection: Axis.vertical,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 10),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 1,
+                mainAxisSpacing: 20,
+                childAspectRatio: 2.5,
+              ),
+              itemCount: isLoading ? 2 : filtrados.length,
+              itemBuilder: (context, index) {
+                if (isLoading) {
                   return const CardsCategoriaSkeleton();
                 }
                 try {
@@ -568,6 +631,134 @@ class _HomePageState extends State<HomePage> {
         ),
       ),
     );
+  }
+
+  Widget _buildStatsRow() {
+    final activeJobs = jobs.jobs
+        .where(
+          (j) =>
+              j.job_status == 'in_progress' ||
+              j.job_status == 'going' ||
+              j.job_status == 'arrived',
+        )
+        .length;
+    final activeExpress =
+        express.express.where((e) => e.job_status != 'completed').length;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15),
+      child: Row(
+        children: [
+          _statCard(
+            Icons.work_outline_rounded,
+            activeJobs.toString(),
+            'En Curso',
+            Colors.orange,
+          ),
+          const SizedBox(width: 12),
+          _statCard(
+            Icons.bolt_rounded,
+            activeExpress.toString(),
+            'Express',
+            colorsecundario,
+          ),
+        ],
+      ),
+    ).animate().fade(duration: 350.ms).slideY(begin: 0.1);
+  }
+
+  Widget _statCard(IconData icon, String value, String label, Color color) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: scheme.primary,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: GoogleFonts.inter(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.surface,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: scheme.surface.withValues(alpha: 0.5),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 32),
+      child: Column(
+        children: [
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Icon(
+              Icons.inbox_outlined,
+              size: 38,
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Sin trabajos activos',
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.35),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Cuando tengas servicios en curso\naparecerán aquí.',
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.25),
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
+      ),
+    ).animate().fade(duration: 400.ms);
   }
 
   Widget _buildDivider() {

@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/CrearCuenta.dart';
+import 'package:gixt_worker/Auth/Documentos.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
+import 'package:gixt_worker/Auth/UpdatePassword.dart';
 import 'package:gixt_worker/Components/Toast.dart';
+import 'package:gixt_worker/Config/SignalRService.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/WelcomePage.dart';
-import 'package:gixt_worker/components/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/inputs/input.dart';
 import 'package:gixt_worker/components/inputs/Input_Password.dart';
 import 'package:gixt_worker/config/device.dart';
@@ -35,7 +38,6 @@ class _LoginState extends State<LoginPage> {
   bool _isObscured = true;
   final PreferencesService _preferencesService = PreferencesService();
 
-
   Future<void> _saveToken(
     String token,
     String inicio,
@@ -44,7 +46,6 @@ class _LoginState extends State<LoginPage> {
     String img,
   ) async {
     await _preferencesService.savePreferences(token, inicio, id, img, user);
-
   }
 
   void _login() async {
@@ -67,30 +68,48 @@ class _LoginState extends State<LoginPage> {
       tokenFcm: device["tokenFcm"] ?? '',
     );
 
-    Navigator.pop(context); // cerrar loader
- 
     if (result['success'] == true) {
       final data = result['data'];
       print(data);
       String message = "Bienvenido ${data['username']}";
-      if(data['info'] == false)
-      {
+      if (data['info'] == false) {
+        Navigator.pop(context); // cerrar loader
         Future.microtask(() async {
-        
-        await Toast(
-          context,
-          title: "Bienvenido, antes de comensar necesitamos que termines tu registro",
-          message: message,
-          type: alert_type.exito,
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => CrearInfo(data: data)),
-        );
-      });
-return;
+          await Toast(
+            context,
+            message:
+                "Bienvenido, antes de comensar necesitamos que termines tu registro",
+            title: message,
+            type: alert_type.exito,
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => CrearInfo(data: data)),
+            (route) => false,
+          );
+        });
+        return;
       }
-     
+
+      if (data['docs'] == false) {
+        Navigator.pop(context); // cerrar loader
+        Future.microtask(() async {
+          await Toast(
+            context,
+            message:
+                "Bienvenido, antes de comensar necesitamos que termines tu registro de tus documentos",
+            title: message,
+            type: alert_type.exito,
+          );
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => CrearDocumentos(data: data)),
+            (route) => false,
+          );
+        });
+        return;
+      }
+
       Future.microtask(() async {
         await _saveToken(
           data['token'],
@@ -99,18 +118,25 @@ return;
           data['username'],
           data['img'],
         );
-        await Toast(
-          context,
-          title: "Bienvenido",
-          message: message,
-          type: alert_type.exito,
-        );
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => WelcomePage()),
-        );
+        bool ok = await SignalRService.connectServer();
+        if (ok) {
+          Navigator.pop(context); // cerrar loader
+          await Toast(
+            context,
+            title: "Bienvenido",
+            message: message,
+            type: alert_type.exito,
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => WelcomePage()),
+          );
+          return;
+        }
       });
     } else {
+      Navigator.pop(context); // cerrar loader
       Toast(
         context,
         title: "Error",
@@ -144,7 +170,7 @@ return;
         child: Hero(
           tag: 'logo',
           child: Image.asset(
-            'assets/logo.png',
+            'assets/logo2d.png',
             width: 150,
             height: 150,
             color: colorsecundario,
@@ -166,25 +192,25 @@ return;
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-            'Iniciar sesion',
-            style: GoogleFonts.poppins(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.surface,
-              letterSpacing: -0.5,
+              'Iniciar sesion',
+              style: GoogleFonts.poppins(
+                fontSize: 26,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.surface,
+                letterSpacing: -0.5,
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Ingresa tus datos para continuar',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+            const SizedBox(height: 6),
+            Text(
+              'Ingresa tus datos para continuar',
+              style: GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
+              ),
+              textAlign: TextAlign.center,
             ),
-            textAlign: TextAlign.center,
-          ),
             const SizedBox(height: 40),
             CustomTextFormField(
               controller: _emailController,
@@ -276,66 +302,58 @@ return;
                 ),
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
-            children: [
-              Expanded(
-                child: Divider(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withOpacity(0.12),
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  'o continuar con',
-                  style: GoogleFonts.poppins(
-                    fontSize: 12,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .surface
-                        .withOpacity(0.4),
-                  ),
-                ),
-              ),
-              Expanded(
-                child: Divider(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .surface
-                      .withOpacity(0.12),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
+            // const SizedBox(height: 20),
+            // Row(
+            //   children: [
+            //     Expanded(
+            //       child: Divider(
+            //         color: Theme.of(
+            //           context,
+            //         ).colorScheme.surface.withOpacity(0.12),
+            //       ),
+            //     ),
+            //     Padding(
+            //       padding: const EdgeInsets.symmetric(horizontal: 16),
+            //       child: Text(
+            //         'o continuar con',
+            //         style: GoogleFonts.poppins(
+            //           fontSize: 12,
+            //           color: Theme.of(
+            //             context,
+            //           ).colorScheme.surface.withOpacity(0.4),
+            //         ),
+            //       ),
+            //     ),
+            //     Expanded(
+            //       child: Divider(
+            //         color: Theme.of(
+            //           context,
+            //         ).colorScheme.surface.withOpacity(0.12),
+            //       ),
+            //     ),
+            //   ],
+            // ),
+            // const SizedBox(height: 20),
 
-          // Botones sociales con texto descriptivo
-          Row(
-            children: [
-              Expanded(
-                child: _socialButton(
-                  assetPath: 'assets/google.png',
-                  label: 'Google',
-                  onTap: () {
-               
-                  },
-                ),
-              ),
-              
-            ],
-          ),
-
-           
+            // // Botones sociales con texto descriptivo
+            // Row(
+            //   children: [
+            //     Expanded(
+            //       child: _socialButton(
+            //         assetPath: 'assets/google.png',
+            //         label: 'Google',
+            //         onTap: () {},
+            //       ),
+            //     ),
+            //   ],
+            // ),
           ],
         ),
       ),
     );
   }
 
-Widget _socialButton({
+  Widget _socialButton({
     required String assetPath,
     required String label,
     required VoidCallback onTap,
@@ -349,8 +367,7 @@ Widget _socialButton({
           height: 48,
           decoration: BoxDecoration(
             border: Border.all(
-              color:
-                  Theme.of(context).colorScheme.surface.withOpacity(0.12),
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.12),
               width: 1,
             ),
             borderRadius: BorderRadius.circular(12),
@@ -374,6 +391,7 @@ Widget _socialButton({
       ),
     );
   }
+
   // Métodos auxiliares
   String? _validateEmail(String? value) {
     if (value == null || value.isEmpty) {
@@ -398,7 +416,10 @@ Widget _socialButton({
 
   void _handleForgotPassword() {
     // Implementa la lógica de recuperación de contraseña
-    print('Recuperar Contraseña presionado');
+   Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => Updatepassword()),
+    );
     // Navigator.push(context, MaterialPageRoute(builder: (context) => ForgotPasswordPage()));
   }
 
