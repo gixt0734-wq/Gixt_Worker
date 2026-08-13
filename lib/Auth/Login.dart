@@ -40,12 +40,14 @@ class _LoginState extends State<LoginPage> {
 
   Future<void> _saveToken(
     String token,
+    String refreshoken,
     String inicio,
     String id,
     String user,
     String img,
   ) async {
-    await _preferencesService.savePreferences(token, inicio, id, img, user);
+    await _preferencesService.savePreferences(token,refreshoken, inicio, id, img, user);
+  
   }
 
   void _login() async {
@@ -113,13 +115,14 @@ class _LoginState extends State<LoginPage> {
       Future.microtask(() async {
         await _saveToken(
           data['token'],
+          data['refreshoken'],
           "true",
           data['id'].toString(),
           data['username'],
           data['img'],
         );
-        bool ok = await SignalRService.connectServer();
-        if (ok) {
+        await SignalRService.connectServer();
+       
           Navigator.pop(context); // cerrar loader
           await Toast(
             context,
@@ -133,7 +136,7 @@ class _LoginState extends State<LoginPage> {
             MaterialPageRoute(builder: (context) => WelcomePage()),
           );
           return;
-        }
+        
       });
     } else {
       Navigator.pop(context); // cerrar loader

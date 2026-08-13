@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
@@ -19,6 +19,8 @@ class User {
   int workers;
   int services;
   bool is_working;
+  double balance;
+  bool has_balance;
   
   User({
     required this.user_id,
@@ -32,7 +34,9 @@ class User {
     required this.gender,
     required this.workers,
     required this.services,
-    required this.is_working
+    required this.is_working,
+    required this.balance,
+    required this.has_balance,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -46,6 +50,8 @@ class User {
       email: json['email'],
       birth_date: json['birth_date'],
       gender: json['gender'],
+      balance: json['balance'],
+      has_balance: json['has_balance'],
       workers: json['workers']?? 0,
       services: json['services'] ?? 0,
       is_working:json['is_working']??0
@@ -59,7 +65,10 @@ class User {
 }
 
 class User_service {
-  List<User> user = []; // Lista de empresas
+  static final User_service _instance = User_service._internal();
+  factory User_service() => _instance;
+  User_service._internal();
+  List<User> user = []; // Lista de usuarios
   bool isLoading = false;
   bool hasMore = true;
   static const String _cacheKey = 'user_cache';
@@ -105,19 +114,19 @@ class User_service {
 
   Future<bool> fetchFromApi() async {
     final prefs = await SharedPreferences.getInstance();
-
-    print("🌐 Llamando API user");
-
-    final token = prefs.getString('token');
-    String? id_user = prefs.getString('id');
-
-    final headers = {'Authorization': 'Bearer $token'};
     int attempts = 0;
     const int maxAttempts = 3;
 
     while (attempts < maxAttempts) {
       try {
         isLoading = true;
+        
+
+        final token = prefs.getString('token');
+        String? id_user = prefs.getString('id');
+        print('🌐 Llamando API user $token');
+        final headers = {'Authorization': 'Bearer $token'};
+        print(token);
 
         final response = await http
             .get(
@@ -139,6 +148,20 @@ class User_service {
             DateTime.now().millisecondsSinceEpoch,
           );
           return true;
+        }
+
+        if (response.statusCode == 401) {
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
+
+          print("✅ Token actualizado. Reintentando petición...");
+          continue;
         }
         print("❌ Error HTTP: ${response.statusCode}");
         return false;

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,21 +17,25 @@ class AddReportService {
 
 
   }) async {
-    
+
     int attempts = 0;
     const int maxAttempts = 2;
     final prefs = await SharedPreferences.getInstance();
-    String? id_user = prefs.getString('id');
-    final token = prefs.getString('token');
-    final headers = {'Authorization': 'Bearer $token'};
 
     while (attempts < maxAttempts) {
       try {
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Report');
+      
+      String? id_user = prefs.getString('id');
+      final token = prefs.getString('token');
+
+      final uri = Uri.parse('${dotenv.env['API_URL']}/api/Report');
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
-        print(id);
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+        });
+        
         // Campos de texto
         request.fields['user_id'] = id_user!;
         request.fields['reported_id'] = id;
@@ -69,10 +74,21 @@ class AddReportService {
             };
         }
         if (streamedResponse.statusCode == 401) {
-          return {
-            'success': false,
-            'message': 'error al crear servicio',
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+           if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': 'Error inesperado',
+            };
+          }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
 
         if(streamedResponse.statusCode == 400)

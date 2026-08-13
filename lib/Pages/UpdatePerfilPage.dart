@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/Loaders/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/update_loader.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Fecha.dart';
@@ -96,48 +97,38 @@ class _UpdateperfilpageState extends State<Updateperfilpage> {
 
  
 
-  void _Crear() async {
+   void _Crear() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Indicador(),
+      builder: (_) => UpdateLoader(
+        onRun: () => UpdateService.Crear(
+          first_name: _first_nameController.text,
+          last_name: _last_nameController.text,
+          image: _image,
+          phone: _phoneController.text,
+          gender: _gender ?? "",
+          birth_date: _birth_dateController.text,
+        ),
+        onSuccess: (result) async {
+          final data = result['data'];
+          Navigator.pop(context);
+          Future.microtask(() async {
+            Toast(
+              context,
+              title: "Datos Actualizados",
+              message: 'tus datos se actualizo correctamente',
+              type: alert_type.exito,
+            );
+            await user.updatedata();
+            _updateUser(user.user[0].username, user.user[0].image_url);
+          });
+        },
+      ),
     );
-
-    final result = await UpdateService.Crear(
-      first_name: _first_nameController.text,
-      last_name: _last_nameController.text,
-      image: _image,
-      phone: _phoneController.text,
-      gender: _gender ?? "",
-      birth_date: _birth_dateController.text,
-    );
-
-    Navigator.pop(context);
-
-    if (result['success'] == true) {
-      final data = result['data'];
-      Future.microtask(() async {
-      Toast(
-        context,
-        title: "Datos Actualizados",
-        message: 'tus datos se actualizo correctamente',
-        type: alert_type.exito,
-      );
-      await user.updatedata();
-      _updateUser(user.user[0].username, user.user[0].image_url);
-      Navigator.pop(context);
-      });
-    } else {
-      Toast(
-        context,
-        title: "Error",
-        message: result['message'],
-        type: alert_type.error,
-      );
-    }
   }
-
+  
   Future<void> _pickImage() async {
     final File? image = await pickAndCropImage(context);
 

@@ -6,6 +6,7 @@ import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/reports_notifiers.dart';
+import 'package:gixt_worker/Config/vibration.dart';
 import 'package:gixt_worker/main.dart';
 import 'package:gixt_worker/services/Notification/ChatCacheService.dart';
 import 'package:gixt_worker/services/Notification/Notification.dart';
@@ -23,6 +24,8 @@ void handleNotification(
   print("Body: ${notification['body']}");
   print("Data: ${data}");
 
+  VibrationService.vibrar();
+  
     final botMsg = NotificationModel(
     id: 150,
     text: notification['title'],

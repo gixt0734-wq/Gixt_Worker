@@ -10,8 +10,10 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Config/Notification.dart';
+import 'package:gixt_worker/Config/Notifiers/reports_notifiers.dart';
 import 'package:gixt_worker/Config/SignalRService.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Pages/LogoutPage.dart';
 import 'package:gixt_worker/config/location.dart';
 import 'package:gixt_worker/routes/root.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,10 +22,21 @@ import 'config/theme.dart';
 import 'providers/theme_provider.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
+class NavigationService {
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
+  static void goToLogin() {
+    navigatorKey.currentState?.pushNamedAndRemoveUntil(
+      '/logout',
+      (route) => false,
+    );
+  }
+}
+
 /// 🔔 LOCAL NOTIFICATIONS
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 /// 🔔 BACKGROUND HANDLER
 @pragma('vm:entry-point')
@@ -95,7 +108,7 @@ class MyApp extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return MaterialApp(
-          navigatorKey: navigatorKey,
+           navigatorKey: NavigationService.navigatorKey,
           title: 'Gixt',
           theme: lightTheme,
           darkTheme: darkTheme,
@@ -103,6 +116,9 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           locale: const Locale('es', ''),
           home: const SplashScreen(),
+           routes: {
+              '/logout': (context) => const Logoutpage(),
+            },
         );
       },
     );
@@ -186,6 +202,12 @@ void didChangeAppLifecycleState(AppLifecycleState state) async {
       final notification = message.notification;
       final data = message.data;
 
+      print('🔔 Mensaje recibido en primer plano: ${data}');
+
+      if(data['type'] == 'Report') {
+        reportsNotifier.refresh();
+      }
+
       /// Mostrar notificación local solo si hay contenido
       if (notification != null) {
         const AndroidNotificationDetails androidDetails =
@@ -240,13 +262,13 @@ void didChangeAppLifecycleState(AppLifecycleState state) async {
     if (!mounted) return;
 
     if (inicio == 'true') {
-      bool ok = await SignalRService.connectServer();
-        if(ok){Navigator.pushReplacement(
+       await SignalRService.connectServer();
+       Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => RootPage()),
         );
         return;
-      }
+      
     } else {
       Navigator.pushReplacement(
         context,

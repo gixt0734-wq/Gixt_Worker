@@ -22,7 +22,7 @@
             "request": "launch",
             "type": "dart",
             "deviceId": "RF8N83145BZ",
-            // "flutterMode": "release"
+             "flutterMode": "release"
         },
         {
             "name": "Flutter (Device 3)",
@@ -34,7 +34,7 @@
     "compounds": [
     {
       "name": "Run All Devices",
-      "configurations": ["Flutter (A31)", "Flutter (Device A14555)"]
+      "configurations": ["Flutter (A31)", "Flutter (Device A14)"]
     }
   ]
 }

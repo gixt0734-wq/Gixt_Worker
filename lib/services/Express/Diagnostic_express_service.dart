@@ -2,11 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:gixt_worker/services/material/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-class FinishSerivicioExpressService {
+class DiagnosticExpressService {
   static Future<Map<String, dynamic>> Send({
     required String job_id,
     required double total,
@@ -19,17 +20,18 @@ class FinishSerivicioExpressService {
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    final headers = {'Authorization': 'Bearer $token'};
     http.Response? response;
+    final prefs = await SharedPreferences.getInstance();
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
+      
+      final token = prefs.getString('token');
+      final headers = {'Content-Type': 'application/json','Authorization': 'Bearer $token'};
         response = await http
             .post(
-              Uri.parse('${dotenv.env['API_URL']}/api/Payment'),
-              headers: {'Content-Type': 'application/json'},
+              Uri.parse('${dotenv.env['API_URL']}/api/Diagnostic'),
+              headers: headers,
               body: json.encode({
                 'job_id': job_id,
                 'materials': material,
@@ -48,10 +50,21 @@ class FinishSerivicioExpressService {
         }
 
         else if (response.statusCode == 401) {
-          return {
-            'success': false,
-            'message': jsonDecode(response.body)['message'],
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': 'Error inesperado',
+            };
+          }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
 
         else if (response.statusCode == 400) {

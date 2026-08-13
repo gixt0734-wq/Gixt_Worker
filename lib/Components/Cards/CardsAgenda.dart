@@ -18,7 +18,6 @@ class CardsAgenda extends StatelessWidget {
     required this.client,
     required this.date,
     required this.time,
-    required this.price,
     required this.description,
     required this.address,
     required this.status,
@@ -33,7 +32,6 @@ class CardsAgenda extends StatelessWidget {
   final String client;
   final String description;
   final String address;
-  final double price;
   final String date;
   final String status;
   final String time;
@@ -225,11 +223,11 @@ class CardsAgenda extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: _getStatusColor().withOpacity(0.12),
+                            color: _getStatusColor().withOpacity(0.5),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: _getStatusColor(),
-                              width: 1,
+                              color: _getStatusColor().withOpacity(0.5),
+                              width: 0,
                             ),
                           ),
                           child: Text(
@@ -237,7 +235,7 @@ class CardsAgenda extends StatelessWidget {
                             style: GoogleFonts.poppins(
                               fontSize: 10,
                               fontWeight: FontWeight.w600,
-                              color: _getStatusColor(),
+                              color: colorWhite,
                             ),
                           ),
                         ),

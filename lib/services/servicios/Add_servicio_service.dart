@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,14 +19,14 @@ class AddServicioService {
     
     int attempts = 0;
     const int maxAttempts = 2;
-    final prefs = await SharedPreferences.getInstance();
-    String? id_user = prefs.getString('id');
-    final token = prefs.getString('token');
-    final headers = {'Authorization': 'Bearer $token'};
 
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
+      final prefs = await SharedPreferences.getInstance();
+      String? id_user = prefs.getString('id');
+      final token = prefs.getString('token');
+      final headers = {'Authorization': 'Bearer $token'};
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Services');
 
         // Crear MultipartRequest
@@ -73,10 +74,17 @@ class AddServicioService {
             };
         }
         if (streamedResponse.statusCode == 401) {
-          return {
-            'success': false,
-            'message': 'error al crear servicio',
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': 'error al crear servicio',
+            };
+          }
         }
 
         if(streamedResponse.statusCode == 400)

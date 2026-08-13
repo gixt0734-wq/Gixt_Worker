@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,22 +12,24 @@ class AddEvidenceService {
     required bool is_express,
     List<File?> images = const [],
   }) async {
-    
+
     int attempts = 0;
     const int maxAttempts = 2;
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    final headers = {'Authorization': 'Bearer $token'};
-    String? id_user = prefs.getString('id');
-    
     while (attempts < maxAttempts) {
       print("llamando a crear ${is_express}");
       try {
+      
+      final token = prefs.getString('token');
+   
+      String? id_user = prefs.getString('id');
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Evidence');
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
-
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+        });
         // Campos de texto
         request.fields['job_id'] = job_id!;
         request.fields['user_id'] = id_user!;
@@ -60,10 +63,22 @@ class AddEvidenceService {
             };
         }
         if (streamedResponse.statusCode == 401) {
-          return {
-            'success': false,
-            'message': 'error al crear servicio',
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+         
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': 'Error inesperado',
+            };
+          }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
 
         if(streamedResponse.statusCode == 400)

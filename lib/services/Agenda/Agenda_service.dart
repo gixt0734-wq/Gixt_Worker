@@ -1,12 +1,32 @@
 import 'dart:async';
 import 'dart:io';
-
+import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
 
-class Jobs_Worker {
+String formatDate(String? date) {
+  if (date == null || date.isEmpty) return '';
+
+  final parsed = DateTime.parse(date);
+
+  return DateFormat('dd-MM-yyyy').format(parsed);
+}
+
+String formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+
+  try {
+    final parsed = DateFormat('HH:mm:ss').parse(time);
+     return DateFormat('hh:mm a').format(parsed);
+  } catch (_) {
+    return '';
+  }
+}
+
+class Agenda {
   String job_id;
   String type;
   // worker
@@ -18,7 +38,7 @@ class Jobs_Worker {
   // location
   String maps_address;
 
-  String image_url;
+  String image;
 
   // job
   String job_date;
@@ -28,10 +48,10 @@ class Jobs_Worker {
 
   bool is_active;
   String job_status;
-  double price;
+  double labor_cost;
   
 
-  Jobs_Worker({
+  Agenda({
     required this.job_id,
     required this.type,
     required this.client_user_id,
@@ -39,19 +59,19 @@ class Jobs_Worker {
     required this.client_username,
     required this.client_image,
     required this.maps_address,
-    required this.image_url,
+    required this.image,
     required this.job_date,
     required this.job_time,
     required this.description,
     required this.problem,
     required this.is_active,
     required this.job_status,
-    required this.price,
+    required this.labor_cost,
 
   });
 
-  factory Jobs_Worker.fromJson(Map<String, dynamic> json) {
-    return Jobs_Worker(
+  factory Agenda.fromJson(Map<String, dynamic> json) {
+    return Agenda(
     job_id: json['id'] ?? '',
       type :json['type'] ?? '',
       client_user_id: json['client']?['user_id'] ?? '',
@@ -62,21 +82,25 @@ class Jobs_Worker {
       maps_address: json['location']?['maps_address'] ?? '',
 
 
-      job_date: json['job_date'] ?? '',
-      job_time: json['job_time'] ?? '',
+      job_date: formatDate(json['job_date'] ?? ''),
+      job_time: formatTime(json['job_time'] ?? ''),
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-      image_url : json['image_url'] ?? '',
+      image : json['image_url'] ?? '',
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      labor_cost: (json['price'] as num?)?.toDouble() ?? 0.0,
      
     );
   }
 }
 
-class Jobs_worker_service {
-  List<Jobs_Worker> jobs = []; // Lista de empresas
+class Agenda_service {
+  static final Agenda_service _instance = Agenda_service._internal();
+  factory Agenda_service() => _instance;
+  Agenda_service._internal();
+
+  List<Agenda> agenda = []; // Lista de empresas
   int pageNumber = 1;
   bool isLoading = false;
   bool hasMore = true;
@@ -84,12 +108,8 @@ class Jobs_worker_service {
   static const String _cacheTimeKey = 'agenda_cache_time';
 
   set loading(bool loading) {}
-  Future<void> updatedata() async {
-    print("📦 actualizando agenda");
-    await fetchFromApi();
-  }
 
-  Future<bool> fetchAgendaData() async {
+   Future<bool> fetchAgendaData() async {
     final prefs = await SharedPreferences.getInstance();
 
     // config cache
@@ -109,31 +129,33 @@ class Jobs_worker_service {
       print("📦 Usando cache agenda");
 
       final List<dynamic> jsonData = json.decode(cachedData);
-      jobs
+      agenda
         ..clear()
-        ..addAll(jsonData.map((e) => Jobs_Worker.fromJson(e)));
+        ..addAll(jsonData.map((e) => Agenda.fromJson(e)));
 
       return true;
     }
 
     print("🚫 Cache inválido → API agenda");
-    return await fetchFromApi();
+    return await fetchFromApi(1);
   }
 
-  Future<bool> fetchFromApi() async {
-    final prefs = await SharedPreferences.getInstance();
+  Future<bool> fetchFromApi(int page) async {
 
     print("🌐 Llamando API agenda");
+    final prefs = await SharedPreferences.getInstance();
 
-    final token = prefs.getString('token');
-    String? id_user = prefs.getString('id');
-
-    final headers = {'Authorization': 'Bearer $token'};
     int attempts = 0;
-    const int maxAttempts = 2;
+    const int maxAttempts = 3;
+
     while (attempts < maxAttempts) {
       try {
-        isLoading = true;
+
+      final token = prefs.getString('token');
+      String? id_user = prefs.getString('id');
+      final headers = {'Authorization': 'Bearer $token'};
+
+      isLoading = true;
 
         final response = await http
             .get(
@@ -143,18 +165,49 @@ class Jobs_worker_service {
             .timeout(const Duration(seconds: 15));
 
         if (response.statusCode == 200) {
-          final List<dynamic> jsonResponse = json.decode(response.body);
-          print(jsonResponse);
-          jobs
-            ..clear()
-            ..addAll(jsonResponse.map((e) => Jobs_Worker.fromJson(e)));
+          final decoded = json.decode(response.body);
 
-          await prefs.setString(_cacheKey, response.body);
-          await prefs.setInt(
-            _cacheTimeKey,
-            DateTime.now().millisecondsSinceEpoch,
-          );
+          final List<dynamic> jsonResponse =
+              decoded['data'] is List ? decoded['data'] as List<dynamic> : [];
+          print(jsonResponse);
+
+          if(page == 1)
+          {
+            print('guardando los primeros');
+            agenda
+            ..clear()
+            ..addAll(jsonResponse.map((e) => Agenda.fromJson(e)));
+
+            await prefs.setString(_cacheKey,  json.encode(jsonResponse),);
+            await prefs.setInt(
+              _cacheTimeKey,
+              DateTime.now().millisecondsSinceEpoch,
+            );
+            
+          }
+          else
+          {
+             print('📦 Agregando página $page');
+
+             agenda
+            ..addAll(jsonResponse.map((e) => Agenda.fromJson(e)));
+          }
           return true;
+        }
+
+        if (response.statusCode == 401) {
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
+          
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
         print(" Error HTTP: ${response.statusCode}");
         return false;

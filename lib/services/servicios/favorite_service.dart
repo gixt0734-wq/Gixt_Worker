@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -9,17 +10,17 @@ class FavoritoService {
   static Future<Map<String, dynamic>> Crear({
     required String service_id,
   }) async {
-    
+
     int attempts = 0;
     const int maxAttempts = 2;
-    final prefs = await SharedPreferences.getInstance();
-    String? id_user = prefs.getString('id');
-    final token = prefs.getString('token');
-    final headers = {'Authorization': 'Bearer $token'};
 
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
+      final prefs = await SharedPreferences.getInstance();
+      String? id_user = prefs.getString('id');
+      final token = prefs.getString('token');
+      final headers = {'Authorization': 'Bearer $token'};
         final response = await http.put(
           Uri.parse('${dotenv.env['API_URL']}/api/Favorites?id=${service_id}&userId=${id_user}'),
           headers: headers,
@@ -33,10 +34,17 @@ class FavoritoService {
           };
         }
         if (response.statusCode == 401) {
-          return {
-            'success': false,
-            'message': jsonDecode(response.body)['message'],
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': jsonDecode(response.body)['message'],
+            };
+          }
         }
 
         if (response.statusCode == 400) {

@@ -221,15 +221,6 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _saveToken(
-    String token,
-    String inicio,
-    String id,
-    String user,
-    String img,
-  ) async {
-    await _preferencesService.savePreferences(token, inicio, id, img, user);
-  }
 
   void _Create() async {
      showDialog(
@@ -246,6 +237,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
       images: _images,
       cat: _categoriaSeleccionada,
       id: widget.data['id'],
+      token: widget.data['token'],
     ),
 
       onSuccess: (result) async {

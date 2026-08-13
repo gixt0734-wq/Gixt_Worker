@@ -1,11 +1,32 @@
 import 'dart:async';
 import 'dart:io';
-
+import 'package:gixt_worker/services/Details/DetailsModel.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:gixt_worker/services/Express/Express_proposal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
+
+String formatDate(String? date) {
+  if (date == null || date.isEmpty) return '';
+
+  final parsed = DateTime.parse(date);
+
+  return DateFormat('dd-MM-yyyy').format(parsed);
+}
+
+String formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+
+  try {
+    final parsed = DateFormat('HH:mm:ss').parse(time);
+     return DateFormat('hh:mm a').format(parsed);
+  } catch (_) {
+    return '';
+  }
+}
 
 class Express {
   // IDs
@@ -35,10 +56,13 @@ class Express {
   double diagnostic_cost;
   double labor_cost;
   double materials;
+  double total;
+  double iva;
   List<String> images_evicence;
   List<Express_proposal> express_proposal;
   // images
   String? image;
+  List<DetailsModel> listdetails;
 
   Express({
     required this.express_id,
@@ -55,6 +79,8 @@ class Express {
     required this.description,
     required this.problem,
     required this.price,
+    required this.total,
+    required this.iva,
     required this.payment_method,
     required this.is_active,
     required this.job_status,
@@ -66,6 +92,7 @@ class Express {
     required this.images_evicence,
     this.image,
     required this.express_proposal,
+    required this.listdetails
   });
 
   factory Express.fromJson(Map<String, dynamic> json) {
@@ -88,9 +115,11 @@ class Express {
       payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
       labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
       materials: (json['payment'] ? ['materials']) ?? 0.0,
+      iva: (json['payment'] ? ['iva']) ?? 0.0,
+      total : (json['payment'] ? ['total']) ?? 0.0,
       // job
-      job_date: json['job_date'] ?? '',
-      job_time: json['job_time'] ?? '',
+      job_date: formatDate(json['job_date'] ?? ''),
+      job_time: formatTime(json['job_time'] ?? ''),
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
@@ -100,6 +129,9 @@ class Express {
       images_evicence: List<String>.from(json['evidence'] ?? []),
       express_proposal: (json['proposal'] as List<dynamic>? ?? [])
         .map((e) => Express_proposal.fromJson(e))
+        .toList(),
+      listdetails: (json['details'] as List<dynamic>? ?? [])
+        .map((e) => DetailsModel.fromJson(e))
         .toList(),
       image: json['image'],
 
@@ -118,17 +150,18 @@ class ExpressById_service {
 
   Future<bool> fetchServicioData(String id, {bool forceRefresh = false}) async {
     print("fetch Job by id");
-
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    String? id_user = prefs.getString('id');
-    print("id user: ${id_user}");
-    final headers = {'Authorization': 'Bearer $token'};
     int attempts = 0;
-    const int maxAttempts = 2;
+    const int maxAttempts = 3;
+
     while (attempts < maxAttempts) {
       try {
-        isLoading = true;
+      
+      final token = prefs.getString('token');
+      String? id_user = prefs.getString('id');
+      print("id user: ${id_user}");
+      final headers = {'Authorization': 'Bearer $token'};
+      isLoading = true;
 
         final response = await http
             .get(
@@ -144,6 +177,21 @@ class ExpressById_service {
             ..clear()
             ..add(Express.fromJson(jsonResponse));
           return true;
+        }
+
+        if (response.statusCode == 401) {
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
+          
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
 
         print(" Error HTTP: ${response.statusCode}");

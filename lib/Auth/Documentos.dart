@@ -98,7 +98,8 @@ class _CrearDocumentostate extends State<CrearDocumentos>
       image_ine_reverso: _documentos['ine_trasera'],
       image_cd: _documentos['domicilio'] ,
       image_canp: _documentos['antecedentes'] ,
-      id: widget.data['id']),
+      id: widget.data['id'],
+      token: widget.data['token']),
       onSuccess: (result) async {
           await Toast(
             context,

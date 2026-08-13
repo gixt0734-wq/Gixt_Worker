@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
@@ -60,6 +61,9 @@ class Worker {
 }
 
 class Worker_service {
+    static final Worker_service _instance = Worker_service._internal();
+  factory Worker_service() => _instance;
+  Worker_service._internal();
   List<Worker> worker = []; // Lista de empresas
   bool isLoading = false;
   bool hasMore = true;
@@ -105,20 +109,17 @@ class Worker_service {
   }
 
   Future<bool> fetchFromApi() async {
-    final prefs = await SharedPreferences.getInstance();
-
     print("🌐 Llamando API user");
-
-    final token = prefs.getString('token');
-    String? id_user = prefs.getString('id');
-
-    final headers = {'Authorization': 'Bearer $token'};
+    final prefs = await SharedPreferences.getInstance();
     int attempts = 0;
     const int maxAttempts = 3;
 
     while (attempts < maxAttempts) {
       try {
-        isLoading = true;
+      final token = prefs.getString('token');
+      String? id_user = prefs.getString('id');
+      final headers = {'Authorization': 'Bearer $token'};
+      isLoading = true;
 
         final response = await http
             .get(
@@ -141,6 +142,23 @@ class Worker_service {
           );
           return true;
         }
+
+        if (response.statusCode == 401) {
+
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
+        }
+         
         print("❌ Error HTTP: ${response.statusCode}");
         return false;
       } on TimeoutException {

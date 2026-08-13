@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:http/http.dart' as http;
 
 class DocumentsService {
@@ -11,6 +12,7 @@ class DocumentsService {
     required File? image_cd,
     required File? image_canp,
     required String? id,
+    required String token
   }) async {
     if (id == null ||
         image_ine == null ||
@@ -31,7 +33,9 @@ class DocumentsService {
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
-
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+        });
         // Campos de texto
         request.fields['user_id'] = id;
         request.files.add(
@@ -87,10 +91,13 @@ class DocumentsService {
           return {'success': true, 'data': data};
         }
         if (streamedResponse.statusCode == 401) {
-          return {
-            'success': false,
-            'message': jsonDecode(responseString)['message'],
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+            return {
+              'success': false,
+              'message': jsonDecode(responseString)['message'],
+            };
+          
         }
 
         if (streamedResponse.statusCode == 400) {

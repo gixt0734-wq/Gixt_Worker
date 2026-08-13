@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gixt_worker/config/device.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:gixt_worker/services/Auth/auth_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,7 @@ class InfoService {
     required double labor_cost,
     required double range_km,
     required String? id,
+    required String token,
     List<File?> images = const [],
     List<int?> cat = const [],
   }) async {
@@ -32,7 +34,9 @@ class InfoService {
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
-
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+        });
         // Campos de texto
         request.fields['user_id'] = id!;
         request.fields['description'] = description;
@@ -90,10 +94,14 @@ class InfoService {
             };
         }
         if (streamedResponse.statusCode == 401) {
-          return {
-            'success': false,
-            'message': jsonDecode(responseString)['message'],
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+      
+            return {
+              'success': false,
+              'message': jsonDecode(responseString)['message'],
+            };
+          
         }
 
         if(streamedResponse.statusCode == 400)

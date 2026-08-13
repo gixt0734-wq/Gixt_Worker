@@ -20,9 +20,9 @@ import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/components/sketor/cardsCategoria.dart';
 import 'package:gixt_worker/components/sketor/cardsServicios.dart';
 import 'package:gixt_worker/routes/BottomNavigationBar.dart';
+import 'package:gixt_worker/services/Agenda/Agenda_service.dart';
 import 'package:gixt_worker/services/Express/Express_service.dart';
 import 'package:gixt_worker/services/Job/Jobs_service.dart';
-import 'package:gixt_worker/services/Job/Jobs_worker_service.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 import 'package:gixt_worker/services/servicios/categorias_service.dart';
@@ -43,8 +43,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   // final Servicios_service api = Servicios_service();
-  final Jobs_worker_service jobs = Jobs_worker_service();
-  final ServiciosFav_service fav = ServiciosFav_service();
+  final Agenda_service jobs = Agenda_service();
   final Categorias_service categorias = Categorias_service();
   final Express_service express = Express_service();
   final ScrollController _scrollController = ScrollController();
@@ -109,7 +108,7 @@ class _HomePageState extends State<HomePage> {
 
     await categorias.updatedata();
     await express.updatedata();
-    await jobs.updatedata();
+    await jobs.fetchFromApi(1);
     if (!mounted) return;
     setState(() {
       isLoading = false;
@@ -118,7 +117,7 @@ class _HomePageState extends State<HomePage> {
   }
   Future<void> _Refresh() async {
     await express.updatedata();
-    await jobs.updatedata();
+    await jobs.fetchFromApi(1);
     if (!mounted) return;
     setState(() {
     });
@@ -228,7 +227,7 @@ class _HomePageState extends State<HomePage> {
                     const SizedBox(height: 20),
                     _buildServiciosjob(),
                     if (!isLoading &&
-                        jobs.jobs
+                        jobs.agenda
                             .where(
                               (j) =>
                                   j.job_status == 'in_progress' ||
@@ -441,7 +440,7 @@ class _HomePageState extends State<HomePage> {
 
   Widget _buildServiciosjob() {
     // Filtrar por estado
-    final List<Jobs_Worker> filtrados = jobs.jobs.where((a) {
+    final List<Agenda> filtrados = jobs.agenda.where((a) {
       return a.job_status == 'in_progress' ||
           a.job_status == 'going' ||
           a.job_status == 'arrived';
@@ -474,7 +473,7 @@ class _HomePageState extends State<HomePage> {
                 final agenda = filtrados[index];
 
                 return CardsAgenda(
-                      image_url: agenda.image_url,
+                      image_url: agenda.image,
                       type: agenda.type,
                       name: agenda.problem,
                       client_image: agenda.client_image,
@@ -482,7 +481,6 @@ class _HomePageState extends State<HomePage> {
                       client: agenda.client_first_name,
                       date: agenda.job_date,
                       time: agenda.job_time,
-                      price: agenda.price,
                       description: agenda.description,
                       address: agenda.maps_address,
                       status: agenda.job_status,
@@ -634,7 +632,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildStatsRow() {
-    final activeJobs = jobs.jobs
+    final activeJobs = jobs.agenda
         .where(
           (j) =>
               j.job_status == 'in_progress' ||

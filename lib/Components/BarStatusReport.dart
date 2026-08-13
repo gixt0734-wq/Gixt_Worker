@@ -77,18 +77,8 @@ class BarstatusReport extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Título
-        Text(
-          'Estado del Reporte',
-          style: GoogleFonts.poppins(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 5),
 
         // Barra de progreso minimalista
         Row(

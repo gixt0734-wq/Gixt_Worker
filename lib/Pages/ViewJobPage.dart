@@ -16,6 +16,21 @@ import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
+import 'package:gixt_worker/Components/Job/ActionsButton.dart';
+import 'package:gixt_worker/Components/Job/BarStatus.dart';
+import 'package:gixt_worker/Components/Job/Button.dart';
+import 'package:gixt_worker/Components/Job/Client.dart';
+import 'package:gixt_worker/Components/Job/DetailField.dart';
+import 'package:gixt_worker/Components/Job/Extra.dart';
+import 'package:gixt_worker/Components/Job/FieldLabelDescription.dart';
+import 'package:gixt_worker/Components/Job/Image.dart';
+import 'package:gixt_worker/Components/Job/InfoCard.dart';
+import 'package:gixt_worker/Components/Job/InfoChip.dart';
+import 'package:gixt_worker/Components/Job/OptionsButton.dart';
+import 'package:gixt_worker/Components/Job/PaymentChip.dart';
+import 'package:gixt_worker/Components/Job/PaymentMethodCard.dart';
+import 'package:gixt_worker/Components/Job/PriceBreakdown.dart';
+import 'package:gixt_worker/Components/Job/SectionCard.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/alert_bar.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
@@ -26,7 +41,6 @@ import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayjobPage.dart';
 import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
-import 'package:gixt_worker/components/BarStatus.dart';
 import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/config/location.dart';
@@ -53,7 +67,7 @@ class ViewJobPage extends StatefulWidget {
 }
 
 class _ViewJobPageState extends State<ViewJobPage>
-    with TickerProviderStateMixin , WidgetsBindingObserver{
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
@@ -100,20 +114,19 @@ class _ViewJobPageState extends State<ViewJobPage>
     super.dispose();
   }
 
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     print("Entrando otravez a express");
     switch (state) {
       case AppLifecycleState.resumed:
-        // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
-        // sin que el widget se reconstruya: verificamos y reconectamos.
+      // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
+      // sin que el widget se reconstruya: verificamos y reconectamos.
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
         // La app pasó a segundo plano: mantenemos la conexión abierta para
         // no perder notificaciones mientras el SO no la mate, pero evitamos
         // mostrar la pantalla de "sin conexión" mientras el usuario no la ve.
-    _initial();
+        _initial();
         break;
       case AppLifecycleState.detached:
         // La app se está cerrando por completo: cerramos el hub de forma
@@ -122,7 +135,7 @@ class _ViewJobPageState extends State<ViewJobPage>
 
         break;
       case AppLifecycleState.hidden:
-    _initial();
+        _initial();
         break;
     }
   }
@@ -480,46 +493,35 @@ class _ViewJobPageState extends State<ViewJobPage>
   BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
-  Future<BitmapDescriptor> getMarkerIcon(
-  String imagePath,
-  int width,
-) async {
-  final ByteData data = await rootBundle.load(imagePath);
+  Future<BitmapDescriptor> getMarkerIcon(String imagePath, int width) async {
+    final ByteData data = await rootBundle.load(imagePath);
 
-  final ui.Codec codec = await ui.instantiateImageCodec(
-    data.buffer.asUint8List(),
-    targetWidth: width,
-  );
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
 
-  final ui.FrameInfo fi = await codec.getNextFrame();
+    final ui.FrameInfo fi = await codec.getNextFrame();
 
-  final ByteData? bytes = await fi.image.toByteData(
-    format: ui.ImageByteFormat.png,
-  );
+    final ByteData? bytes = await fi.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
 
-  return BitmapDescriptor.fromBytes(
-    bytes!.buffer.asUint8List(),
-  );
-}
-  
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
+
   Future<void> marker() async {
     const ImageConfiguration configuration = ImageConfiguration(
       size: Size(80, 80),
     );
 
-      markericon = await getMarkerIcon(
-        "assets/marker.png",
-        100,
-      );
+    markericon = await getMarkerIcon("assets/marker.png", 100);
 
-      workericon = await getMarkerIcon(
-        "assets/worker.png",
-        100,
-      );
+    workericon = await getMarkerIcon("assets/worker.png", 100);
 
     if (mounted) {
       setState(() {
-        markericon ;
+        markericon;
         workericon;
       });
     }
@@ -546,7 +548,6 @@ class _ViewJobPageState extends State<ViewJobPage>
     _startTracking();
     setState(() {});
   }
-
 
   Future<void> _cancelreload() async {
     await _stopTracking();
@@ -689,7 +690,7 @@ class _ViewJobPageState extends State<ViewJobPage>
     }
   }
 
-void _Cancelar() async {
+  void _Cancelar() async {
     bool? ok = await ActionAlert(
       context,
       title: 'Cancelar solicitud',
@@ -713,8 +714,7 @@ void _Cancelar() async {
       if (mounted) Navigator.pop(context);
       if (mounted) Navigator.pop(context);
       if (result['success'] == true) {
-        
-        _cancelreload();    
+        _cancelreload();
         homeNotifier.refresh();
         if (!mounted) return;
         if (mounted) Navigator.pop(context);
@@ -736,31 +736,8 @@ void _Cancelar() async {
       }
     }
   }
-  // Imagenes
-  void _showFullImage(String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return Dialog(
-          backgroundColor: Colors.black,
-          insetPadding: EdgeInsets.all(10),
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context), // cerrar al tocar
-            child: InteractiveViewer(
-              panEnabled: true,
-              minScale: 0.5,
-              maxScale: 4,
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 
+  // Imagenes
   void _startCountdown(DateTime expiresAt) {
     _timer?.cancel();
     _countdownExpiresAt = expiresAt;
@@ -910,10 +887,7 @@ void _Cancelar() async {
           right: 12,
           child: GestureDetector(
             onTap: () {
-              abrirGoogleMaps(
-                job.job[0].latitude,
-                job.job[0].longitude,
-              );
+              abrirGoogleMaps(job.job[0].latitude, job.job[0].longitude);
             },
             child: Container(
               width: 42,
@@ -1019,16 +993,17 @@ void _Cancelar() async {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      Expanded(child: 
-                      Text(
-                        'Ubicación seleccionada',
-                        style: GoogleFonts.poppins(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: colorsecundario,
-                          letterSpacing: 0.3,
+                      Expanded(
+                        child: Text(
+                          'Ubicación seleccionada',
+                          style: GoogleFonts.poppins(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: colorsecundario,
+                            letterSpacing: 0.3,
+                          ),
                         ),
-                      )),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 6),
@@ -1059,7 +1034,6 @@ void _Cancelar() async {
             ),
           ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
 
-
         // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],
     );
@@ -1084,7 +1058,6 @@ void _Cancelar() async {
               ),
             ),
           ),
-
           // Título: entrada protagónica desde arriba con scale sutil
           _buildTitle()
               .animate()
@@ -1096,47 +1069,26 @@ void _Cancelar() async {
                 duration: 500.ms,
                 curve: Curves.easeOutCubic,
               ),
-
-          const SizedBox(height: 20),
-
-          // Status bar: entra "expandiéndose" horizontalmente — refuerza que es un indicador de progreso
-          Barstatus(
-                estadoTrabajo: job.job[0].job_status.isEmpty
-                    ? ''
-                    : job.job[0].job_status,
-              )
-              .animate(delay: 200.ms)
-              .fadeIn(duration: 450.ms)
-              .scaleX(
-                begin: 0.7,
-                end: 1,
-                alignment: Alignment.centerLeft,
-                curve: Curves.easeOutCubic,
-                duration: 600.ms,
-              ),
-
-          const SizedBox(height: 20),
-
-          // Bloque "Trabajo": desliza desde la izquierda
+          const SizedBox(height: 10),
           _buildTrabajo()
               .animate(delay: 350.ms)
               .fadeIn(duration: 500.ms)
               .slideX(begin: -0.15, curve: Curves.easeOutCubic),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           // Client: vuelve desde la izquierda (zigzag visual)
           _buildClient()
               .animate(delay: 550.ms)
               .fadeIn(duration: 500.ms)
               .slideX(begin: -0.15, curve: Curves.easeOutCubic),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           // Evidence: desliza desde la derecha (efecto espejo con el anterior)
           _buildEvidence()
               .animate(delay: 450.ms)
               .fadeIn(duration: 500.ms)
               .slideX(begin: 0.15, curve: Curves.easeOutCubic),
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
           _buildActionsSection()
-          .animate(delay: 450.ms)
+              .animate(delay: 450.ms)
               .fadeIn(duration: 500.ms)
               .slideX(begin: 0.15, curve: Curves.easeOutCubic),
           const SizedBox(height: 20),
@@ -1146,45 +1098,76 @@ void _Cancelar() async {
   }
 
   Widget _buildTitle() {
+    final surface = Theme.of(context).colorScheme.surface;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Trabajo para ${job.job[0].client_username}',
+          'SOLICITUD DE TRABAJO',
+          style: GoogleFonts.poppins(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.2,
+            color: colorsecundario,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          job.job[0].client_username,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.dmSans(
-            fontSize: 20,
+            fontSize: 26,
             fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.4,
-            height: 1.2,
+            color: surface,
+            letterSpacing: -0.8,
+            height: 1.1,
           ),
         ),
+        const SizedBox(height: 16),
+        Barstatus(
+              estadoTrabajo: job.job[0].job_status.isEmpty
+                  ? ''
+                  : job.job[0].job_status,
+            )
+            .animate(delay: 200.ms)
+            .fadeIn(duration: 450.ms)
+            .scaleX(
+              begin: 0.7,
+              end: 1,
+              alignment: Alignment.centerLeft,
+              curve: Curves.easeOutCubic,
+              duration: 600.ms,
+            ),
         const SizedBox(height: 10),
         Wrap(
           spacing: 8,
           runSpacing: 6,
           children: [
-            _infoChip(
-              Icons.location_on_outlined,
-              job.job[0].maps_address,
-              colorsecundario,
+            SizedBox(
+              width: double.infinity,
+              child: InfoChip(
+                icon: Icons.location_on_outlined,
+                label: (job.job[0].maps_address?.trim().isNotEmpty ?? false)
+                    ? job.job[0].maps_address!
+                    : 'Buscando ubicación...',
+                color: colorsecundario,
+              ),
             ),
-            _infoChip(
-              Icons.event_outlined,
-              job.job[0].job_date,
-              Colors.transparent,
+            InfoChip(
+              icon: Icons.event_outlined,
+              label: job.job[0].job_date,
+              color: Colors.transparent,
             ),
-            _infoChip(
-              Icons.access_time_outlined,
-              job.job[0].job_time,
-              Colors.transparent,
+            InfoChip(
+              icon: Icons.access_time_outlined,
+              label: job.job[0].job_time,
+              color: Colors.transparent,
             ),
-            _infoChip(
-              Icons.handyman_rounded,
-              job.job[0].category.toUpperCase(),
-              colorsecundario,
+            InfoChip(
+              icon: Icons.handyman_rounded,
+              label: job.job[0].category.toUpperCase(),
+              color: colorsecundario,
             ),
           ],
         ),
@@ -1192,465 +1175,117 @@ void _Cancelar() async {
     );
   }
 
-  Widget _infoChip(IconData icon, String label, Color accent) {
-    final surface = Theme.of(context).colorScheme.surface;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 12,
-            color: accent == Colors.transparent
-                ? surface.withValues(alpha: 0.4)
-                : accent,
-          ),
-          const SizedBox(width: 5),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 380),
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.poppins(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                color: surface.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildClient() {
-    return Column(
-      children: [
-        SizedBox(height: 20),
-        _fieldLabel('Cliente'),
-        SizedBox(height: 20),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primary,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
-              width: 0,
-            ),
-          ),
-          child: Row(
-            children: [
-              Circleimage(w: 56, h: 56, image_url: job.job[0].client_image),
-              const SizedBox(width: 20),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            job.job[0].client_username,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.surface,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              GestureDetector(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => AddReportPage(
-                        type: 'client',
-                        id: job.job[0].client_id,
-                        user: "${job.job[0].client_username}".trim(),
-                        type_job: null,
-                      ),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(
-                    color: colorError.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(50),
-                  ),
-                  child: Icon(
-                    Icons.report_outlined,
-                    color: colorWhite,
-                    size: 20,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
+    return ClientInfo(img: job.job[0].client_image ,name: job.job[0].client_username ,id: job.job[0].client_id);
   }
 
   Widget _buildTrabajo() {
+    final problem = job.job[0].problem;
+    final description = job.job[0].description;
+    final expressdetails = job.job[0].listdetails;
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _fieldLabel('Problema descrito por el cliente'),
-        SizedBox(height: 20),
-        _fieldText(job.job[0].problem),
-        SizedBox(height: 20),
-        _fieldLabel('Descripción del trabajo'),
-        SizedBox(height: 20),
-        _fieldText(job.job[0].description),
-        SizedBox(height: 20),
-        _buildInfoCard(
+        SectionCard(
+          title: 'Trabajo a realizar',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DetailField(label: 'Problema', value: problem),
+              const SizedBox(height: 16),
+              DetailField(label: 'Descripción', value: description),
+            ],
+          ),
+        ),
+        if (expressdetails.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SectionCard(
+            title: 'Informacion extra',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var details in expressdetails) ...[
+                  Extra(name: details.name, value: details.value),
+                ],
+              ],
+            ),
+          ),
+        ],
+        const SizedBox(height: 10),
+        InfoCard(
           icon: Icons.info_outline,
           text:
               'El precio mostrado corresponde a la mano de obra y de ir al domicilio; el costo final puede variar según los materiales necesarios.',
         ),
-        SizedBox(height: 20),
-         _fieldLabel('Pago y método de pago'),
-         SizedBox(height: 20),
         if (job.job[0].job_status != 'pending') ...[
-          SizedBox(height: 20),
+          SizedBox(height: 10),
           _buildPriceBreakdown(),
         ],
-        SizedBox(height: 20),
+        SizedBox(height: 10),
         _buildPaymentMethodCard(),
       ],
     );
   }
 
   Widget _buildPriceBreakdown() {
-      final surface = Theme.of(context).colorScheme.surface;
-      final labor = _toNum(job.job[0].labor_cost);
-      final diagnostic = _toNum(job.job[0].diagnostic_cost);
-      final materials = _toNum(job.job[0].materials);
-      final total = labor + diagnostic + materials;
-
-      return Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          children: [
-            _priceLine('Mano de obra', labor),
-            const SizedBox(height: 12),
-            _priceLine('Visita / diagnóstico', diagnostic),
-            const SizedBox(height: 12),
-            _priceLine('Materiales (estimado)', materials),
-            const SizedBox(height: 16),
-            Divider(
-              height: 1,
-              thickness: 0.7,
-              color: surface.withValues(alpha: 0.1),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(child: 
-                Text(
-                  'Total estimado',
-                  style: GoogleFonts.poppins(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: surface,
-                  ),
-                )),
-                Text(
-                  '\$${total.toStringAsFixed(2)}',
-                  style: GoogleFonts.poppins(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: colorsecundario,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-  Widget _priceLine(String label, double value) {
     final surface = Theme.of(context).colorScheme.surface;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(child: 
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w400,
-            color: surface.withValues(alpha: 0.6),
-          ),
-        )),
-        Text(
-          '\$${value.toStringAsFixed(2)}',
-          style: GoogleFonts.poppins(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: surface.withValues(alpha: 0.9),
-          ),
-        ),
-      ],
-    );
-  }
+    final labor = job.job[0].labor_cost;
+    final diagnostic = job.job[0].diagnostic_cost;
+    final materials = job.job[0].materials;
+    final iva = job.job[0].iva;
+    final total = job.job[0].total;
 
-  double _toNum(dynamic v) {
-    if (v == null) return 0;
-    if (v is num) return v.toDouble();
-    return double.tryParse(v.toString()) ?? 0;
-  }
- 
-  Widget image(String? imagen, String type, IconData badgeIcon) {
-    return SizedBox(
-      width: 140,
-      height: 170,
-      child: Stack(
-        alignment: Alignment.center,
-        clipBehavior: Clip.none,
-        children: [
-          imagen == null
-              ? Container(
-                  decoration: BoxDecoration(
-                    color: Color.fromARGB(255, 177, 177, 177),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  width: double.infinity,
-                  height: double.infinity,
-                  child: IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
-                      Icons.person,
-                    ), // Usa un icono de calendario
-                    color: const Color.fromARGB(255, 255, 255, 255),
-                    iconSize: 65,
-                  ),
-                )
-              : GestureDetector(
-                  onTap: () {
-                    _showFullImage(imagen);
-                  },
-                  child: Stack(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Color.fromARGB(0, 103, 10, 10),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        width: double.infinity,
-                        height: double.infinity,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: CachedNetworkImage(
-                            imageUrl: imagen!,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) =>
-                                Center(child: Indicador()),
-                            errorWidget: (context, url, error) =>
-                                const Icon(Icons.broken_image),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        bottom: 12,
-                        left: 12,
-                        right: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorsecundario,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                 Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(badgeIcon, size: 12, color: colorWhite),
-                                  const SizedBox(width: 5),
-                                  Expanded(child: 
-                                  Text(
-                                    type,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: colorWhite,
-                                    ),
-                                  )),
-                                ],
-                              ),
-                              ],
-                       
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-        ],
-      ),
+    return PriceBreakdown(
+      labor: labor,
+      diagnostic: diagnostic,
+      materials: materials,
+      iva: iva,
+      total: total,
     );
   }
 
   Widget _buildEvidence() {
     final evidence = job.job[0].images_evicence;
     final total = 1 + evidence.length;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(child: _fieldLabel('Evidencia')),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: colorsecundario.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                '$total foto${total != 1 ? 's' : ''}',
-                style: GoogleFonts.poppins(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: colorsecundario,
-                ),
-              ),
-            ),
-          ],
+    return  SectionCard(
+      title: 'Imágenes de evidencia',
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: colorsecundario.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
         ),
-        SizedBox(height: 20),
-        SingleChildScrollView(
+        child: Text(
+          '$total foto${total != 1 ? 's' : ''}',
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: colorsecundario,
+          ),
+        ),
+      ),
+      child:SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
             children: [
-              image(job.job[0].image, 'Cliente', Icons.person_rounded)
+              Imagen(imagen: job.job[0].image!, type: 'Cliente',icon: Icons.person_rounded)
                   .animate()
                   .fade(duration: 450.ms, delay: 60.ms)
                   .slideX(begin: -0.2),
               const SizedBox(width: 20),
               for (final img in evidence) ...[
-                image(img, 'Trabajador', Icons.handyman_rounded),
+                Imagen(imagen: img!,type: 'Trabajador',icon: Icons.handyman_rounded),
                 const SizedBox(width: 20),
               ],
             ],
           ),
         ),
-        SizedBox(height: 20),
-      ],
-    );
-  }
-
-  Widget _buildInfoCard({required IconData icon, required String text}) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorsecundario.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorsecundario.withOpacity(0.15)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: colorsecundario),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: GoogleFonts.poppins(
-                fontSize: 12,
-                height: 1.5,
-                color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
   Widget _buildPaymentMethodCard() {
-    final isCash = job.job[0].payment_method == 'cash';
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: colorsecundario,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(
-              isCash ? Icons.payments_outlined : Icons.credit_card_rounded,
-              size: 18,
-              color: colorWhite,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(child: 
-          Text(
-            'Método de pago',
-            style: GoogleFonts.poppins(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(
-                context,
-              ).colorScheme.surface
-            ),
-          )),
-          const Spacer(),
-          Text(
-            isCash ? 'Efectivo' : 'Tarjeta',
-                        style: GoogleFonts.poppins(
-              fontSize: 14,
-                    fontWeight: FontWeight.w800,
-              color: colorsecundario,
-            ),
-          ),
-        ],
-      ),
-    );
+    return PaymentMethod(payment_method: job.job[0].payment_method);
   }
 
   Widget _bottomBar(BuildContext context) {
@@ -1682,8 +1317,10 @@ void _Cancelar() async {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>
-                    Evidencejobpage(isExpress: false, job_id: job.job[0].job_id),
+                builder: (context) => Evidencejobpage(
+                  isExpress: false,
+                  job_id: job.job[0].job_id,
+                ),
               ),
             );
 
@@ -1693,8 +1330,8 @@ void _Cancelar() async {
       }
     };
     switch (expressStatus) {
-   case 'pending':
-        final proposals =job.job[0].jobs_proposal;
+      case 'pending':
+        final proposals = job.job[0].jobs_proposal;
         if (proposals.length == 1) {
           final createdAt = DateTime.parse(proposals[0].created_at);
           print(createdAt);
@@ -1786,74 +1423,9 @@ void _Cancelar() async {
         bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
     }
 
-    return Container(
-      height: 86,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          // top: BorderSide(
-          //   color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
-          //   width: 1,
-          // ),
-        ),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: action,
-          icon: Icon(icon, color: colorWhite, size: 25),
-          label: Text(
-            text,
-            style: const TextStyle(fontSize: 18, color: colorWhite),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: bgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _fieldLabel(String label) {
-    return Row(
-      children: [
-        // Container(
-        //   width: 3,
-        //   height: 18,
-        //   decoration: BoxDecoration(
-        //     color: colorsecundario,
-        //     borderRadius: BorderRadius.circular(2),
-        //   ),
-        // ),
-        // const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            label,
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.surface,
-              letterSpacing: -0.2,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _fieldText(String text) {
-    return Text(
-      text,
-      style: GoogleFonts.poppins(
-        fontSize: 13,
-        height: 1.6,
-        color: Theme.of(context).colorScheme.surface.withOpacity(0.45),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Button(bgColor: bgColor, text: text, icon: icon, action: action),
     );
   }
 
@@ -1910,26 +1482,8 @@ void _Cancelar() async {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        'Enviar propuesta',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.surface,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.45),
-                          height: 1.5,
-                        ),
-                      ),
+                       FieldLabelDescription(label: 'Enviar propuesta' , value: 'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',),
+                      
                       const SizedBox(height: 24),
 
                       Text(
@@ -1952,7 +1506,7 @@ void _Cancelar() async {
                               padding: EdgeInsets.only(
                                 right: index == multipliers.length - 1 ? 0 : 10,
                               ),
-                              child: _paymentChip(
+                              child: PaymentChip(
                                 value: value,
                                 label: '\$${value.toStringAsFixed(0)}',
                                 icon: Icons.attach_money_rounded,
@@ -1988,30 +1542,7 @@ void _Cancelar() async {
                         },
                       ),
                       const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 52,
-                        child: ElevatedButton.icon(
-                          onPressed: _Send,
-                          icon: const Icon(Icons.send_rounded, size: 18),
-                          label: Text(
-                            'Enviar propuesta',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: colorsecundario,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                          ),
-                        ),
-                      ),
+                       Button(text: 'Enviar propuesta', icon: Icons.send_rounded, bgColor: colorsecundario, action: _Send)
                     ],
                   ),
                 ),
@@ -2023,58 +1554,14 @@ void _Cancelar() async {
     );
   }
 
-  Widget _paymentChip({
-    required double value,
-    required String label,
-    required IconData icon,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected ? colorsecundario : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isSelected
-                ? colorsecundario
-                : Theme.of(context).colorScheme.surface.withOpacity(0.12),
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              size: 16,
-              color: isSelected
-                  ? colorWhite
-                  : Theme.of(context).colorScheme.surface.withOpacity(0.4),
-            ),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: GoogleFonts.poppins(
-                fontSize: 13,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected
-                    ? colorWhite
-                    : Theme.of(context).colorScheme.surface.withOpacity(0.55),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
   Widget _buildActionsSection() {
     final status = job.job[0].job_status.toLowerCase();
-    final bool canCancel = ['pending', 'canceled','finalized','completed'].contains(status);
+    final bool canCancel = [
+      'pending',
+      'canceled',
+      'finalized',
+      'completed',
+    ].contains(status);
     final bool canReport = [
       'canceled',
       'completed',
@@ -2083,158 +1570,60 @@ void _Cancelar() async {
 
     if (canCancel && !canReport) return const SizedBox.shrink();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _fieldLabel('Acciones'),
-        const SizedBox(height: 16),
-        if (!canCancel) _cancelButton(),
-        if (!canCancel && canReport) const SizedBox(height: 12),
-        if (canReport) _reportButton(),
-      ],
-    );
-  }
-
-  Widget _cancelButton() {
-    return GestureDetector(
-      onTap: _showcancelSheet,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: colorError.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.cancel_rounded, color: colorError, size: 24),
+    return SectionCard(
+      title: 'Acciones',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!canCancel)
+            ActionsButton(
+              text: 'Cuéntanos si algo salió mal',
+              title: 'Cancelar solicitud',
+              icon: Icons.cancel_rounded,
+              action: _showcancelSheet,
+              color: colorError,
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cancelar solicitud',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.surface,
+          if (!canCancel && canReport) const SizedBox(height: 12),
+          if (canReport)
+            ActionsButton(
+              text: 'Esta acción no se puede deshacer',
+              title: 'Reportar un problema',
+              icon: Icons.flag_rounded,
+              action: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AddReportPage(
+                      type: 'job',
+                      id: widget.id_trabajo,
+                      user: "${job.job[0].problem}",
+                      type_job: 'job',
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Esta acción no se puede deshacer',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: colorError.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
+              color: colorsecundario,
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: colorError.withValues(alpha: 0.6),
-            ),
-          ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _reportButton() {
-    final surface = Theme.of(context).colorScheme.surface;
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => AddReportPage(
-              type: 'job',
-              id: widget.id_trabajo,
-              user: "${job.job[0].problem}",
-              type_job: 'job',
-            ),
-          ),
-        );
-      },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primary,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: colorsecundario,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.flag_rounded, color: colorWhite, size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Reportar un problema',
-                    style: GoogleFonts.poppins(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: surface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Cuéntanos si algo salió mal',
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      color: surface.withValues(alpha: 0.5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: surface.withValues(alpha: 0.35),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-void _showcancelSheet() {
+  void _showcancelSheet() {
     // 👇 Opciones de motivo de cancelación
     const List<String> motivos = [
       'No puedo acudir al servicio',
       'Tuve una emergencia personal',
       'El cliente no responde',
       'La ubicación es incorrecta',
-      'El servicio está fuera de mi zona',
       'No cuento con las herramientas necesarias',
       'Surgió un imprevisto',
-      'El horario ya no es compatible',
       'No puedo realizar este tipo de trabajo',
     ];
 
     // 👇 Motivo seleccionado (null = ninguno → botón deshabilitado)
 
-    showModalBottomSheet(
+   showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -2243,183 +1632,89 @@ void _showcancelSheet() {
           builder: (context, setModalState) {
             final surface = Theme.of(context).colorScheme.surface;
             final bool habilitado = motivoSeleccionado != null;
+            final mq = MediaQuery.of(context);
+            final bool isCompact = mq.size.width < 360;
 
             return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
+              padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
               child: KeyboardDismisser(
-                child: Container(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 24,
-                        offset: const Offset(0, -4),
+                child:  Container(
+                      width: double.infinity,
+                      padding: EdgeInsets.fromLTRB(
+                        isCompact ? 16 : 24,
+                        8,
+                        isCompact ? 16 : 24,
+                        mq.padding.bottom + 20,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Handle bar centrado
-                      Center(
-                        child: Container(
-                          width: 36,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 20),
-                          decoration: BoxDecoration(
-                            color: surface.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(2),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: const BorderRadius.vertical(
+                          top: Radius.circular(24),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 24,
+                            offset: const Offset(0, -4),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '¿Por qué cancelas el servicio?',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: surface,
-                          letterSpacing: -0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        'Selecciona un motivo para continuar',
-                        style: GoogleFonts.dmSans(
-                          fontSize: 13,
-                          color: surface.withOpacity(0.5),
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // 👇 Lista de opciones seleccionables
-                      ...motivos.map((motivo) {
-                        final bool seleccionado = motivoSeleccionado == motivo;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: GestureDetector(
-                            onTap: () {
-                              setModalState(() {
-                                motivoSeleccionado = motivo;
-                              });
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              curve: Curves.easeInOut,
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 16,
-                              ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Handle bar centrado
+                          Center(
+                            child: Container(
+                              width: 36,
+                              height: 4,
+                              margin: const EdgeInsets.only(bottom: 20),
                               decoration: BoxDecoration(
-                                color: seleccionado
-                                    ? colorsecundario.withOpacity(0.1)
-                                    : surface.withOpacity(0.04),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: seleccionado
-                                      ? colorsecundario
-                                      : surface.withOpacity(0.12),
-                                  width: seleccionado ? 1.6 : 1,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      motivo,
-                                      style: GoogleFonts.dmSans(
-                                        fontSize: 15,
-                                        fontWeight: seleccionado
-                                            ? FontWeight.w600
-                                            : FontWeight.w500,
-                                        color: seleccionado
-                                            ? colorsecundario
-                                            : surface.withOpacity(0.8),
-                                        letterSpacing: -0.2,
-                                      ),
-                                    ),
-                                  ),
-                                  // 👇 Indicador tipo radio
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    width: 22,
-                                    height: 22,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: seleccionado
-                                          ? colorsecundario
-                                          : Colors.transparent,
-                                      border: Border.all(
-                                        color: seleccionado
-                                            ? colorsecundario
-                                            : surface.withOpacity(0.3),
-                                        width: 2,
-                                      ),
-                                    ),
-                                    child: seleccionado
-                                        ? const Icon(
-                                            Icons.check,
-                                            size: 14,
-                                            color: Colors.white,
-                                          )
-                                        : null,
-                                  ),
-                                ],
+                                color: surface.withOpacity(0.3),
+                                borderRadius: BorderRadius.circular(2),
                               ),
                             ),
                           ),
-                        );
-                      }),
+                          const SizedBox(height: 8),
+                          FieldLabelDescription(label:'¿Por qué cancelas el servicio?' , value: 'Selecciona un motivo para continuar',),
+                          const SizedBox(height: 20),
 
-                      const SizedBox(height: 22),
+                          // 👇 Lista de opciones seleccionables (con scroll propio
+                          // para no desbordar en pantallas pequeñas)
+                          Flexible(
+                            child: SingleChildScrollView(
+                              child: Column(
+                                children: motivos.map((motivo) {
+                                  final bool seleccionado = motivoSeleccionado == motivo;
+                                  
+                                  return OptionsButton(
+                                    motivo: motivo, 
+                                    seleccionado: 
+                                    seleccionado,
+                                    action: () {
+                                      setModalState(() {
+                                        motivoSeleccionado = motivo;
+                                      });
+                                    }
+                                  );
+                                }).toList(),
+                            )
+                        )
+                      
+                      ),
 
-                      // 👇 Botón: habilitado solo si hay motivo seleccionado
-                      ElevatedButton(
-                        onPressed: habilitado
+                          const SizedBox(height: 22),
+                          Button(text: 'Cancelar servicio', icon: Icons.send, bgColor: colorsecundario, action:  habilitado
                             ? () {
                                 _Cancelar();
                               }
-                            : null, // 👈 null = deshabilitado
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: colorsecundario,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: surface.withOpacity(0.12),
-                          disabledForegroundColor: surface.withOpacity(0.4),
-                          elevation: 0,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(Icons.send, size: 20),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Cancelar servicio',
-                              style: GoogleFonts.dmSans(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: -0.2,
-                              ),
-                            ),
-                          ],
-                        ),
+                            : null,),
+                          // 👇 Botón: habilitado solo si hay motivo seleccionado
+                          
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
             );
           },
         );

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -11,33 +12,35 @@ class SendPropuestaJobService {
     required String labor_price,
     required String job_id
   }) async {
+
     int attempts = 0;
     const int maxAttempts = 2;
-      final prefs = await SharedPreferences.getInstance();
-    String? id_user = prefs.getString('id');
+    final prefs = await SharedPreferences.getInstance();
 
     while (attempts < maxAttempts) {
-      print("llamando a crear");
-      print(id_user);
+        print("llamando a send propuestas ");
+  
       try {
+        final token = prefs.getString('token');
+        String? id_user = prefs.getString('id');
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Jobs/Send');
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('POST', uri);
+        request.headers.addAll({
+          'Authorization': 'Bearer $token',
+        });
 
         // Campos de texto
         request.fields['worker'] = id_user!;
         request.fields['id'] = job_id;
         request.fields['diagnostic_cost'] = diagnostic_cost.toString();
         request.fields['labor_price'] = labor_price.toString();
-        print(request.fields);
         // Enviar request
         var streamedResponse = await request.send().timeout(const Duration(seconds: 30));
 
         // Convertir la respuesta a String
         final responseString = await streamedResponse.stream.bytesToString();
-
-        print('${responseString}');
 
         if (streamedResponse.statusCode == 200) {
           return {
@@ -47,10 +50,20 @@ class SendPropuestaJobService {
         }
 
         if (streamedResponse.statusCode == 401) {
-          return {
-            'success': false,
-            'message': jsonDecode(responseString)['message'],
-          };
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': 'Error inesperado',
+            };
+          }
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
 
         if(streamedResponse.statusCode == 400)

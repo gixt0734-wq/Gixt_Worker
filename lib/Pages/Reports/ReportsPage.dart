@@ -101,7 +101,7 @@ class _ReportsPageState extends State<ReportsPage> {
                   child: Column(
                     children: [
                       const SizedBox(height: 10),
-                      _buildFiltros(),
+                      _buildHero(),
                       const SizedBox(height: 20),
                       _buildData(),
                       const SizedBox(height: 100),
@@ -151,6 +151,43 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
+Widget _buildHero() {
+    final onSurface = Theme.of(context).colorScheme.surface;
+    return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Tus Reportes',
+              style: GoogleFonts.poppins(
+                fontSize: 28,
+                height: 1.15,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.9,
+                color: onSurface,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              isLoading
+                  ? 'Cargando tus reportes...'
+                  : 'Revisa el estado de tus reportes y gestiona tus solicitudes de soporte.',
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                height: 1.5,
+                color: onSurface.withOpacity(0.5),
+              ),
+            ),
+            if (!isLoading) ...[
+              const SizedBox(height: 18),
+              _buildFiltros(),
+            ],
+          ],
+        )
+        .animate()
+        .fadeIn(duration: 350.ms)
+        .slideY(begin: 0.06, curve: Curves.easeOutCubic);
+  }
+  
   Widget _buildFiltros() {
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,

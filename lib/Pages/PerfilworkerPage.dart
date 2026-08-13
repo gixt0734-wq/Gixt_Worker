@@ -19,6 +19,7 @@ import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Pages/Skeletor/PerfilWorkerSkeletor.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 import 'package:gixt_worker/services/user/Worker_service.dart';
@@ -189,7 +190,6 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
       if(_paginaActual == 1)
       {
          setState(() {
-            
           _paginaActual--;
         });
       }
@@ -209,7 +209,6 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
       latitude = worker.worker[0].latitude;
       longitude = worker.worker[0].longitude;
       hasMore = true;
-
       posicionActual = LatLng(latitude, longitude);
       mapController?.animateCamera(
         CameraUpdate.newCameraPosition(
@@ -222,8 +221,6 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
 
   Future<void> _Refresh() async {
     await worker.updatedata();
-
-      
     setState(() {
       print('Actualizando datos...');
       hasMore = true;
@@ -309,12 +306,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (worker.worker.isEmpty) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Center(child: Indicador()),
-      );
-    }
+
     return WillPopScope(
       onWillPop: () async {
         return salir();
@@ -336,6 +328,9 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                   ),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
+                      if (worker.worker.isEmpty) ...[
+                      const PerfilWorkerSkeletor(),
+                    ] else ...[
                       if (_paginaActual == 1) _buildMapa(),
                       if (_paginaActual == 0) ...[
                         _buildEditHint(),
@@ -343,6 +338,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                         _buildWorkingCategory(),
                         const SizedBox(height: 100),
                       ],
+                    ]
                     ]),
                   ),
                 ),

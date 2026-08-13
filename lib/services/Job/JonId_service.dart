@@ -2,6 +2,9 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
+import 'package:gixt_worker/services/Details/DetailsModel.dart';
+import 'package:gixt_worker/services/Express/Express_Id_service.dart';
 import 'package:gixt_worker/services/Job/jobs_proposal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
@@ -12,7 +15,7 @@ class Job {
   String job_id;
   String client_id;
   String category;
-  
+
   // client
   String client_first_name;
   String client_username;
@@ -22,7 +25,6 @@ class Job {
   String maps_address;
   double latitude;
   double longitude;
-
 
   // job
   String job_date;
@@ -36,12 +38,15 @@ class Job {
   String job_status;
   String payment_status;
   double diagnostic_cost;
-   double materials;
+  double materials;
+  double total;
+  double iva;
   // images
   String? image;
   List<String> images_evicence;
   List<Jobs_proposal> jobs_proposal;
-
+  List<DetailsModel> listdetails;
+  
   Job({
     required this.job_id,
     required this.client_id,
@@ -59,6 +64,8 @@ class Job {
     required this.diagnostic_cost,
     required this.labor_cost,
     required this.materials,
+    required this.total,
+    required this.iva,
     required this.worker_price,
     required this.payment_method,
     required this.is_active,
@@ -66,7 +73,8 @@ class Job {
     required this.payment_status,
     this.image,
     required this.images_evicence,
-    required this.jobs_proposal
+    required this.jobs_proposal,
+    required this.listdetails
   });
 
   factory Job.fromJson(Map<String, dynamic> json) {
@@ -75,44 +83,47 @@ class Job {
 
     return Job(
       job_id: json['job_id'] ?? '',
-      client_id: json['client_id']?? '',
+      client_id: json['client_id'] ?? '',
 
       // client
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',
       client_image: json['client']?['image'] ?? '',
-      // location
 
-      latitude:  json['latitude'] ?? 0,
-      longitude: json['longitude'] ??0 ,
+      // location
+      latitude: json['latitude'] ?? 0,
+      longitude: json['longitude'] ?? 0,
       maps_address: json['maps_address'] ?? '',
       category: json['category'] ?? '',
 
       // worker
-      worker_price : (json['worker'] ? ['diagnostic_cost']) ?? 0.0,
-
+      worker_price: (json['worker']?['diagnostic_cost']) ?? 0.0,
 
       // job
       job_date: json['job_date'] ?? '',
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-      diagnostic_cost : (json['payment'] ? ['diagnostic_cost']) ?? 0.0,
-      payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
-      labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
-      materials: (json['payment'] ? ['materials']) ?? 0.0,
+      diagnostic_cost: (json['payment']?['diagnostic_cost']) ?? 0.0,
+      payment_method: (json['payment']?['payment_method']) ?? 0.0,
+      labor_cost: (json['payment']?['labor_cost']) ?? 0.0,
+      materials: (json['payment']?['materials']) ?? 0.0,
+      iva: (json['payment'] ? ['iva']) ?? 0.0,
+      total : (json['payment'] ? ['total']) ?? 0.0,
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
       payment_status: json['payment_status'] ?? '',
       image: json['image_url'],
       images_evicence: List<String>.from(json['evidence'] ?? []),
       jobs_proposal: (json['proposal'] as List<dynamic>? ?? [])
-        .map((e) => Jobs_proposal.fromJson(e))
-        .toList(),
+          .map((e) => Jobs_proposal.fromJson(e))
+          .toList(),
+      listdetails: (json['details'] as List<dynamic>? ?? [])
+              .map((e) => DetailsModel.fromJson(e))
+              .toList(),
     );
   }
 }
-
 
 class JobById_service {
   List<Job> job = []; // Lista de empresas
@@ -126,42 +137,71 @@ class JobById_service {
     print("fetch Job by id");
 
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    String? id_user = prefs.getString('id');
-    final headers = {'Authorization': 'Bearer $token'};
 
-    try {
-      isLoading = true;
+    int attempts = 0;
+    const int maxAttempts = 3;
 
-      final response = await http
-          .get(
-            Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/id/${id}?idworker=${id_user}'),
-            headers: headers,
-          )
-          .timeout(const Duration(seconds: 15));
+    while (attempts < maxAttempts) {
+      try {
+        final token = prefs.getString('token');
+        String? id_user = prefs.getString('id');
+        final headers = {'Authorization': 'Bearer $token'};
+        isLoading = true;
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> jsonResponse = json.decode(response.body);
-        print(jsonResponse);
-        job
-          ..clear()
-          ..add(Job.fromJson(jsonResponse));
-        return true;
+        final response = await http
+            .get(
+              Uri.parse(
+                '${dotenv.env['API_URL']}/api/Jobs/worker/id/${id}?idworker=${id_user}',
+              ),
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 15));
+
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> jsonResponse = json.decode(response.body);
+          print(jsonResponse);
+          job
+            ..clear()
+            ..add(Job.fromJson(jsonResponse));
+          return true;
+        }
+
+        if (response.statusCode == 401) {
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
+        }
+
+        print(" Error HTTP: ${response.statusCode}");
+        return false;
+      } on TimeoutException {
+        print(" Timeout de la API");
+        return false;
+      } on SocketException {
+        print(" Sin conexión a internet");
+        return false;
+      } catch (e) {
+        print(" Error inesperado: $e");
+        return false;
+      } finally {
+        isLoading = false;
       }
-
-      print(" Error HTTP: ${response.statusCode}");
-      return false;
-    } on TimeoutException {
-      print(" Timeout de la API");
-      return false;
-    } on SocketException {
-      print(" Sin conexión a internet");
-      return false;
-    } catch (e) {
-      print(" Error inesperado: $e");
-      return false;
-    } finally {
-      isLoading = false;
     }
+    attempts++;
+
+    if (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    return false;
   }
 }

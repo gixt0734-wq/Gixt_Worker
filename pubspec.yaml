@@ -72,6 +72,7 @@ dependencies:
   permission_handler: ^12.0.3
   file_picker: ^11.0.2
   pdfx: ^2.9.2
+  vibration: ^3.2.0
 
 flutter_launcher_icons:
   android: true
@@ -109,7 +110,6 @@ flutter:
   - assets/info.png
   - assets/gxt.png
   - assets/persona.png
-  - assets/Banner1.png
   - assets/selectworker.png
   - assets/support.png
   - assets/persona2.png
@@ -125,3 +125,13 @@ flutter:
   - assets/aprosupport.png
   - assets/active.png
   - assets/bye.png
+  - assets/check.png
+  - assets/lupa.png
+  - assets/card.png
+  - assets/box.png
+  - assets/manos.png
+  - assets/candado.png
+  - assets/truck.png
+  - assets/cancel.png
+  - assets/house.png
+  - assets/reloj.png

@@ -15,7 +15,9 @@ import 'package:gixt_worker/Config/SignalRService.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/Reports/ReportsPage.dart';
+import 'package:gixt_worker/Pages/Skeletor/ConfigSkeletor.dart';
 import 'package:gixt_worker/Pages/UpdatePerfilPage.dart';
+import 'package:gixt_worker/Pages/WalletPage.dart';
 import 'package:gixt_worker/providers/theme_provider.dart' show ThemeProvider;
 import 'package:gixt_worker/services/user/User_service.dart';
 import 'package:gixt_worker/services/user/update_active_service.dart';
@@ -34,6 +36,7 @@ class ConfigPage extends StatefulWidget {
 class _ConfigPageState extends State<ConfigPage> {
   bool isLoading = false;
   bool hasMore = true;
+  bool timeout = false;
   final User_service user = User_service();
   final ScrollController _scrollController = ScrollController();
   final PreferencesService _preferencesService = PreferencesService();
@@ -42,7 +45,7 @@ class _ConfigPageState extends State<ConfigPage> {
   File? _image;
   String? _img;
   String? _user;
-  bool? is_working;
+  bool is_working = false;
 
   @override
   void initState() {
@@ -68,10 +71,26 @@ class _ConfigPageState extends State<ConfigPage> {
         type: alert_type.error,
       );
     }
+    _Validation();
+  }
+
+  Future<void> _Validation() async {
+    print('empezando contador');
+    Future.delayed(const Duration(seconds: 5), () {
+      if (isLoading) {
+        setState(() {
+          timeout = true;
+        });
+        print('terminando contador');
+      }
+    });
+    if (!mounted) return;
     setState(() {
-      hasMore = true;
-      _gender = user.user[0].gender;
-      is_working = user.user[0].is_working;
+      if (user.user.isNotEmpty) {
+        hasMore = true;
+        _gender = user.user[0].gender;
+        is_working = user.user[0].is_working;
+      }
     });
   }
 
@@ -122,22 +141,15 @@ class _ConfigPageState extends State<ConfigPage> {
 
   void _active() async {
     await _preferencesService.clearPreferencesWorking();
-    await _preferencesService.savePreferencesWorking(!is_working!);
+    await _preferencesService.savePreferencesWorking(!is_working);
     setState(() {
-      is_working = !is_working!;
+      is_working = !is_working;
     });
     await UpdateActvieService.Send();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (user.user.isEmpty) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        body: Center(child: Indicador()),
-      );
-    }
-
     return KeyboardDismisser(
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -154,33 +166,36 @@ class _ConfigPageState extends State<ConfigPage> {
                   delegate: SliverChildListDelegate([
                     const SizedBox(height: 16),
 
-                    // HEADER: foto + nombre + email
-                    _buildProfileHeader()
-                        .animate()
-                        .fadeIn(duration: 400.ms)
-                        .slideY(begin: 0.1),
+                    if (user.user.isEmpty) ...[
+                      const ConfigSkeletor(),
+                    ] else ...[
+                      // HEADER: foto + nombre + email
+                      _buildProfileHeader()
+                          .animate()
+                          .fadeIn(duration: 400.ms)
+                          .slideY(begin: 0.1),
+                      const SizedBox(height: 32),
 
-                    const SizedBox(height: 32),
+                      // STATS
+                      _buildStatsRow()
+                          .animate()
+                          .fadeIn(duration: 400.ms, delay: 100.ms)
+                          .slideY(begin: 0.1),
 
-                    // STATS
-                    _buildStatsRow()
-                        .animate()
-                        .fadeIn(duration: 400.ms, delay: 100.ms)
-                        .slideY(begin: 0.1),
+                      const SizedBox(height: 40),
 
-                    const SizedBox(height: 40),
-
-                    // ACCIONES (lista tipo iOS settings)
-                    _buildActionsList().animate().fadeIn(
-                      duration: 400.ms,
-                      delay: 200.ms,
-                    ),
-                    const SizedBox(height: 20),
-                    _buildActionsListDelete().animate().fadeIn(
-                      duration: 400.ms,
-                      delay: 200.ms,
-                    ),
-                    const SizedBox(height: 100),
+                      // ACCIONES (lista tipo iOS settings)
+                      _buildActionsList().animate().fadeIn(
+                        duration: 400.ms,
+                        delay: 200.ms,
+                      ),
+                      const SizedBox(height: 20),
+                      _buildActionsListDelete().animate().fadeIn(
+                        duration: 400.ms,
+                        delay: 200.ms,
+                      ),
+                      const SizedBox(height: 100),
+                    ],
                   ]),
                 ),
               ),
@@ -235,7 +250,7 @@ class _ConfigPageState extends State<ConfigPage> {
                 },
                 child: Circleimage(image_url: _imageUrl, w: 150, h: 150),
               ),
-              if (is_working!)
+              if (is_working)
                 Positioned(
                   bottom: 6,
                   right: 6,
@@ -284,38 +299,47 @@ class _ConfigPageState extends State<ConfigPage> {
     );
   }
 
-  Widget _buildStatsRow() {
-    // 🔥 Reemplaza estos valores con los reales del modelo del usuario
-    // p.ej: user.user[0].jobsCompleted, user.user[0].rating, user.user[0].activeSince
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primary,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _statItem(
-            value:
-                '${user.user[0].workers}', // user.user[0].jobsCompleted.toString()
+Widget _buildStatsRow() {
+  return Container(
+    padding: const EdgeInsets.symmetric(vertical: 18),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.primary,
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: _statItem(
+            value: '${user.user[0].workers}',
             label: 'Trabajos',
           ),
-          _statDivider(),
-          _statItem(
-            value:
-                '${user.user[0].services}', // user.user[0].rating.toStringAsFixed(1)
-            label: 'Servicos',
+        ),
+        _statDivider(),
+        SizedBox(width: 10,),
+        Expanded(
+          child: _statItem(
+            value: '\$ ${user.user[0].balance}',
+            label: 'Wallet',
+            icon: user.user[0].has_balance
+                ? Icons.moving_rounded
+                : Icons.trending_down_outlined,
+            iconColor: user.user[0].has_balance
+                ? const Color(0xFF10B981)
+                : Colors.red,
           ),
-          _statDivider(),
-          _statItem(
-            value: '0', // user.user[0].monthsActive.toString()
+        ),
+        SizedBox(width: 10,),
+        _statDivider(),
+        Expanded(
+          child: _statItem(
+            value: '0',
             label: 'Meses',
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  );
+}
 
   Widget _statItem({
     required String value,
@@ -326,6 +350,18 @@ class _ConfigPageState extends State<ConfigPage> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        Text(
+          value,
+           maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          style: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.surface,
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 2),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -334,31 +370,22 @@ class _ConfigPageState extends State<ConfigPage> {
               const SizedBox(width: 4),
             ],
             Text(
-              value,
+              label,
               style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.surface,
-                letterSpacing: -0.3,
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 2),
-        Text(
-          label,
-          style: GoogleFonts.poppins(
-            fontSize: 11,
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-          ),
         ),
       ],
     );
   }
 
   Widget _statDivider() {
-    return Container(
+    return 
+    Container(
       height: 28,
       width: 1,
       color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
@@ -375,13 +402,13 @@ class _ConfigPageState extends State<ConfigPage> {
       child: Column(
         children: [
           _actionRowscroll(
-            icon: is_working! ? Icons.work_outline : Icons.bedtime_outlined,
-            iconBgColor: is_working!
+            icon: is_working ? Icons.work_outline : Icons.bedtime_outlined,
+            iconBgColor: is_working
                 ? const Color(0xFF10B981).withOpacity(0.12)
                 : colorsecundario.withOpacity(0.12),
-            iconColor: is_working! ? const Color(0xFF10B981) : colorsecundario,
-            title: is_working! ? 'Modo Activo' : 'Modo Descanso',
-            subtitle: is_working! ? 'Descansar' : 'Activar',
+            iconColor: is_working ? const Color(0xFF10B981) : colorsecundario,
+            title: is_working ? 'Modo Activo' : 'Modo Descanso',
+            subtitle: is_working ? 'Descansar' : 'Activar',
             onTap: _active,
           ),
           _rowDivider(),
@@ -402,6 +429,20 @@ class _ConfigPageState extends State<ConfigPage> {
           ),
           _rowDivider(),
           _actionRow(
+            icon: Icons.account_balance_wallet_rounded,
+            iconBgColor: colorsecundario.withOpacity(0.12),
+            iconColor: colorsecundario,
+            title: 'Mi Wallet',
+            subtitle: 'Gestiona tus ingresos',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WalletPage()),
+              );
+            },
+          ),
+          _rowDivider(),
+          _actionRow(
             icon: Icons.report_outlined,
             iconBgColor: colorsecundario.withOpacity(0.12),
             iconColor: colorsecundario,
@@ -414,6 +455,7 @@ class _ConfigPageState extends State<ConfigPage> {
               );
             },
           ),
+          
           _rowDivider(),
           _actionRow(
             icon: Icons.update_outlined,
@@ -483,7 +525,6 @@ class _ConfigPageState extends State<ConfigPage> {
       ),
       child: Column(
         children: [
-         
           _rowDivider(),
           _actionRow(
             icon: Icons.delete_forever,
@@ -492,9 +533,14 @@ class _ConfigPageState extends State<ConfigPage> {
             title: 'Borrar Cuenta',
             subtitle: 'borrar tu cuenta',
             onTap: () {
-                Navigator.push(
+              Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => Deleteaccount(email: user.user[0].email,img : user.user[0].image_url)),
+                MaterialPageRoute(
+                  builder: (context) => Deleteaccount(
+                    email: user.user[0].email,
+                    img: user.user[0].image_url,
+                  ),
+                ),
               );
             },
             isDestructive: true,

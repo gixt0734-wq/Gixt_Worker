@@ -35,42 +35,42 @@ class ErrorConnectionPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 20),
-              ElevatedButton(
+              // ElevatedButton(
                 
-                onPressed: () async {
-                  bool ok = await SignalRService.connectServer();
-                  final prefs = await SharedPreferences.getInstance();
+              //   onPressed: () async {
+              //     bool ok = await SignalRService.connectServer();
+              //     final prefs = await SharedPreferences.getInstance();
 
-                  if (ok && context.mounted) {
-                    String? inicio = prefs.getString('inicio');
+              //     if (ok && context.mounted) {
+              //       String? inicio = prefs.getString('inicio');
 
-                    if (inicio == 'true') {
-                      if (ok) {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => RootPage()),
-                        );
-                        return;
-                      }
-                    } else {
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => WelcomePage()),
-                      );
-                    }
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                minimumSize: const Size(100, 50),
-                backgroundColor: colorsecundario,
-                foregroundColor: colorWhite,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
-                ),
-              ),
-              child: const Text("Reintentar"),
-              ),
+              //       if (inicio == 'true') {
+              //         if (ok) {
+              //           Navigator.pushReplacement(
+              //             context,
+              //             MaterialPageRoute(builder: (context) => RootPage()),
+              //           );
+              //           return;
+              //         }
+              //       } else {
+              //         Navigator.pushReplacement(
+              //           context,
+              //           MaterialPageRoute(builder: (context) => WelcomePage()),
+              //         );
+              //       }
+              //     }
+              //   },
+              //   style: ElevatedButton.styleFrom(
+              //   minimumSize: const Size(100, 50),
+              //   backgroundColor: colorsecundario,
+              //   foregroundColor: colorWhite,
+              //   elevation: 0,
+              //   shape: RoundedRectangleBorder(
+              //     borderRadius: BorderRadius.circular(20),
+              //   ),
+              // ),
+              // child: const Text("Reintentar"),
+              // ),
             ],
           ),
         ),

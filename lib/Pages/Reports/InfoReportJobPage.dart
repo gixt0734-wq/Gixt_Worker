@@ -177,36 +177,40 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
                 ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
-                    const SizedBox(height: 20),
                     _buildTitle()
                         .animate()
                         .fadeIn(duration: 500.ms)
                         .slideX(begin: -0.2, curve: Curves.easeOutCubic),
 
-                    const SizedBox(height: 20),
-                    BarstatusReport(
-                      estadoReport: report.report[0].status_report,
-                    ).animate()
-                        .fadeIn(delay: 50.ms, duration: 500.ms)
-                        .slideY(begin: 0.3, curve: Curves.easeOutCubic),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 10),
+                     _sectionCard(
+                      title: 'Estado del reporte',
+                      child:
+                          BarstatusReport(
+                                estadoReport: report.report[0].status_report,
+                              )
+                              .animate()
+                              .fadeIn(delay: 50.ms, duration: 500.ms)
+                              .slideY(begin: 0.3, curve: Curves.easeOutCubic),
+                    ),
+                    const SizedBox(height: 10),
 
                     _buildReport()
                         .animate()
                         .fadeIn(delay: 150.ms, duration: 500.ms)
                         .slideY(begin: 0.3, curve: Curves.easeOutCubic),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 10),
 
                     _buildTrabajador()
                         .animate()
                         .fadeIn(delay: 300.ms, duration: 500.ms)
                         .slideY(begin: 0.3, curve: Curves.easeOutCubic),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 10),
                     _buildImg().animate()
                         .fadeIn(delay: 400.ms, duration: 500.ms)
                         .slideY(begin: 0.3, curve: Curves.easeOutCubic),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
                   ]),
                 ),
               ),
@@ -245,14 +249,14 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
     );
   }
 
-  Widget _buildTitle() {
+ Widget _buildTitle() {
     final color = Theme.of(context).colorScheme.surface;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Reporte del trabajo ${report.report[0].type_job}',
+          'Reporte para el trabajador',
           style: GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: FontWeight.w500,
@@ -266,10 +270,11 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: GoogleFonts.poppins(
-            fontSize: 26,
-            fontWeight: FontWeight.w800,
+            fontSize: 28,
+            height: 1.15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.9,
             color: color,
-            height: 1.1,
           ),
         ),
 
@@ -294,96 +299,68 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
       ],
     );
   }
+ 
 
   Widget _buildReport() {
+    return _sectionCard(
+      title: 'Información del reporte',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sección descripción
+          _detailField('Problema', report.report[0].reason),
+          const SizedBox(height: 20),
+          _detailField('Descripcion del reporte', report.report[0].description),
+          const SizedBox(height: 20),
+          if (report.report[0].status_report == 'resolved') ...[
+            _detailField('Solucion del reporte', report.report[0].solution),
+            const SizedBox(height: 20),
+          ],
+
+          _buildInfoCard(
+            icon: Icons.support_agent_rounded,
+            text:
+                'El reporte esta siendo supervisado por el equipo Gixt Support espera una respuesta',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailField(String label, String value) {
+    final surface = Theme.of(context).colorScheme.surface;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Sección descripción
         Text(
-          'Problema',
+          label,
           style: GoogleFonts.poppins(
-            fontSize: 16,
+            fontSize: 12,
             fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
             letterSpacing: -0.2,
+            color: surface.withValues(alpha: 0.5),
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
-          report.report[0].reason,
+          value,
           style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
+            fontSize: 14,
+            height: 1.5,
+            color: surface.withValues(alpha: 0.85),
           ),
-        ),
-
-        const SizedBox(height: 20),
-        Text(
-          'Descripcion del reporte',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          report.report[0].description,
-          style: GoogleFonts.poppins(
-            fontSize: 13,
-            height: 1.75,
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-          ),
-        ),
-        const SizedBox(height: 20),
-        if (report.report[0].status_report == 'resolved') ...[
-          Text(
-            'Solucion del reporte',
-            style: GoogleFonts.poppins(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.surface,
-              letterSpacing: -0.2,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            report.report[0].solution,
-            style: GoogleFonts.poppins(
-              fontSize: 13,
-              height: 1.75,
-              color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-
-        _buildInfoCard(
-          icon: Icons.support_agent_rounded,
-          text:
-              'El reporte esta siendo supervisado por el equipo Gixt Support espera una respuesta',
         ),
       ],
     );
   }
 
+
   Widget _buildTrabajador() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Trabajador reportado',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
-          ),
-        ),
-        const SizedBox(height: 14),
+  return _sectionCard(
+      title: 'Trabajo reportado',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
         InkWell(
           onTap: () {
             // Navigator.push(
@@ -394,13 +371,7 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
             //   ),
             // );
           },
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.primary,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
+          child:  Row(
               children: [
                 Circleimage(
                   w: 56,
@@ -447,38 +418,33 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
                   ),
                 ),
               ],
-            ),
+            
           ),
-        ),
+        )
+
       ],
+      )
     );
   }
 
-  Widget _buildImg() {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.start,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Evdencia del reporte',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Theme.of(context).colorScheme.surface,
-            letterSpacing: -0.2,
+ Widget _buildImg() {
+    return _sectionCard(
+      title: 'Evdencia del reporte',
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                imageBox(report.report[0].evidence_image),
+                const SizedBox(width: 20),
+              ],
+            ),
           ),
-        ),
-        SizedBox(height: 20),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              imageBox(report.report[0].evidence_image),
-              const SizedBox(width: 20),
-            ],
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -493,12 +459,19 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
           imagen == null || imagen == ''
               ? Container(
                   decoration: BoxDecoration(
-                    color: Color.fromARGB(255, 177, 177, 177),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surface.withValues(alpha: 0.05),
+                    border: Border.all(
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surface.withValues(alpha: 0.12),
+                    ),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   width: double.infinity,
                   height: double.infinity,
-                  child: Icon(Icons.broken_image, color: Colors.white, size: 30),
+                  child: Icon(Icons.image, color: Colors.white, size: 25),
                 )
               : GestureDetector(
                   onTap: () {
@@ -518,7 +491,7 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
                         placeholder: (context, url) =>
                             Container(color: Colors.white24),
                         errorWidget: (context, url, error) =>
-                        const Icon(Icons.broken_image ,size: 30,),
+                            const Icon(Icons.broken_image),
                       ),
                     ),
                   ),
@@ -534,12 +507,12 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
-        border: Border(
-          top: BorderSide(
-            color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
-            width: 1,
-          ),
-        ),
+        // border: Border(
+        //   top: BorderSide(
+        //     color: Theme.of(context).colorScheme.surface.withOpacity(0.08),
+        //     width: 0,
+        //   ),
+        // ),
       ),
       child: SizedBox(
         width: double.infinity,
@@ -594,4 +567,55 @@ class _InforeportjobpageState extends State<Inforeportjobpage> {
       ),
     );
   }
+
+  Widget _sectionCard({
+    String? title,
+    Widget? trailing,
+    required Widget child,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primary,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (title != null) ...[
+            Row(
+              children: [
+                Expanded(child: _fieldLabel(title)),
+                if (trailing != null) trailing,
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          child,
+        ],
+      ),
+    );
+  }
+
+  Widget _fieldLabel(String label) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 18,
+              height: 1.15,
+              fontWeight: FontWeight.w700,
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.85),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
 }

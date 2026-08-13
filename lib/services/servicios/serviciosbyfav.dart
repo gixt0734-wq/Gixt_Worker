@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
@@ -89,19 +90,17 @@ class ServiciosFav_service {
   }
 
   Future<bool> fetchFromApi() async {
-    final prefs = await SharedPreferences.getInstance();
-
     print("🌐 Llamando API fav");
 
-    final token = prefs.getString('token');
-    String? id = prefs.getString('id');
-
-    final headers = {'Authorization': 'Bearer $token'};
     int attempts = 0;
     const int maxAttempts = 3;
 
     while (attempts < maxAttempts) {
       try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+      String? id = prefs.getString('id');
+      final headers = {'Authorization': 'Bearer $token'};
         isLoading = true;
 
         final response = await http
@@ -123,6 +122,17 @@ class ServiciosFav_service {
             DateTime.now().millisecondsSinceEpoch,
           );
           return true;
+        }
+
+        if (response.statusCode == 401) {
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
         }
         print("❌ Error HTTP: ${response.statusCode}");
         return false;

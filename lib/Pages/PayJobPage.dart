@@ -3,6 +3,10 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:gixt_worker/Components/ActionAlert%20.dart';
+import 'package:gixt_worker/Components/Job/Button.dart';
+import 'package:gixt_worker/Components/Job/FieldLabelDescription.dart';
+import 'package:gixt_worker/Components/Job/PriceBreakdown.dart';
+import 'package:gixt_worker/Components/Job/SectionCard.dart';
 import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
@@ -15,6 +19,7 @@ import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/services/Evidence/Add_evidence_service.dart';
+import 'package:gixt_worker/services/Express/Diagnostic_express_service.dart';
 import 'package:gixt_worker/services/Job/finish_serivicio_service.dart';
 import 'package:gixt_worker/services/material/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -100,12 +105,13 @@ class _PayPageState extends State<PayJobPage> {
   }
 
   void _Send() async {
-     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     FocusScope.of(context).unfocus();
     bool? ok = await ActionAlert(
       context,
       title: 'Diagnostico',
-      message:'Asegurate que los precios esten correctos ya que no se pueden modificar despues de finalizar',
+      message:
+          'Asegurate que los precios esten correctos ya que no se pueden modificar despues de finalizar',
       type: action_type.advertencia,
     );
     if (ok!) {
@@ -115,15 +121,15 @@ class _PayPageState extends State<PayJobPage> {
         builder: (_) => Indicador(),
       );
 
-      final result = await FinishSerivicioService.Send(
+      final result = await DiagnosticExpressService.Send(
         job_id: widget.job_id,
         total: _total,
         material: _subtotalMateriales,
         iva: _iva,
-        labor_cost:  double.tryParse(_priceController.text.trim()) ,
+        labor_cost: double.tryParse(_priceController.text.trim()),
         description: _descriptionController.text,
         materials: _materiales,
-        isexpress: widget.isExpress
+        isexpress: widget.isExpress,
       );
 
       Navigator.pop(context); // cerrar loader
@@ -190,76 +196,174 @@ class _PayPageState extends State<PayJobPage> {
   }
 
   Widget _buildPay() {
+    final surface = Theme.of(context).colorScheme.surface;
     return Form(
-    key: _formKey,
-    child: 
-     Column(
-      children: [
-        _buildSectionHeader(number: '1',title:  'Descripcion del diagnostico',subtitle: 'Agrega una descripción detallada del trabajo realizado'),
-        const SizedBox(height: 12),
-        _buildDescriptionChips(),
-        const SizedBox(height: 12),
-        CustomDescriptionFormField(
-          controller: _descriptionController,
-          label: 'Descripción final',
-          hint: 'Ej: Se tiene que cambiar lamaparas e cablerias',
-          minLines: 3,
-          maxLines: 5,
-          validator: (value) {
-            if (value == null || value.isEmpty)
-              return 'Por favor agrega una descripción';
-            return null;
-          },
-        ),
-        const SizedBox(height: 20),
-        _buildSectionHeader(number: '2', title: 'Mano de obra' , subtitle: 'Agrega el precio de la mano de obra'),
-        const SizedBox(height: 20),
-        CustomTextFormFieldPrice(
-          controller: _priceController,
-          label: 'Precio de mano de obra',
-          onChanged: (value) {
-            setState(() {});
-          },
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return 'Por favor ingrese el precio';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 20),
-        _buildSectionHeader(number: '3', title:  'Materiales utilizados' , subtitle: 'Agrega los materiales utilizados en el trabajo'),
-        const SizedBox(height: 20),
-        for (var material in _materiales) ...[
-          Row(
-            children: [
-              _removeitem(_materiales.indexOf(material)),
-              Expanded(
-                child: _buildRow(
-                  material.name,
-                  '\$${material.cost.toStringAsFixed(0)}',
+      key: _formKey,
+      child: Column(
+        children: [
+          _buildSectionHeader(
+            number: '1',
+            title: 'Descripcion del diagnostico',
+            subtitle: 'Agrega una descripción detallada del trabajo realizado',
+          ),
+          const SizedBox(height: 12),
+          _buildDescriptionChips(),
+          const SizedBox(height: 12),
+          CustomDescriptionFormField(
+            controller: _descriptionController,
+            label: 'Descripción final',
+            hint: 'Ej: Se tiene que cambiar lamaparas e cablerias',
+            minLines: 3,
+            maxLines: 5,
+            validator: (value) {
+              if (value == null || value.isEmpty)
+                return 'Por favor agrega una descripción';
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSectionHeader(
+            number: '2',
+            title: 'Mano de obra',
+            subtitle: 'Agrega el precio de la mano de obra',
+          ),
+          const SizedBox(height: 20),
+          CustomTextFormFieldPrice(
+            controller: _priceController,
+            label: 'Precio de mano de obra',
+            onChanged: (value) {
+              setState(() {});
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Por favor ingrese el precio';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 20),
+          _buildSectionHeader(
+            number: '3',
+            title: 'Materiales utilizados',
+            subtitle: 'Agrega los materiales utilizados en el trabajo',
+          ),
+          const SizedBox(height: 20),
+          SectionCard(
+            title: 'Desglose del servicio',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var material in _materiales) ...[
+                  Row(
+                    children: [
+                      _removeitem(_materiales.indexOf(material)),
+                      Expanded(
+                        child: _priceLine(
+                          material.name,
+                          '\$${material.cost.toStringAsFixed(0)}',
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 16),
+                _buildAddMaterial(_materiales),
+                if(_materiales.isNotEmpty)...[
+                const SizedBox(height: 16),
+                Divider(
+                  height: 1,
+                  thickness: 0.7,
+                  color: surface.withValues(alpha: 0.1),
                 ),
-              ),
-            ],
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Total',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: surface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '\$${_subtotalMateriales.toStringAsFixed(2)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: colorsecundario,
+                      ),
+                    ),
+                  ],
+                ),
+                ]
+
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildSectionHeader(
+            number: '4',
+            title: 'Desglose de costo',
+            subtitle: 'Revisa el desglose de los costos antes de enviar',
+          ),
+          const SizedBox(height: 20),
+          SectionCard(
+            title: 'Desglose del servicio',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _priceLine('Mano de obra', '${_priceController.text}'),
+                const SizedBox(height: 12),
+                _priceLine(
+                  'Tarifa de traslado',
+                  '${widget.km_priece.toStringAsFixed(2)}',
+                ),
+                const SizedBox(height: 12),
+                _priceLine(
+                  'Materiales',
+                  '${_subtotalMateriales.toStringAsFixed(2)}',
+                ),
+                const SizedBox(height: 12),
+                _priceLine('Iva', '${_iva.toStringAsFixed(2)}'),
+                const SizedBox(height: 16),
+                Divider(
+                  height: 1,
+                  thickness: 0.7,
+                  color: surface.withValues(alpha: 0.1),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Total',
+                        style: GoogleFonts.poppins(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: surface,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '\$${_total.toStringAsFixed(2)}',
+                      style: GoogleFonts.poppins(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: colorsecundario,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ],
-        _buildSubtotal('\$${_subtotalMateriales.toStringAsFixed(0)}'),
-        _buildAddMaterial(_materiales),
-        const SizedBox(height: 20),
-        _buildSectionHeader(number: '4', title: 'Desglose de costo' , subtitle: 'Revisa el desglose de los costos antes de enviar'),
-        const SizedBox(height: 20),
-        _buildRow('Mano de obra', '\$${_priceController.text}'),
-        _buildRow(
-          'Tarifa de traslado',
-          '\$${widget.km_priece.toStringAsFixed(0)}',
-        ),
-        _buildRow('Materiales', '\$${_subtotalMateriales.toStringAsFixed(0)}'),
-        _buildRow('Iva', '\$${_iva.toStringAsFixed(0)}'),
-        _buildSubtotal('\$${_total.toStringAsFixed(0)}'),
-        const SizedBox(height: 28),
-
-      ],
-     )
+      ),
     );
   }
 
@@ -277,10 +381,14 @@ class _PayPageState extends State<PayJobPage> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.06),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.06),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.12),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.12),
                 width: 1,
               ),
             ),
@@ -289,7 +397,9 @@ class _PayPageState extends State<PayJobPage> {
               style: GoogleFonts.dmSans(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.7),
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.7),
               ),
             ),
           ),
@@ -386,42 +496,69 @@ class _PayPageState extends State<PayJobPage> {
       ],
     );
   }
-  
-  Widget _buildRow(String label, String value) {
-    return Column(
+
+  // Widget _buildRow(String label, String value) {
+  //   return Column(
+  //     children: [
+  //       Padding(
+  //         padding: const EdgeInsets.symmetric(vertical: 14),
+  //         child: Row(
+  //           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  //           children: [
+  //             Text(
+  //               label,
+  //               style: GoogleFonts.poppins(
+  //                 fontSize: 14,
+  //                 fontWeight: FontWeight.w400,
+  //                 color: Theme.of(
+  //                   context,
+  //                 ).colorScheme.surface.withOpacity(0.65),
+  //               ),
+  //             ),
+  //             Text(
+  //               value,
+  //               style: GoogleFonts.poppins(
+  //                 fontSize: 14,
+  //                 fontWeight: FontWeight.w500,
+  //                 color: Theme.of(
+  //                   context,
+  //                 ).colorScheme.surface.withOpacity(0.85),
+  //               ),
+  //             ),
+  //           ],
+  //         ),
+  //       ),
+  //       Divider(
+  //         height: 1,
+  //         thickness: 0.5,
+  //         color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
+  //       ),
+  //     ],
+  //   );
+  // }
+
+  Widget _priceLine(String label, String value) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                label,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.65),
-                ),
-              ),
-              Text(
-                value,
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.85),
-                ),
-              ),
-            ],
+        Expanded(
+          child: Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w400,
+              color: surface.withValues(alpha: 0.6),
+            ),
           ),
         ),
-        Divider(
-          height: 1,
-          thickness: 0.5,
-          color: Theme.of(context).colorScheme.surface.withOpacity(0.06),
+        Text(
+          '\$${value}',
+          style: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: surface.withValues(alpha: 0.9),
+          ),
         ),
       ],
     );
@@ -471,7 +608,7 @@ class _PayPageState extends State<PayJobPage> {
       child: Row(
         children: [
           // Precio
-          if (_paginaActual == 2)
+          
             Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,36 +638,9 @@ class _PayPageState extends State<PayJobPage> {
             ),
 
           const SizedBox(width: 20),
-
           // Botón
           Expanded(
-            child: GestureDetector(
-              onTap: () {
-                _Send();
-              },
-              child: Container(
-                height: 52,
-                decoration: BoxDecoration(
-                  color: colorsecundario,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const SizedBox(width: 6),
-                    Text(
-                      'Enviar',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            child:Button(text: 'Enviar', icon: Icons.send, bgColor: colorsecundario, action: _Send,),
           ),
         ],
       ),
@@ -543,9 +653,9 @@ class _PayPageState extends State<PayJobPage> {
         _showAddMaterialSheet();
       },
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(0),
         decoration: BoxDecoration(
-          color: Theme.of(context).scaffoldBackgroundColor,
+          color:Colors.transparent,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -628,33 +738,10 @@ class _PayPageState extends State<PayJobPage> {
                   ),
                 ),
 
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Nuevo material',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.surface,
-                        letterSpacing: -0.4,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Añade los detalles del material',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w400,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withOpacity(0.5),
-                      ),
-                    ),
-                  ],
-                ),
+              const SizedBox(height: 8),
+              FieldLabelDescription(label:'Nuevo material' , value: 'Añade los detalles del material',),
+              const SizedBox(height: 20),
 
-                const SizedBox(height: 28),
                 Text(
                   'Nombre del material',
                   style: GoogleFonts.dmSans(
@@ -808,6 +895,4 @@ class _PayPageState extends State<PayJobPage> {
       ),
     );
   }
-
-
 }

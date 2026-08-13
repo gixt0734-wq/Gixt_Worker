@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:gixt_worker/Components/CircleImage.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Config/vibration.dart';
 import 'package:gixt_worker/Pages/ViewJobPage.dart';
 import 'package:gixt_worker/main.dart';
 import 'package:gixt_worker/pages/ExpressPage.dart';
@@ -45,7 +46,7 @@ Future<void> mostrarDialogNewjob({
   required String img,
   required String type
 }) async {
-  final overlayState = navigatorKey.currentState?.overlay;
+  final overlayState = NavigationService.navigatorKey.currentState?.overlay;
 
   if (overlayState == null) return;
 
@@ -60,6 +61,9 @@ Future<void> mostrarDialogNewjob({
   });
 
   _alertas.add(alerta);
+  VibrationService.desactivarVibracion();
+  VibrationService.activarVibracion();
+
   // Si ya existe overlay, solo actualizamos el widget
   if (_overlayEntry != null) {
     _AlertaExpressState.update();
@@ -77,7 +81,7 @@ void _cerrarAlertaPorId(String id) {
 
   _alertas[index].autoCloseTimer?.cancel();
   _alertas.removeAt(index);
-
+  VibrationService.desactivarVibracion();
   if (_alertas.isEmpty) {
     cerrarTodasAlertas();
   } else {
@@ -140,6 +144,7 @@ class _AlertaExpressState extends State<AlertaExpress>
 
   void _cerrarAlerta(String id) {
     final index = _alertas.indexWhere((a) => a.id == id);
+      VibrationService.desactivarVibracion();
     if (index != -1) {
       _alertas[index].autoCloseTimer?.cancel(); // 👈 cancela su timer
       _alertas.removeAt(index);
@@ -338,6 +343,7 @@ class _AlertaExpressState extends State<AlertaExpress>
                                             child: ElevatedButton(
                                               onPressed: () {
                                                 final Id = alerta.id;
+                                                VibrationService.desactivarVibracion();
                                                 cerrarTodasAlertas();
                                                 if(alerta.type == 'express')
                                                 {

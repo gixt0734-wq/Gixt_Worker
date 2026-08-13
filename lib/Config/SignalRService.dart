@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gixt_worker/Config/LocalNotificationService.dart';
-import 'package:gixt_worker/Config/Notification.dart';
+import 'package:gixt_worker/Config/Notification.dart';   
 import 'package:gixt_worker/Pages/ErrorConnectionPage.dart';
 import 'package:gixt_worker/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -11,44 +11,79 @@ import 'package:signalr_netcore/http_connection_options.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/hub_connection_builder.dart';
 
+
 class SignalRService {
   static HubConnection? hubConnection;
 
-  // Numero maximo de reintentos antes de mostrar la ErrorConnectionPage
-  // (lo tenias en 2 para pruebas, ajustalo aqui)
-  static const int _maxIntentos = 1;
-
-  // Monitor de conexion
+  // Monitor de conexion. NO se cancela nunca, salvo logout.
   static Timer? _monitorTimer;
-  static bool _reconectando = false;
 
-  // Indica si la app esta en primer plano (resumed). Si el usuario salio
-  // de la app (paused/inactive/detached), no mostramos la ErrorConnectionPage
-  // aunque la reconexion falle; seguimos reintentando en segundo plano.
+  // true mientras un bucle de (re)conexion esta corriendo -> evita solapes
+  static bool _conectando = false;
+
+  // true cuando el usuario cerro sesion -> corta los bucles infinitos
+  static bool _desconectadoManual = false;
+
+  // App en primer plano
   static bool _appEnPrimerPlano = true;
+
+  // Control de la pagina de error para poder quitarla al reconectar
+  static bool _errorPageVisible = false;
+  static Route<dynamic>? _errorRoute;
+
+  // Cuando es true, NO se muestra la ErrorConnectionPage.
+  // Se activa durante flujos que tumban el socket a proposito,
+  // p.ej. el confirmSetupIntent/pago de Stripe (abre actividad nativa).
+  static bool suppressErrorPage = false;
+
+  // Numero de reintentos fallidos consecutivos antes de mostrar el error.
+  static const int _maxIntentosAntesDeError = 3;
 
   static void setAppEnPrimerPlano(bool value) {
     _appEnPrimerPlano = value;
+
+    // Si volvemos al primer plano y seguimos caidos, mostramos el mensaje
+    if (value) {
+      final state = hubConnection?.state;
+      if (state == null ||
+          state == HubConnectionState.Disconnected ||
+          state == HubConnectionState.Reconnecting) {
+        _mostrarErrorPage();
+      }
+    }
   }
 
-  static Future<bool> connectServer() async {
+  // ------------------- CONEXION -------------------
+
+  /// Punto de entrada (login / arranque). Lanza el bucle de conexion.
+  static Future<void> connectServer() async {
+    _desconectadoManual = false;
+    await _intentarConectarLoop();
+  }
+
+  /// Bucle infinito: intenta conectar hasta lograrlo.
+  /// Reintenta en silencio; solo tras [_maxIntentosAntesDeError] fallos
+  /// consecutivos muestra la ErrorConnectionPage.
+  /// Al conectar -> la quita y arranca el monitor.
+  static Future<void> _intentarConectarLoop() async {
+    if (_conectando) return; // ya hay un bucle activo, no abrimos otro
+    _conectando = true;
+
     final prefs = await SharedPreferences.getInstance();
-    String? id_user = prefs.getString('id');
+    final String? id_user = prefs.getString('id');
 
-    int intentos = 0;
+    int intentos = 0; // fallos consecutivos
 
-    while (intentos < _maxIntentos) {
+    while (true) {
+      // El usuario cerro sesion -> salimos sin reconectar
+      if (_desconectadoManual) {
+        _conectando = false;
+        return;
+      }
+
       try {
-        // Cerrar conexion anterior si existe para no dejar fugas
-        if (hubConnection != null) {
-          try {
-            await hubConnection!.stop();
-          } catch (_) {}
-          hubConnection = null;
-        }
+        await _cerrarConexion();
 
-        // Sin withAutomaticReconnect(): el monitor de abajo se encarga
-        // de reconectar, asi no hay hueco de 40s esperando a la libreria
         hubConnection = HubConnectionBuilder()
             .withUrl(
               "${dotenv.env['API_URL']}/notificationHub?userId=$id_user",
@@ -58,132 +93,161 @@ class SignalRService {
             )
             .build();
 
-        hubConnection!.on("ReceiveNotification", (arguments) async {
-          print("📩 Datos crudos: $arguments");
+        _registrarHandlers();
 
-          if (arguments == null || arguments.isEmpty) return;
-
-          try {
-            final Map<String, dynamic> jsonResponse =
-                Map<String, dynamic>.from(arguments[0] as Map);
-
-            final context = navigatorKey.currentContext;
-            if (context == null) return;
-
-            await LocalNotificationService.showNotification(
-              title: jsonResponse['title']?.toString() ?? 'Notificación',
-              body: jsonResponse['body']?.toString() ?? '',
-            );
-
-            handleNotification(
-              context,
-              jsonResponse['data'],
-              jsonResponse,
-            );
-          } catch (e) {
-            print("❌ Error parsing notification: $e");
-          }
-        });
-
-        hubConnection!.serverTimeoutInMilliseconds = 600000;
+        // 60s: si el server deja de responder, lo detecta relativamente rapido
+        hubConnection!.serverTimeoutInMilliseconds = 60000;
         hubConnection!.keepAliveIntervalInMilliseconds = 15000;
 
         await hubConnection!.start();
 
         if (id_user != null) {
-          await hubConnection!.invoke(
-            "JoinGroup",
-            args: [id_user],
-          );
+          await hubConnection!.invoke("JoinGroup", args: [id_user]);
         }
 
         print("✅ SignalR conectado");
 
-        // Inicia el chequeo de conexion cada 2 segundos
-        _startMonitor();
+        intentos = 0; // reinicio el contador al lograr conexion
+        _ocultarErrorPage(); // reconecto -> quitamos el mensaje
+        _startMonitor(); // vigila futuras caidas
 
-        return true;
+        _conectando = false;
+        return;
       } catch (e) {
         intentos++;
         print(
-          "❌ Error conectando SignalR (intento $intentos): $e",
+          "❌ Error conectando SignalR (intento $intentos/$_maxIntentosAntesDeError), reintento en 3s: $e",
         );
 
-        await Future.delayed(
-          const Duration(seconds: 3),
-        );
+        // Solo mostramos el error tras N fallos consecutivos.
+        // Asi un corte transitorio (p.ej. pago Stripe) se reconecta
+        // sin molestar al usuario con la pantalla de error.
+        if (intentos >= _maxIntentosAntesDeError) {
+          _mostrarErrorPage();
+        }
+
+        await Future.delayed(const Duration(seconds: 3));
+        // el while vuelve a intentar -> NUNCA se rinde
       }
     }
-
-    // Se acabaron los intentos -> mostrar pagina de error
-    _mostrarErrorPage();
-    return false;
   }
 
-  /// Revisa cada 2 segundos el estado de la conexion.
-  /// Si quedo en Disconnected, corre el while de reintentos.
-  /// Si tambien falla, connectServer() muestra la ErrorConnectionPage.
+  static void _registrarHandlers() {
+    hubConnection!.on("ReceiveNotification", (arguments) async {
+      print("📩 Datos crudos: $arguments");
+      if (arguments == null || arguments.isEmpty) return;
+
+      try {
+        final Map<String, dynamic> jsonResponse =
+            Map<String, dynamic>.from(arguments[0] as Map);
+
+        final context = NavigationService.navigatorKey.currentContext;
+        if (context == null) return;
+
+        await LocalNotificationService.showNotification(
+          title: jsonResponse['title']?.toString() ?? 'Notificación',
+          body: jsonResponse['body']?.toString() ?? '',
+        );
+
+        handleNotification(context, jsonResponse['data'], jsonResponse);
+      } catch (e) {
+        print("❌ Error parsing notification: $e");
+      }
+    });
+
+    // Se dispara al instante cuando la conexion se cae -> reconecta ya,
+    // sin esperar los 2s del monitor. NO mostramos el error aqui: deja
+    // que el bucle decida tras los reintentos.
+    hubConnection!.onclose(({error}) {
+      print("🔌 SignalR onclose: $error");
+      if (_desconectadoManual) return;
+      _intentarConectarLoop();
+    });
+  }
+
+  // ------------------- MONITOR -------------------
+
+  /// Cada 2s revisa el estado. Si esta caido, dispara el bucle de reconexion.
+  /// Este timer NO se cancela nunca (solo en logout).
   static void _startMonitor() {
     _monitorTimer?.cancel();
 
     _monitorTimer = Timer.periodic(const Duration(seconds: 2), (_) async {
-      // Evita correr dos reconexiones al mismo tiempo
-      if (_reconectando) return;
+      if (_conectando) return; // ya se esta reconectando
+      if (_desconectadoManual) return;
 
       final state = hubConnection?.state;
       print("🔍 SignalR estado: $state");
 
-      if (state == null || state == HubConnectionState.Disconnected||
-        state == HubConnectionState.Reconnecting) {
-        print("⚠️ SignalR desconectado, corriendo reintentos...");
-
-        _reconectando = true;
-        final ok = await connectServer();
-        _reconectando = false;
-
-        if (!ok) {
-          // Ya se mostro la ErrorConnectionPage, paramos el monitor
-          _monitorTimer?.cancel();
-          _monitorTimer = null;
-        }
+      if (state == null ||
+          state == HubConnectionState.Disconnected ||
+          state == HubConnectionState.Reconnecting) {
+        print("⚠️ SignalR caido, reconectando...");
+        // No mostramos el error aqui: el bucle lo hara tras los reintentos.
+        await _intentarConectarLoop();
       }
     });
   }
 
+  // ------------------- PAGINA DE ERROR -------------------
+
   static void _mostrarErrorPage() {
-    // Si el usuario ya no esta en la app, no tiene sentido navegar a la
-    // pantalla de error: solo confundiria al volver.
-    if (!_appEnPrimerPlano) return;
+    if (suppressErrorPage) return; // flujo de pago u otro -> no navegar
+    if (!_appEnPrimerPlano) return; // fuera de la app no molestamos
+    if (_errorPageVisible) return; // ya esta mostrada, no duplicar
+    final navigator = NavigationService.navigatorKey.currentState;
+    if (navigator == null) return;
 
-    final context = navigatorKey.currentContext;
+    _errorPageVisible = true;
+    _errorRoute = MaterialPageRoute(
+      builder: (_) => const ErrorConnectionPage(),
+    );
 
-    if (context != null) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const ErrorConnectionPage(),
-        ),
-        (route) => false,
-      );
+    // push (no pushAndRemoveUntil) para que al quitarla el usuario
+    // regrese exactamente a donde estaba.
+    navigator.push(_errorRoute!);
+  }
+
+  static void _ocultarErrorPage() {
+    if (!_errorPageVisible) return;
+
+    final navigator = NavigationService.navigatorKey.currentState;
+    if (navigator != null && _errorRoute != null) {
+      navigator.removeRoute(_errorRoute!);
+    }
+
+    _errorRoute = null;
+    _errorPageVisible = false;
+  }
+
+  // ------------------- UTILES -------------------
+
+  static Future<void> _cerrarConexion() async {
+    if (hubConnection != null) {
+      try {
+        await hubConnection!.stop();
+      } catch (_) {}
+      try {
+        hubConnection!.off("ReceiveNotification");
+      } catch (_) {}
+      hubConnection = null;
     }
   }
 
+  /// Logout: corta bucles, monitor y conexion.
   static Future<bool> disconnectServer() async {
     try {
-      // Paramos el monitor para que no intente reconectar
+      _desconectadoManual = true;
+
       _monitorTimer?.cancel();
       _monitorTimer = null;
-      _reconectando = false;
+      _conectando = false;
 
-      if (hubConnection != null) {
-        await hubConnection!.stop();
-        hubConnection!.off("ReceiveNotification");
-        hubConnection = null;
+      _ocultarErrorPage();
+      await _cerrarConexion();
 
-        print("🔌 SignalR desconectado correctamente");
-        return true;
-      }
-      return false;
+      print("🔌 SignalR desconectado correctamente");
+      return true;
     } catch (e) {
       print("❌ Error al desconectar SignalR: $e");
       return false;

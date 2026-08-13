@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
@@ -14,7 +15,6 @@ class Express {
   String client_first_name;
   String client_username;
   String client_image;
-
 
   String job_date;
   String job_time;
@@ -42,12 +42,10 @@ class Express {
     required this.is_active,
     required this.job_status,
     required this.image,
-    required this.maps_address
+    required this.maps_address,
   });
 
   factory Express.fromJson(Map<String, dynamic> json) {
-
-
     return Express(
       express_id: json['express_id'] ?? '',
 
@@ -56,8 +54,6 @@ class Express {
       client_username: json['client']?['username'] ?? '',
       client_image: json['client']?['image'] ?? '',
       // location
-     
-
 
       // job
       job_date: json['job_date'] ?? '',
@@ -74,13 +70,12 @@ class Express {
   }
 }
 
-
 class Express_service {
   List<Express> express = []; // Lista de empresas
   int pageNumber = 1;
   bool isLoading = false;
   bool hasMore = true;
-static const String _cacheKey = 'express_cache';
+  static const String _cacheKey = 'express_cache';
   static const String _cacheTimeKey = 'express_cache_time';
 
   set loading(bool loading) {}
@@ -124,47 +119,74 @@ static const String _cacheKey = 'express_cache';
     print("fetch Job by id");
 
     final prefs = await SharedPreferences.getInstance();
-     final token = prefs.getString('token');
-    String? id_user = prefs.getString('id');
 
-    final headers = {'Authorization': 'Bearer $token'};
+    int attempts = 0;
+    const int maxAttempts = 3;
 
-    try {
-      isLoading = true;
+    while (attempts < maxAttempts) {
+      try {
+        isLoading = true;
+        final token = prefs.getString('token');
+        String? id_user = prefs.getString('id');
+        final headers = {'Authorization': 'Bearer $token'};
 
-      final response = await http
-          .get(
-            Uri.parse('${dotenv.env['API_URL']}/api/Expresss/worker/${id_user}'),
-            headers: headers,
-          )
-          .timeout(const Duration(seconds: 15));
+        final response = await http
+            .get(
+              Uri.parse(
+                '${dotenv.env['API_URL']}/api/Expresss/worker/${id_user}',
+              ),
+              headers: headers,
+            )
+            .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode == 200) {
-              final List<dynamic> jsonResponse = json.decode(response.body);
-        express
-          ..clear()
-          ..addAll(jsonResponse.map((e) => Express.fromJson(e)));
-         await prefs.setString(_cacheKey, response.body);
-        await prefs.setInt(
-          _cacheTimeKey,
-          DateTime.now().millisecondsSinceEpoch,
-        );
-        return true;
+        if (response.statusCode == 200) {
+          final List<dynamic> jsonResponse = json.decode(response.body);
+          express
+            ..clear()
+            ..addAll(jsonResponse.map((e) => Express.fromJson(e)));
+          await prefs.setString(_cacheKey, response.body);
+          await prefs.setInt(
+            _cacheTimeKey,
+            DateTime.now().millisecondsSinceEpoch,
+          );
+          return true;
+        }
+
+        if (response.statusCode == 401) {
+          print("🔐 Token expirado. Refrescando token...");
+
+          final ok = await RefreshAccesTokenService.refresh();
+
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return false;
+          }
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
+        }
+
+        print(" Error HTTP: ${response.statusCode}");
+        return false;
+      } on TimeoutException {
+        print(" Timeout de la API");
+        return false;
+      } on SocketException {
+        print(" Sin conexión a internet");
+        return false;
+      } catch (e) {
+        print(" Error inesperado: $e");
+        return false;
+      } finally {
+        isLoading = false;
       }
-
-      print(" Error HTTP: ${response.statusCode}");
-      return false;
-    } on TimeoutException {
-      print(" Timeout de la API");
-      return false;
-    } on SocketException {
-      print(" Sin conexión a internet");
-      return false;
-    } catch (e) {
-      print(" Error inesperado: $e");
-      return false;
-    } finally {
-      isLoading = false;
     }
+    attempts++;
+
+    if (attempts < maxAttempts) {
+      await Future.delayed(const Duration(seconds: 2));
+    }
+
+    return false;
   }
 }
