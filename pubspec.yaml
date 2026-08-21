@@ -99,6 +99,7 @@ flutter:
   assets:
   - .env
   - assets/logo.svg
+  - assets/aprobate.png
   - assets/promo.png
   - assets/correcto.png
   - assets/alerta.png

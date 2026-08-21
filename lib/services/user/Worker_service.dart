@@ -8,14 +8,16 @@ import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
 
 class Worker_Category {
+  int id;
   String name;
   String image;
 
-  Worker_Category({required this.name, required this.image});
+  Worker_Category({required this.id, required this.name, required this.image});
 
   factory Worker_Category.fromJson(Map<String, dynamic> json) {
     return Worker_Category(
       name: json['name'] ?? '',
+      id: json['category_id'] ?? 0,
       image: (json['image_url'] ?? ''),
     );
   }

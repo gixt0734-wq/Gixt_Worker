@@ -115,12 +115,12 @@ class _HomePageState extends State<HomePage> {
     });
     _Validation();
   }
+
   Future<void> _Refresh() async {
     await express.updatedata();
     await jobs.fetchFromApi(1);
     if (!mounted) return;
-    setState(() {
-    });
+    setState(() {});
   }
 
   Future<void> _Initial() async {
@@ -193,12 +193,12 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-    String _getGreeting() {
-      final hour = DateTime.now().hour;
-      if (hour < 12) return 'Buenos días';
-      if (hour < 19) return 'Buenas tardes';
-      return 'Buenas noches';
-    }
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Buenos días';
+    if (hour < 19) return 'Buenas tardes';
+    return 'Buenas noches';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +226,7 @@ class _HomePageState extends State<HomePage> {
                     _buildStatsRow(),
                     const SizedBox(height: 20),
                     _buildServiciosjob(),
+                    // _buildServiciosActivos2(),
                     if (!isLoading &&
                         jobs.agenda
                             .where(
@@ -303,7 +304,7 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                          '${_getGreeting()}, ${username ?? ''}',
+                        '${_getGreeting()}, ${username ?? ''}',
                         maxLines: 2,
                         style: GoogleFonts.inter(
                           fontSize: 22,
@@ -459,11 +460,11 @@ class _HomePageState extends State<HomePage> {
               'Servicios En Curso',
               sub: 'Servicios Programados Activos',
             ),
-
-               ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: EdgeInsets.zero,
+            const SizedBox(height: 20),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
               itemCount: isLoading ? 2 : filtrados.length,
               itemBuilder: (context, index) {
                 if (isLoading) {
@@ -497,6 +498,84 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget _buildServiciosActivos2() {
+    final List<Agenda> filtrados = jobs.agenda.where((a) {
+      return a.job_status == 'in_progress' ||
+          a.job_status == 'going' ||
+          a.job_status == 'arrived';
+    }).toList();
+
+    if (!isLoading && filtrados.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 15, right: 0, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(right: 15),
+            child: _sectionHeader(
+              'Servicios En Curso',
+              sub: 'Tus servicios activos ahora',
+            ),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: MediaQuery.of(context).size.height * 0.18,
+            child: isLoading && !timeout
+                ? ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(right: 15),
+                    itemCount: 2,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (_, __) => SizedBox(
+                      width: MediaQuery.of(context).size.width * 0.10,
+                      child: Shimmer.fromColors(
+                        baseColor: Theme.of(context).colorScheme.primary,
+                        highlightColor: Theme.of(
+                          context,
+                        ).colorScheme.surface.withValues(alpha: 0.06),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.primary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                        ),
+                      ),
+                    ),
+                  )
+                : ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(right: 15),
+                    itemCount: filtrados.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final agenda = filtrados[index];
+                      return SizedBox(
+                        width: MediaQuery.of(context).size.width * 0.82,
+
+                        child: CardsAgenda(
+                          image_url: agenda.image,
+                          type: agenda.type,
+                          name: agenda.problem,
+                          client_image: agenda.client_image,
+                          job_id: agenda.job_id,
+                          client: agenda.client_first_name,
+                          date: agenda.job_date,
+                          time: agenda.job_time,
+                          description: agenda.description,
+                          address: agenda.maps_address,
+                          status: agenda.job_status,
+                        ).animate().fade(duration: 350.ms).slideX(begin: 0.08),
+                      );
+                    },
+                  ),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
   // Widget _buildServicios() {
   //   final isLoading = api.servicios.isEmpty;
 
@@ -640,8 +719,9 @@ class _HomePageState extends State<HomePage> {
               j.job_status == 'arrived',
         )
         .length;
-    final activeExpress =
-        express.express.where((e) => e.job_status != 'completed').length;
+    final activeExpress = express.express
+        .where((e) => e.job_status != 'completed')
+        .length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15),
@@ -732,7 +812,9 @@ class _HomePageState extends State<HomePage> {
             child: Icon(
               Icons.inbox_outlined,
               size: 38,
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.2),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.2),
             ),
           ),
           const SizedBox(height: 16),
@@ -741,7 +823,9 @@ class _HomePageState extends State<HomePage> {
             style: GoogleFonts.inter(
               fontSize: 16,
               fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.35),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.35),
             ),
           ),
           const SizedBox(height: 6),
@@ -750,7 +834,9 @@ class _HomePageState extends State<HomePage> {
             textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 13,
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.25),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.25),
               fontWeight: FontWeight.w400,
             ),
           ),

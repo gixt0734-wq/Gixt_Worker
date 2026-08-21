@@ -81,7 +81,8 @@ class CardsCatalog extends StatelessWidget {
                       bottomLeft: Radius.circular(20),
                     ),
                     child: SizedBox(
-                      width: 110,
+                      height: double.infinity,
+                      width: 100,
                       child: CachedNetworkImage(
                         imageUrl: image_url,
                         fit: BoxFit.cover,
@@ -172,7 +173,7 @@ class CardsCatalog extends StatelessWidget {
                               vertical: 4,
                             ),
                             decoration: BoxDecoration(
-                              color: colorsecundario.withOpacity(0.12),
+                              color: colorsecundario,
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
                                 color: colorsecundario,
@@ -184,7 +185,7 @@ class CardsCatalog extends StatelessWidget {
                               style: GoogleFonts.poppins(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: colorsecundario,
+                                color: colorWhite,
                               ),
                             ),
                           ),

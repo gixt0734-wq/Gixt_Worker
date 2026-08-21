@@ -34,9 +34,13 @@ class PriceBreakdown extends StatelessWidget {
         children: [
           _priceLine(context, 'Mano de obra', labor),
           const SizedBox(height: 12),
+          if(diagnostic != 0.0)
           _priceLine(context, 'Visita / diagnóstico', diagnostic),
+          if(diagnostic != 0.0)
           const SizedBox(height: 12),
+          if(materials != 0.0)
           _priceLine(context, 'Materiales (estimado)', materials),
+          if(materials != 0.0)
           const SizedBox(height: 12),
           _priceLine(context, 'IVA', iva),
           const SizedBox(height: 16),

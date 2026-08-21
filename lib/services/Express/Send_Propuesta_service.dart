@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class SendPropuestaExpressService {
   static Future<Map<String, dynamic>> Update({
-    required double diagnostic_cost,
+    required double? diagnostic_cost,
     required String labor_price,
     required String express_id
   }) async {
@@ -20,6 +20,7 @@ class SendPropuestaExpressService {
       try {
      
         print("llamando a send propuestas ");
+        print('PRecio  de diagnostico $diagnostic_cost');
       
         final token = prefs.getString('token');
         String? id_user = prefs.getString('id');
@@ -34,7 +35,11 @@ class SendPropuestaExpressService {
         // Campos de texto
         request.fields['worker'] = id_user!;
         request.fields['id'] = express_id;
+
+        if(diagnostic_cost != null)
         request.fields['diagnostic_cost'] = diagnostic_cost.toString();
+
+
         request.fields['labor_price'] = labor_price.toString();
         print(request.fields);
         // Enviar request

@@ -121,7 +121,7 @@ class _LoginState extends State<LoginPage> {
           data['username'],
           data['img'],
         );
-        await SignalRService.connectServer();
+         await SignalRService.connectServer();
        
           Navigator.pop(context); // cerrar loader
           await Toast(

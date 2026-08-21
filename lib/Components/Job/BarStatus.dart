@@ -107,7 +107,7 @@ class _BarstatusState extends State<Barstatus> with TickerProviderStateMixin {
       case 'in_progress':
         return 'assets/box.png';
       case 'finalized':
-        return 'assets/card.png';
+        return 'assets/aprobate.png';
       case 'completed':
         return 'assets/check.png';
       case 'canceled':
@@ -263,15 +263,7 @@ class _BarstatusState extends State<Barstatus> with TickerProviderStateMixin {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: (done || active) ? colorsecundario : _track,
-        boxShadow: active
-            ? [
-                BoxShadow(
-                  color: colorsecundario.withOpacity(0.35),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                ),
-              ]
-            : null,
+       
       ),
     );
   }

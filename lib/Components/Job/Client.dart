@@ -36,11 +36,21 @@ class ClientInfo extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Circleimage(
+                Container(
+                  padding: const EdgeInsets.all(2.5),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                      colors: [colorsecundario, colorsecundario],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child:Circleimage(
                   w: 56,
                   h: 56,
                   image_url: img,
-                ),
+                )),
                 const SizedBox(width: 20),
                 Expanded(
                   child: Column(

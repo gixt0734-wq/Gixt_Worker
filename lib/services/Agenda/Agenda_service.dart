@@ -101,7 +101,6 @@ class Agenda_service {
   Agenda_service._internal();
 
   List<Agenda> agenda = []; // Lista de empresas
-  int pageNumber = 1;
   bool isLoading = false;
   bool hasMore = true;
   static const String _cacheKey = 'agenda_cache';
@@ -159,7 +158,7 @@ class Agenda_service {
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/$id_user'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Jobs/worker/$id_user?page=$page '),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

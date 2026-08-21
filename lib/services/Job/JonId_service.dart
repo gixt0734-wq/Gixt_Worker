@@ -15,6 +15,7 @@ class Job {
   String job_id;
   String client_id;
   String category;
+  int type_category;
 
   // client
   String client_first_name;
@@ -51,6 +52,7 @@ class Job {
     required this.job_id,
     required this.client_id,
     required this.category,
+    required this.type_category,
     required this.client_first_name,
     required this.client_username,
     required this.client_image,
@@ -94,7 +96,8 @@ class Job {
       latitude: json['latitude'] ?? 0,
       longitude: json['longitude'] ?? 0,
       maps_address: json['maps_address'] ?? '',
-      category: json['category'] ?? '',
+      category: json['category']? ['name']?? '',
+      type_category : json['category'] ? ['type_id'] ?? 0,
 
       // worker
       worker_price: (json['worker']?['diagnostic_cost']) ?? 0.0,

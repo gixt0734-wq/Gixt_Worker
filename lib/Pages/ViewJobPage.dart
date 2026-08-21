@@ -190,6 +190,7 @@ class _ViewJobPageState extends State<ViewJobPage>
   bool isaccept = false;
   bool isSearch = false;
   bool timeout = false;
+  bool isMantenimiento = false;
   bool loadig = true;
   bool _tracking = false;
   bool onlocation = false;
@@ -542,7 +543,11 @@ class _ViewJobPageState extends State<ViewJobPage>
       });
       Navigator.pop(context);
     }
-
+    if (!mounted) return;
+    setState(() {
+      isMantenimiento = job.job[0].type_category == 1;
+      print('Es de mantenimiento $isMantenimiento');
+    });  
     await GetRute();
     await _GoMyLocation();
     _startTracking();
@@ -587,7 +592,10 @@ class _ViewJobPageState extends State<ViewJobPage>
       });
     }
     if (!mounted) return;
-    setState(() {});
+    setState(() {
+    isMantenimiento = job.job[0].type_category == 1;
+    print('Es de mantenimiento $isMantenimiento');
+    });
     _startTracking();
   }
 
@@ -609,10 +617,10 @@ class _ViewJobPageState extends State<ViewJobPage>
       );
       return;
     }
-    if (_diagnostic_cost == null) {
+     if (_diagnostic_cost == null && isMantenimiento== false) {
       Toast(
         context,
-        title: 'Selecciona un precio',
+        title: 'Selecciona un precio a tu diagnostico',
         message: 'Selecciona una opcion',
         type: alert_type.error,
       );
@@ -1070,17 +1078,18 @@ class _ViewJobPageState extends State<ViewJobPage>
                 curve: Curves.easeOutCubic,
               ),
           const SizedBox(height: 10),
-          _buildTrabajo()
-              .animate(delay: 350.ms)
-              .fadeIn(duration: 500.ms)
-              .slideX(begin: -0.15, curve: Curves.easeOutCubic),
-          const SizedBox(height: 10),
           // Client: vuelve desde la izquierda (zigzag visual)
           _buildClient()
               .animate(delay: 550.ms)
               .fadeIn(duration: 500.ms)
               .slideX(begin: -0.15, curve: Curves.easeOutCubic),
           const SizedBox(height: 10),
+          _buildTrabajo()
+              .animate(delay: 350.ms)
+              .fadeIn(duration: 500.ms)
+              .slideX(begin: -0.15, curve: Curves.easeOutCubic),
+          const SizedBox(height: 10),
+          
           // Evidence: desliza desde la derecha (efecto espejo con el anterior)
           _buildEvidence()
               .animate(delay: 450.ms)
@@ -1376,9 +1385,15 @@ class _ViewJobPageState extends State<ViewJobPage>
         break;
 
       case 'arrived':
-        icon = Icons.search;
-        text = 'Iniciar diagnóstico';
+        icon =  isMantenimiento ?  Icons.home_repair_service :Icons.search;
+        text = isMantenimiento ? 'Empezar' :'Iniciar diagnóstico' ;
         action = () {
+          if(isMantenimiento == true)
+          {
+            _Update(job.job[0].job_status);
+          }
+          else
+          {
           _startTracking();
 
           Navigator.push(
@@ -1392,6 +1407,7 @@ class _ViewJobPageState extends State<ViewJobPage>
               ),
             ),
           );
+          }
         };
         break;
 
@@ -1423,9 +1439,13 @@ class _ViewJobPageState extends State<ViewJobPage>
         bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-      child: Button(bgColor: bgColor, text: text, icon: icon, action: action),
+    return Container(
+      height: 86,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+      ),
+      child:  Button(bgColor: bgColor, text: text, icon: icon, action: action),
     );
   }
 
@@ -1485,7 +1505,7 @@ class _ViewJobPageState extends State<ViewJobPage>
                        FieldLabelDescription(label: 'Enviar propuesta' , value: 'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',),
                       
                       const SizedBox(height: 24),
-
+                      if(isMantenimiento == false)...[
                       Text(
                         'Tarifa de visita y diagnóstico',
                         style: GoogleFonts.poppins(
@@ -1521,6 +1541,7 @@ class _ViewJobPageState extends State<ViewJobPage>
                         ),
                       ),
                       const SizedBox(height: 20),
+                      ],
                       Text(
                         'Tarifa de mano de obra',
                         style: GoogleFonts.poppins(

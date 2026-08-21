@@ -158,10 +158,10 @@ class SignalRService {
     // Se dispara al instante cuando la conexion se cae -> reconecta ya,
     // sin esperar los 2s del monitor. NO mostramos el error aqui: deja
     // que el bucle decida tras los reintentos.
-    hubConnection!.onclose(({error}) {
+    hubConnection!.onclose(({error}) async {
       print("🔌 SignalR onclose: $error");
       if (_desconectadoManual) return;
-      _intentarConectarLoop();
+       await  _forzarReconectar();
     });
   }
 
@@ -184,7 +184,8 @@ class SignalRService {
           state == HubConnectionState.Reconnecting) {
         print("⚠️ SignalR caido, reconectando...");
         // No mostramos el error aqui: el bucle lo hara tras los reintentos.
-        await _intentarConectarLoop();
+         await _forzarReconectar();
+
       }
     });
   }
@@ -234,23 +235,128 @@ class SignalRService {
     }
   }
 
-  /// Logout: corta bucles, monitor y conexion.
-  static Future<bool> disconnectServer() async {
-    try {
-      _desconectadoManual = true;
+static Future<void> _forzarReconectar() async {
+  if (_desconectadoManual) return;
+  if (_conectando) return;
 
-      _monitorTimer?.cancel();
-      _monitorTimer = null;
-      _conectando = false;
+  print("🔄 Forzando reconexión de SignalR...");
 
-      _ocultarErrorPage();
-      await _cerrarConexion();
+  try {
+    final oldConnection = hubConnection;
 
-      print("🔌 SignalR desconectado correctamente");
-      return true;
-    } catch (e) {
-      print("❌ Error al desconectar SignalR: $e");
-      return false;
+    // Quitamos la referencia inmediatamente.
+    // Así ningún otro proceso seguirá usando esta conexión.
+    hubConnection = null;
+
+    // Intentamos cerrar la conexión vieja.
+    if (oldConnection != null) {
+      try {
+        oldConnection.off("ReceiveNotification");
+      } catch (_) {}
+
+      try {
+        await oldConnection.stop();
+      } catch (e) {
+        print("⚠️ Error cerrando conexión anterior: $e");
+      }
     }
+  } catch (e) {
+    print("⚠️ Error limpiando conexión anterior: $e");
   }
+
+  // Crear una conexión completamente nueva.
+  await _intentarConectarLoop();
+}
+  /// Logout: corta bucles, monitor y conexion.
+static Future<bool> disconnectServer() async {
+  // IMPORTANTE:
+  // Primero bloqueamos cualquier reconexión automática.
+  _desconectadoManual = true;
+
+  print("🔌 Iniciando desconexión de SignalR...");
+
+  // Detener monitor inmediatamente
+  _monitorTimer?.cancel();
+  _monitorTimer = null;
+
+  // Evitar nuevos intentos de conexión
+  _conectando = false;
+
+  // Ocultar pantalla de error
+  try {
+    _ocultarErrorPage();
+  } catch (_) {}
+
+  final connection = hubConnection;
+
+  // Ya no existe conexión
+  if (connection == null) {
+    print("✅ SignalR ya estaba desconectado");
+    return true;
+  }
+
+  try {
+    final state = connection.state;
+
+    print("🔍 Estado antes de desconectar: $state");
+
+    // Quitar listeners primero
+    try {
+      connection.off("ReceiveNotification");
+    } catch (e) {
+      print("⚠️ Error quitando handler: $e");
+    }
+
+    // Si ya está desconectado, no hacemos nada
+    if (state == HubConnectionState.Disconnected) {
+      print("ℹ️ SignalR ya estaba en Disconnected");
+      return true;
+    }
+
+    // Si ya se está desconectando,
+    // NO volvemos a llamar stop().
+    if (state == HubConnectionState.Disconnecting) {
+      print("⏳ SignalR ya se estaba desconectando...");
+
+      // Esperamos un máximo de 5 segundos
+      for (int i = 0; i < 50; i++) {
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        if (connection.state == HubConnectionState.Disconnected) {
+          print("✅ SignalR terminó de desconectarse");
+          return true;
+        }
+      }
+
+      print("⚠️ SignalR no terminó de desconectarse, forzando limpieza");
+      return true;
+    }
+
+    // Connected / Connecting / Reconnecting
+    try {
+      await connection.stop();
+      print("✅ SignalR stop() completado");
+    } catch (e) {
+      print("⚠️ Error ejecutando stop(): $e");
+    }
+
+    return true;
+  } catch (e) {
+    print("⚠️ Error desconectando SignalR: $e");
+    return true;
+  } finally {
+    // SIEMPRE limpiamos la referencia.
+    hubConnection = null;
+
+    // Nos aseguramos de que no haya reconexión automática.
+    _desconectadoManual = true;
+    _conectando = false;
+
+    _monitorTimer?.cancel();
+    _monitorTimer = null;
+
+    print("🧹 SignalR limpiado");
+  }
+}
+
 }

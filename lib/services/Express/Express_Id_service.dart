@@ -33,6 +33,7 @@ class Express {
   String express_id;
   String client_id;
   String category;
+  int type_category;
   // client
   String client_first_name;
   String client_username;
@@ -71,6 +72,7 @@ class Express {
     required this.client_username,
     required this.client_image,
     required this.category,
+    required this.type_category,
     required this.maps_address,
     required this.latitude,
     required this.longitude,
@@ -99,7 +101,8 @@ class Express {
     return Express(
       express_id: json['express_id'] ?? '',
       client_id: json['client_id'] ?? '',
-      category: json['category'] ?? '',
+      category: json['category']? ['name']?? '',
+      type_category : json['category'] ? ['type_id'] ?? 0,
       // client
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',

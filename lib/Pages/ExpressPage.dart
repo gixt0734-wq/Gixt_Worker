@@ -190,6 +190,7 @@ class _ExpressPageState extends State<ExpressPage>
   String? colonia;
   String distanceText = "";
   String durationText = "";
+  bool isMantenimiento = false;
 
   Timer? _timer;
   Duration _remaining = Duration.zero;
@@ -557,11 +558,17 @@ class _ExpressPageState extends State<ExpressPage>
       });
       Navigator.pop(context);
     }
-
+     if (!mounted) return;
+    setState(() {
+      isMantenimiento = express.express[0].type_category == 1;
+      print('Es de mantenimiento $isMantenimiento');
+    });  
     await GetRute();
     await _GoMyLocation();
     _startTracking();
-    setState(() {});
+    if (!mounted) return;
+    setState(() {
+    });    
   }
 
   // Fetchs de datos
@@ -585,7 +592,10 @@ class _ExpressPageState extends State<ExpressPage>
       });
     }
     if (!mounted) return;
-    setState(() {});
+    setState(() {
+    isMantenimiento = express.express[0].type_category == 1;
+    print('Es de mantenimiento $isMantenimiento');
+    });
     _startTracking();
   }
 
@@ -624,10 +634,10 @@ class _ExpressPageState extends State<ExpressPage>
       );
       return;
     }
-    if (_diagnostic_cost == null) {
+    if (_diagnostic_cost == null && isMantenimiento== false) {
       Toast(
         context,
-        title: 'Selecciona un precio',
+        title: 'Selecciona un precio a tu diagnostico',
         message: 'Selecciona una opcion',
         type: alert_type.error,
       );
@@ -642,7 +652,7 @@ class _ExpressPageState extends State<ExpressPage>
 
     final result = await SendPropuestaExpressService.Update(
       express_id: widget.express_id,
-      diagnostic_cost: _diagnostic_cost?.roundToDouble() ?? 0.0,
+      diagnostic_cost: _diagnostic_cost,
       labor_price: _priceController.text,
     );
 
@@ -1411,22 +1421,28 @@ class _ExpressPageState extends State<ExpressPage>
         break;
 
       case 'arrived':
-        icon = Icons.search;
-        text = 'Iniciar diagnóstico';
+        icon =  isMantenimiento ?  Icons.home_repair_service :Icons.search;
+        text = isMantenimiento ? 'Empezar' :'Iniciar diagnóstico' ;
         action = () {
-          _startTracking();
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PayJobPage(
-                isExpress: true,
-                job_id: express.express[0].express_id,
-                price: express.express[0].labor_cost,
-                km_priece: express.express[0].diagnostic_cost,
+          if(isMantenimiento == true)
+          {
+            _Update(express.express[0].job_status);
+          }
+          else
+          {
+            _startTracking();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PayJobPage(
+                  isExpress: true,
+                  job_id: express.express[0].express_id,
+                  price: express.express[0].labor_cost,
+                  km_priece: express.express[0].diagnostic_cost,
+                ),
               ),
-            ),
-          );
+            );
+          }
         };
         break;
 
@@ -1526,7 +1542,7 @@ class _ExpressPageState extends State<ExpressPage>
                        FieldLabelDescription(label: 'Enviar propuesta' , value: 'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',),
                       
                       const SizedBox(height: 24),
-
+                      if(isMantenimiento == false)...[
                       Text(
                         'Tarifa de visita y diagnóstico',
                         style: GoogleFonts.poppins(
@@ -1562,6 +1578,7 @@ class _ExpressPageState extends State<ExpressPage>
                         ),
                       ),
                       const SizedBox(height: 20),
+                      ],
                       Text(
                         'Tarifa de mano de obra',
                         style: GoogleFonts.poppins(

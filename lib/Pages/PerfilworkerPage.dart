@@ -15,6 +15,7 @@ import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Sketor/opciones.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/OptionsCategoriasView.dart';
+import 'package:gixt_worker/Components/categoriasoption.dart';
 import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/cache.dart';
@@ -22,7 +23,9 @@ import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/Skeletor/PerfilWorkerSkeletor.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
+import 'package:gixt_worker/services/servicios/categorias_service.dart';
 import 'package:gixt_worker/services/user/Worker_service.dart';
+import 'package:gixt_worker/services/user/update_info_service%20copy.dart';
 import 'package:gixt_worker/services/user/update_info_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -41,6 +44,8 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
   final Worker_service worker = Worker_service();
+  List<int?> _categoriaSeleccionada = [];
+  final Categorias_service category = Categorias_service();
 
   int _paginaActual = 0;
   bool isLoading = false;
@@ -184,13 +189,21 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   Future<void> _onRefresh() async {
     await worker.updatedata();
         Navigator.pop(context);
+        if (!mounted) return;
         setState(() {
-        
       });
       if(_paginaActual == 1)
       {
+        if (!mounted) return;
          setState(() {
           _paginaActual--;
+        });
+      }
+      if(_paginaActual == 2)
+      {
+        if (!mounted) return;
+         setState(() {
+          _paginaActual=0;
         });
       }
      Toast(
@@ -243,6 +256,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
 
   Future<void> _Initial() async {
     bool ok = await worker.fetchUserData();
+    await category.fetchCategoriasData();
     if (!ok) {
       if (!mounted) return;
       Toast(
@@ -251,6 +265,11 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
         message: "No se pudo obtener la información",
         type: alert_type.error,
       );
+    }
+
+    for(var catadd in worker.worker[0].listcatworker)
+    {
+      addcategory(catadd.id);
     }
 
     setState(() {
@@ -301,8 +320,47 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
         message: result['message'],
         type: alert_type.error,
       );
+      Navigator.pop(context);
     }
   }
+
+   void _UpdateCat() async {
+   
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await UpdateCatService.Send(
+      cat: _categoriaSeleccionada
+    );
+
+    if (result['success'] == true) {
+      final data = result['data'];
+     await  _onRefresh();
+
+    } else {
+      Navigator.pop(context);
+      Toast(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+
+      
+    }
+  }
+
+  void addcategory(int id) {
+    if (_categoriaSeleccionada.contains(id)) {
+      _categoriaSeleccionada.remove(id);
+    } else {
+      _categoriaSeleccionada.add(id);
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -338,6 +396,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                         _buildWorkingCategory(),
                         const SizedBox(height: 100),
                       ],
+                      if (_paginaActual == 2) _buildCategory(),
                     ]
                     ]),
                   ),
@@ -432,7 +491,14 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   // 🆕 Badge reutilizable "Editar" para las esquinas de las tarjetas
   // ─────────────────────────────────────────────────────────────
   Widget _editBadge({String label = 'Editar'}) {
-    return Container(
+    return GestureDetector(
+      onTap: () => {
+        setState(() {
+          _paginaActual =2;
+        })
+      },
+      child:
+    Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: colorsecundario.withOpacity(0.15),
@@ -453,6 +519,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
           ),
         ],
       ),
+    )
     );
   }
 
@@ -790,6 +857,32 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                 ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 80,
+            left: 12,
+            child: GestureDetector(
+              onTap: () => setState(() => _paginaActual = 0),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.arrow_back_rounded,
+                  color: colorsecundario,
+                  size: 20,
+                ),
               ),
             ),
           ),
@@ -1278,6 +1371,40 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     );
   }
 
+  Widget _backButton({String label = 'Regresar'}) {
+    return GestureDetector(
+      onTap: () => setState(() => _paginaActual = 0),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: colorsecundario.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.arrow_back_rounded,
+              size: 16,
+              color: colorsecundario,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Theme.of(context).colorScheme.surface.withOpacity(0.7),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildInfoCard({required IconData icon, required String text}) {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1524,4 +1651,115 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
       },
     );
   }
+
+
+Widget _buildCategory() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _backButton(),
+          const SizedBox(height: 16),
+          _buildSectionHeader(
+            number: '3',
+            title: '¿Qué tipo de trabajos realizas?',
+            subtitle:
+                'Selecciona las categorías que mejor describen los servicios que puedes ofrecer a los clientes.',
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(child: 
+              Text(
+                'Categorías seleccionadas',
+                style: GoogleFonts.poppins(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.surface,
+                ),
+              )),
+
+              if (_categoriaSeleccionada.length > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorsecundario.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '${_categoriaSeleccionada.length}',
+                    style: GoogleFonts.poppins(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: colorsecundario,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildCategoriaItem(),
+          const SizedBox(height: 10),
+          _nextButton('Guardar', () {
+            if (_categoriaSeleccionada.isEmpty) {
+              Toast(
+                context,
+                title: 'Selecciona una categoría',
+                message: 'Debes elegir al menos una categoría para continuar',
+                type: alert_type.advertencia,
+              );
+              return;
+            }
+           _UpdateCat();
+          }),
+          const SizedBox(height: 100),
+        ],
+      ),
+    );
+  }
+
+ Widget _buildCategoriaItem() {
+    final isLoading = category.categorias.isEmpty;
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        mainAxisSpacing: 20,
+        crossAxisSpacing: 20,
+        childAspectRatio: 1,
+      ),
+
+      itemCount: isLoading ? 3 : category.categorias.length,
+      itemBuilder: (context, index) {
+        if (isLoading) {
+          return const OptionsSkeleton();
+        }
+        final categoria = category.categorias[index];
+        return OptionsCategorias(
+          nombre: categoria.name,
+          img: categoria.image_url,
+          id: categoria.category_id,
+          isSelected: _categoriaSeleccionada.contains(categoria.category_id),
+          onSelected: (id) {
+            setState(() {
+              if (_categoriaSeleccionada.contains(id)) {
+                _categoriaSeleccionada.remove(id);
+              } else {
+                _categoriaSeleccionada.add(id);
+              }
+            });
+          },
+        ).animate(delay: (index * 50).ms).fade().slideX(begin: -0.15);
+      },
+    ).animate().fade().slideX(begin: -0.2);
+  }
+
 }

@@ -6,6 +6,28 @@ import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
+import 'dart:async';
+import 'dart:io';
+import 'package:intl/intl.dart';
+
+String formatDate(String? date) {
+  if (date == null || date.isEmpty) return '';
+
+  final parsed = DateTime.parse(date);
+
+  return DateFormat('dd-MM-yyyy').format(parsed);
+}
+
+String formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+
+  try {
+    final parsed = DateFormat('HH:mm:ss').parse(time);
+     return DateFormat('hh:mm a').format(parsed);
+  } catch (_) {
+    return '';
+  }
+}
 
 class Catalog {
   String job_id;
@@ -66,8 +88,8 @@ class Catalog {
       maps_address: json['location']?['maps_address'] ?? '',
 
 
-      job_date: json['job_date'] ?? '',
-      job_time: json['job_time'] ?? '',
+      job_date: formatDate(json['job_date'] ?? ''),
+      job_time: formatTime(json['job_time'] ?? ''),
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
       image_url : json['image_url'] ?? '',
