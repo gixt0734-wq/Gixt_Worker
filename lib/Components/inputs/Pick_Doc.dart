@@ -5,6 +5,7 @@ import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Pick_Image.dart';
 import 'package:gixt_worker/config/colors.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdfx/pdfx.dart';
 
 enum _TipoArchivo { imagen, pdf }
 
@@ -78,7 +79,24 @@ Future<File?> pickAndCropDoc(BuildContext context) async {
       );
       return null;
     }
+    final document = await PdfDocument.openFile(archivo.path);
 
+      final int paginas = document.pagesCount;
+
+      await document.close();
+
+      // Límite de páginas
+      const int maxPaginas = 5;
+
+      if (paginas > maxPaginas) {
+        Toast(
+          context,
+          title: 'Demasiadas páginas',
+          message: 'El PDF no debe superar las $maxPaginas páginas',
+          type: alert_type.advertencia,
+        );
+        return null;
+      }
     return archivo;
   }
 

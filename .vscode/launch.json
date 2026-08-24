@@ -15,21 +15,21 @@
             "request": "launch",
             "type": "dart",
             "deviceId": "RF8W90R1L8T",
-            "flutterMode": "release"
+             "flutterMode": "release"
         },
         {
             "name": "Flutter (A31)",
             "request": "launch",
             "type": "dart",
             "deviceId": "RF8N83145BZ",
-             "flutterMode": "release"
+            //  "flutterMode": "release"
         },
-        {
-            "name": "Flutter (Device 3)",
-            "request": "launch",
-            "type": "dart",
-            "deviceId": "emulator-5554"
-        }
+        // {
+        //     "name": "Flutter (Device 3)",
+        //     "request": "launch",
+        //     "type": "dart",
+        //     "deviceId": "emulator-5554"
+        // }
     ],
     "compounds": [
     {

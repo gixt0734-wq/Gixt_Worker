@@ -527,13 +527,14 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   Future<void> marker() async {
+    final w = MediaQuery.of(context).size.width * .27;
     const ImageConfiguration configuration = ImageConfiguration(
       size: Size(80, 80),
     );
 
-    markericon = await getMarkerIcon("assets/marker.png", 100);
+    markericon = await getMarkerIcon("assets/marker.png",w.toInt());
 
-    workericon = await getMarkerIcon("assets/worker.png", 100);
+    workericon = await getMarkerIcon("assets/worker.png",w.toInt());
 
     if (mounted) {
       setState(() {

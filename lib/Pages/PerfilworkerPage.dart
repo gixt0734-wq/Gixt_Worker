@@ -1,5 +1,8 @@
+import 'dart:convert' as ui hide Codec;
 import 'dart:io';
 import 'dart:math';
+import 'dart:ui';
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:carousel_slider/carousel_slider.dart';
@@ -119,19 +122,37 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
     );
   }
 
+
+  Future<BitmapDescriptor> getMarkerIcon(String imagePath, int width) async {
+    final ByteData data = await rootBundle.load(imagePath);
+
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
+
+    final ui.FrameInfo fi = await codec.getNextFrame();
+
+    final ByteData? bytes = await fi.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
+
   Future<void> marker() async {
+
+        final w = MediaQuery.of(context).size.width * .27;
     const ImageConfiguration configuration = ImageConfiguration(
       size: Size(80, 80),
     );
 
-    final BitmapDescriptor icon = await BitmapDescriptor.fromAssetImage(
-      configuration,
-      "assets/marker.png",
-    );
+    markericon = await getMarkerIcon("assets/marker.png", w.toInt());
 
     if (mounted) {
       setState(() {
-        markericon = icon;
+        markericon;
+   
       });
     }
   }

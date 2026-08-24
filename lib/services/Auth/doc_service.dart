@@ -7,16 +7,16 @@ import 'package:http/http.dart' as http;
 
 class DocumentsService {
   static Future<Map<String, dynamic>> Crear({
-    required File? image_ine,
-    required File? image_ine_reverso,
+    // required File? image_ine,
+    // required File? image_ine_reverso,
     required File? image_cd,
     required File? image_canp,
     required String? id,
     required String token
   }) async {
     if (id == null ||
-        image_ine == null ||
-        image_ine_reverso == null ||
+        // image_ine == null ||
+        // image_ine_reverso == null ||
         image_cd == null ||
         image_canp == null) {
       return {'success': false, 'message': 'Faltan documentos por subir'};
@@ -38,19 +38,19 @@ class DocumentsService {
         });
         // Campos de texto
         request.fields['user_id'] = id;
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'image_ine', // mismo nombre que el DTO
-            image_ine.path,
-          ),
-        );
+        // request.files.add(
+        //   await http.MultipartFile.fromPath(
+        //     'image_ine', // mismo nombre que el DTO
+        //     image_ine.path,
+        //   ),
+        // );
 
-        request.files.add(
-          await http.MultipartFile.fromPath(
-            'image_ine_reverso', // mismo nombre que el DTO
-            image_ine_reverso.path,
-          ),
-        );
+        // request.files.add(
+        //   await http.MultipartFile.fromPath(
+        //     'image_ine_reverso', // mismo nombre que el DTO
+        //     image_ine_reverso.path,
+        //   ),
+        // );
         request.files.add(
           await http.MultipartFile.fromPath(
             'image_cd', // mismo nombre que el DTO

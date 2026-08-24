@@ -1,6 +1,11 @@
+import 'dart:convert' as ui hide Codec;
+import 'dart:ui';
+import 'dart:ui' as ui;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Auth/Documentos.dart';
@@ -63,12 +68,11 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
   bool isLoading = false;
   bool hasMore = true;
   bool timeout = false;
-  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   List<int?> _categoriaSeleccionada = [];
   List<File?> _images = [];
 
   final PreferencesService _preferencesService = PreferencesService();
-
+  @override
   void initState() {
     super.initState();
     marker();
@@ -170,23 +174,6 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> marker() async {
-    const ImageConfiguration configuration = ImageConfiguration(
-      size: Size(80, 80),
-    );
-
-    final BitmapDescriptor icon = await BitmapDescriptor.fromAssetImage(
-      configuration,
-      "assets/marker.png",
-    );
-
-    if (mounted) {
-      setState(() {
-        markericon = icon;
-      });
-    }
-  }
-
   double _zoomForRange(double km) {
     // Fórmula aproximada: a 1km → zoom ~15, a 5km → zoom ~12
     // log2(40075 * cos(lat) / (km * 256)) ≈ zoom
@@ -221,6 +208,44 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
     }
   }
 
+
+ //Inconos de marker mapa
+  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
+
+
+  Future<BitmapDescriptor> getMarkerIcon(String imagePath, int width) async {
+    final ByteData data = await rootBundle.load(imagePath);
+
+    final ui.Codec codec = await ui.instantiateImageCodec(
+      data.buffer.asUint8List(),
+      targetWidth: width,
+    );
+
+    final ui.FrameInfo fi = await codec.getNextFrame();
+
+    final ByteData? bytes = await fi.image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+
+    return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+  }
+
+  Future<void> marker() async {
+  
+    final w = MediaQuery.of(context).size.width * .27;
+
+    const ImageConfiguration configuration = ImageConfiguration(
+      size: Size(80, 80),
+    );
+
+    markericon = await getMarkerIcon("assets/marker.png",w.toInt());
+
+    if (mounted) {
+      setState(() {
+        markericon;
+      });
+    }
+  }
 
   void _Create() async {
      showDialog(
@@ -596,7 +621,8 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
   }
 
   Widget _buildMapa() {
-    final h = MediaQuery.of(context).size.height * .89;
+    final h = MediaQuery.of(context).size.height * .88;
+    final w = MediaQuery.of(context).size.width * .89;
     return SizedBox(
       height: h,
       child: Stack(
@@ -641,7 +667,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
             },
           ),
           Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
+            top: MediaQuery.of(context).padding.top+10,
             left: 15,
             right: 15,
             child: Container(

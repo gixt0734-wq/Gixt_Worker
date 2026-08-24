@@ -1,6 +1,7 @@
 ﻿import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -47,8 +48,23 @@ class LocationService {
         initialNotificationContent: 'Enviando ubicación...',
         foregroundServiceNotificationId: 888,
       ),
-      iosConfiguration: IosConfiguration(),
+      iosConfiguration: IosConfiguration(
+        autoStart: false,
+        onForeground: onStart,
+        onBackground: onIosBackground,
+      ),
     );
+  }
+
+    /// Callback de iOS cuando la app pasa a segundo plano.
+  /// DEBE ser static (o top-level) para poder pasarse como tear-off
+  /// dentro de un método estático; si no, no compila.
+  @pragma('vm:entry-point')
+  static Future<bool> onIosBackground(ServiceInstance service) async {
+    WidgetsFlutterBinding.ensureInitialized();
+    DartPluginRegistrant.ensureInitialized();
+
+    return true;
   }
 
   /// START (envía el id al servicio)
