@@ -38,6 +38,7 @@ import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Config/location_cache_service.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayjobPage.dart';
 import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
@@ -72,7 +73,6 @@ class _ViewJobPageState extends State<ViewJobPage>
   void initState() {
     super.initState();
     print("Entré a Mi trabajo");
-    marker();
     _initial();
     WidgetsBinding.instance.addObserver(this);
     jobsStatusNotifierFinish.addListener(_Refresh);
@@ -159,7 +159,8 @@ class _ViewJobPageState extends State<ViewJobPage>
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
   AnimationController? _markerAnimController;
-
+  final LocationCacheService locationCache = LocationCacheService();
+  
   // Controllers
   final ScrollController _scrollController = ScrollController();
   final DraggableScrollableController _sheetController = DraggableScrollableController();
@@ -535,6 +536,16 @@ class _ViewJobPageState extends State<ViewJobPage>
 
   // Validacion inicial
   Future<void> _initial() async {
+
+      if (locationCache.hasPosicion) {
+          latitude = locationCache.latitud!;
+          longitude = locationCache.longitud!; 
+          setState(() {
+            positionActual = LatLng(latitude, longitude);
+            positionclient = LatLng(latitude, longitude);
+          });
+        }
+        
     bool ok = await job.fetchServicioData(widget.id_trabajo);
     if (!ok) {
       if (!mounted) return;

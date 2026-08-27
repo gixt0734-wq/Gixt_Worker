@@ -35,6 +35,7 @@ import 'package:gixt_worker/Components/inputs/Input_Price.dart';
 import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Config/location_cache_service.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayJobPage.dart';
 import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
@@ -87,7 +88,6 @@ class _ExpressPageState extends State<ExpressPage>
   @override
   void initState() {
     super.initState();
-    marker();
     WidgetsBinding.instance.addObserver(this);
     
     _initial();
@@ -172,7 +172,7 @@ class _ExpressPageState extends State<ExpressPage>
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
   AnimationController? _markerAnimController;
-
+  final LocationCacheService locationCache = LocationCacheService();
   // Controllers
   final ScrollController _scrollController = ScrollController();
   final DraggableScrollableController _sheetController =
@@ -548,7 +548,14 @@ class _ExpressPageState extends State<ExpressPage>
 
   // Validacion inicial
   Future<void> _initial() async {
-    
+        if (locationCache.hasPosicion) {
+          latitude = locationCache.latitud!;
+          longitude = locationCache.longitud!; 
+          setState(() {
+            positionActual = LatLng(latitude, longitude);
+            positionclient = LatLng(latitude, longitude);
+          });
+        }
     bool ok = await express.fetchServicioData(widget.express_id);
     if (!ok) {
       if (!mounted) return;

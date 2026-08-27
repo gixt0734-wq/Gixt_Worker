@@ -12,6 +12,7 @@ import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/calendar.dart';
 import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Config/location_cache_service.dart';
 import 'package:gixt_worker/Pages/NotificationPage.dart';
 import 'package:gixt_worker/components/cards/CardsExpress.dart';
 import 'package:gixt_worker/components/cards/cardsAgenda.dart';
@@ -48,6 +49,7 @@ class _HomePageState extends State<HomePage> {
   final Categorias_service categorias = Categorias_service();
   final Express_service express = Express_service();
   final Catalog_service api = Catalog_service();
+  final LocationCacheService locationCache = LocationCacheService();
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
   int pageNumber = 1;
@@ -169,9 +171,27 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _GoMyLocation() async {
+    if (locationCache.hasPosicion) {
+      latitude = locationCache.latitud!;
+      longitude = locationCache.longitud!;
+      // ciudad = locationCache.ciudad ?? ciudad;
+      // calle = locationCache.calle;
+      // estado = locationCache.estado ?? estado;
+      // colonia = locationCache.colonia ?? colonia;
+      // pais = locationCache.pais ?? pais;
+      if (mounted) {
+        setState(() {
+          posicionActual = LatLng(latitude, longitude);
+        });
+      }
+    }
+
+
     Position pos = await GeoLocationService.obtenerUbicacion(context);
     latitude = pos.latitude;
     longitude = pos.longitude;
+    locationCache.updatePosicion(latitude, longitude);
+    if (!mounted) return;
     setState(() {
       posicionActual = LatLng(pos.latitude, pos.longitude);
     });
