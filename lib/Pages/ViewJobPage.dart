@@ -83,6 +83,7 @@ class _ViewJobPageState extends State<ViewJobPage>
     });
     _statusSub = FlutterBackgroundService().on("status").listen((event) {
       final state = event?["state"];
+      final id = event?["id"];
       if (state != null && mounted) {
         setState(() {
           if (state != 'enviando ubicación') {
@@ -93,10 +94,11 @@ class _ViewJobPageState extends State<ViewJobPage>
               isError: state == 'reconectando' ? true : false,
             );
           }
-
+          _gpsid = id;
           _StatusGps = state;
         }); // o lo que quieras hacer con el estado
         print("✅ Status recibido: $state");
+        print("✅ Status recibido: $id");
       }
     });
     _startTracking();
@@ -146,7 +148,7 @@ class _ViewJobPageState extends State<ViewJobPage>
   // servicios
   final JobById_service job = JobById_service();
   String? motivoSeleccionado;
-
+  String _gpsid = '';
   // Datos que se mandan en el formulario
   double? _diagnostic_cost;
   TextEditingController _priceController = TextEditingController();
@@ -160,8 +162,7 @@ class _ViewJobPageState extends State<ViewJobPage>
 
   // Controllers
   final ScrollController _scrollController = ScrollController();
-  final DraggableScrollableController _sheetController =
-      DraggableScrollableController();
+  final DraggableScrollableController _sheetController = DraggableScrollableController();
   late ScrollController _sheetScrollController;
 
   // Variables de mapa
@@ -182,6 +183,10 @@ class _ViewJobPageState extends State<ViewJobPage>
   Timer? _timer;
   Duration _remaining = Duration.zero;
   DateTime? _countdownExpiresAt;
+
+  //Inconos de marker mapa
+  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
   // Estados de express
   bool isLoading = false;
@@ -490,10 +495,6 @@ class _ViewJobPageState extends State<ViewJobPage>
     }
   }
 
-  //Inconos de marker mapa
-  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
-  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
-
   Future<BitmapDescriptor> getMarkerIcon(String imagePath, int width) async {
     final ByteData data = await rootBundle.load(imagePath);
 
@@ -513,7 +514,8 @@ class _ViewJobPageState extends State<ViewJobPage>
 
   Future<void> marker() async {
 
-        final w = MediaQuery.of(context).size.width * .27;
+    final w = MediaQuery.of(context).size.width * .27;
+    
     const ImageConfiguration configuration = ImageConfiguration(
       size: Size(80, 80),
     );
@@ -860,190 +862,202 @@ class _ViewJobPageState extends State<ViewJobPage>
             markers: markers,
           ),
         ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 62,
-          right: 12,
-          child: Gpsstatus(status: _StatusGps), // 👈 una sola línea
-        ),
-        // botón mi ubicación
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          right: 12,
-          child: GestureDetector(
-            onTap: _GoMyLocation,
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.my_location_rounded,
-                color: colorsecundario,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 160,
-          right: 12,
-          child: GestureDetector(
-            onTap: () {
-              abrirGoogleMaps(job.job[0].latitude, job.job[0].longitude);
-            },
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: colorsecundario,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.directions_rounded,
-                color: colorWhite,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 110,
-          right: 12,
-          child: GestureDetector(
-            onTap: () {
-              if (positionclient != null) {
-                _mapController?.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    CameraPosition(target: positionclient!, zoom: 17),
-                  ),
-                );
-              }
-            },
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.person_pin_circle_rounded,
-                color: Colors.deepOrange,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
+
         Positioned(
           top: MediaQuery.of(context).padding.top + 12,
           left: 12,
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).scaffoldBackgroundColor.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(12),
+          right: 12,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Botón atrás ───────────────────────────────────
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 17,
+                    color: Theme.of(context).colorScheme.surface,
+                  ),
+                ),
               ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 17,
-                color: Theme.of(context).colorScheme.surface,
-              ),
-            ),
-          ),
-        ),
-        if (street != null)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 65,
-            right: 64,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).scaffoldBackgroundColor.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              const SizedBox(width: 8),
+
+              // ── Tarjeta "Ubicación seleccionada" ──────────────
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: colorsecundario,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Ubicación seleccionada',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colorsecundario,
-                            letterSpacing: 0.3,
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: colorsecundario,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Ubicación seleccionada',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: colorsecundario,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "${street} ${city} a ${job.job[0].maps_address}",
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.surface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (state != null || city != null)
+                        Text(
+                          "${distanceText} en ${durationText}",
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withOpacity(0.5),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "${street} ${city} a ${job.job[0].maps_address}",
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.surface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (state != null || city != null)
-                    Text(
-                      "${distanceText} en ${durationText}",
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withOpacity(0.5),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // ── Columna de botones ────────────────────────────
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Ir a mi ubicación
+                  GestureDetector(
+                    onTap: _GoMyLocation,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                          ),
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      child: Icon(
+                        Icons.my_location_rounded,
+                        color: colorsecundario,
+                        size: 20,
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Estado GPS
+                  Gpsstatus(status: _StatusGps,is_active: _gpsid == job.job[0].job_id),
+                  const SizedBox(height: 8),
+
+                  // Ir a ubicación del cliente
+                  GestureDetector(
+                    onTap: () {
+                      if (positionclient != null) {
+                        _mapController?.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(target: positionclient!, zoom: 17),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.person_pin_circle_rounded,
+                        color: Colors.deepOrange,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Abrir en Google Maps
+                  GestureDetector(
+                    onTap: () {
+                      abrirGoogleMaps(
+                        job.job[0].latitude,
+                        job.job[0].longitude,
+                      );
+                    },
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: colorsecundario,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.directions_rounded,
+                        color: colorWhite,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
-
+            ],
+          ),
+        ),
         // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],
     );

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
 class Gpsstatus extends StatefulWidget {
-  const Gpsstatus({super.key, required this.status});
+  const Gpsstatus({super.key, required this.status, required this.is_active});
   final String status;
-
+  final bool is_active;
   @override
   State<Gpsstatus> createState() => _GpsstatusState();
 }
@@ -44,7 +44,7 @@ class _GpsstatusState extends State<Gpsstatus>
 
   @override
   Widget build(BuildContext context) {
-    final color = _colorForState(widget.status);
+    final color =widget.is_active ? _colorForState(widget.status) : Colors.grey;
 
     return Container(
           width: 42,

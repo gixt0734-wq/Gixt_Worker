@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
+import 'package:gixt_worker/Config/location.dart';
 import 'package:gixt_worker/routes/root.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -33,6 +34,7 @@ class _LogoutpageState extends State<Logoutpage> {
   void initState() {
     super.initState();
     print("Entré a welcome");
+    LocationService.stop();
     _loadUserId();
   }
 

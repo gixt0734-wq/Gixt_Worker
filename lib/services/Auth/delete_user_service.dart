@@ -8,21 +8,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class DeleteUserService {
   static Future<Map<String, dynamic>> delete(
+    {required String recoveryToken}
   ) async {
     int attempts = 0;
     const int maxAttempts = 3;
+   final prefs = await SharedPreferences.getInstance();
+    String? id_user = prefs.getString('id');
 
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
-      final prefs = await SharedPreferences.getInstance();
-      String? id_user = prefs.getString('id');
-       final uri = Uri.parse('${dotenv.env['API_URL']}/api/Users/${id_user}');
-
+       final uri = Uri.parse('${dotenv.env['API_URL']}/api/Users');
+        final token = prefs.getString('token');
         // Crear MultipartRequest
         var response = await http.delete(
           uri,
-          headers: {'Content-Type': 'application/json'},
+          headers: {'Content-Type': 'application/json','Authorization': 'Bearer $token'},
+          body: json.encode({'user_id': id_user,'recoveryToken' :recoveryToken}),
         );
 
         if (response.statusCode == 200) {
@@ -36,12 +38,14 @@ class DeleteUserService {
 
           if (!ok) {
             print("❌ No se pudo refrescar el token");
-            return {
-              'success': false,
-              'message': jsonDecode(response.body)['message'],
-            };
+            return {'success': false, 'message': 'Error inesperado'};
           }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
+
       } on TimeoutException {
         return {'success': false, 'message': 'Tiempo de espera agotado'};
       } on SocketException {
@@ -56,6 +60,6 @@ class DeleteUserService {
       }
     }
 
-    return {'success': false, 'message': 'No se pudo completar el login'};
+    return {'success': false, 'message': 'No se pudo completar la peticion, vuelva a intentarlo'};
   }
 }

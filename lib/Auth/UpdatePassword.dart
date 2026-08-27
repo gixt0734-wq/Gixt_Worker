@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Components/Loaders/Indicador.dart';
+import 'package:gixt_worker/Components/Loaders/update_loader.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/inputs/Input.dart';
 import 'package:gixt_worker/Components/inputs/Input_Password.dart';
@@ -15,151 +16,208 @@ import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/services/Auth/updatepasswor_service.dart';
 import 'package:gixt_worker/services/Auth/validarAccount.dart';
+import 'package:gixt_worker/services/Auth/validarotp.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class Updatepassword extends StatefulWidget {
   const Updatepassword({super.key, this.email});
+
   final String? email;
+
   @override
   State<Updatepassword> createState() => _UpdatepasswordState();
 }
 
 class _UpdatepasswordState extends State<Updatepassword> {
   final _formKey = GlobalKey<FormState>();
-  final _formKeyinfo = GlobalKey<FormState>();
+  final _formKeyPassword = GlobalKey<FormState>();
+
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _passwordconfirmarController = TextEditingController();
-  final PageController _controller = PageController();
-  final PreferencesService _preferencesService = PreferencesService();
+  final _passwordConfirmarController = TextEditingController();
+
   int _paginaActual = 0;
-  String codigo = '';
-  String codigovalidation = '';
-  bool errorCodigo = false;
-  bool enviado = false;
+  String _codigo = '';
+  String _recoveryToken = '';
+  bool _errorCodigo = false;
+  bool _enviado = false; // ya se envió un OTP al correo
+  bool _verificado = false; // el OTP fue validado por el backend
   Timer? _timer;
-  int segundosRestantes = 120;
-  bool timeout = false;
-  String _emailVerificado = '';
-  bool _codigoVerificado = false;
-  bool get _mismoCorroeQueVerificado =>
-      _emailVerificado.isNotEmpty &&
-      _emailController.text.trim() == _emailVerificado;
+  int _segundosRestantes = 120;
+  bool _timeout = false;
 
-  /// El código ingresado es correcto y no ha expirado
-  bool get _codigoOk =>
-      codigo.length == 5 && codigo == codigovalidation && !timeout;
+  static const int _otpLength = 5;
 
-  void _update() async {
+  /// El código está completo y todavía es válido.
+  bool get _codigoOk => _codigo.length == _otpLength && !_timeout;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Indicador(),
-    );
-
-   final result = await UpdatePasswordService.Update(
-          email: _emailController.text,
-          password: _passwordController.text,
-        );
- if (result['success'] == true) {
-          final data = result['data'];
-          String message = "Contraseña actualizada correctamente. Ahora puedes iniciar sesión con tu nueva contraseña.";
-          Future.microtask(() async {
-              
-            await Toast(
-              context,
-              title: "Password actualizado",
-              message: message,
-              type: alert_type.exito,
-            );
-            Navigator.pop(context); // cerrar loader
-            if(widget.email != null){
-              Navigator.pop(context); // cerrar UpdatePassword
-              return;
-            }
-            Navigator.pushAndRemoveUntil(
-              context,
-              MaterialPageRoute(builder: (context) => LoginPage()),
-              (route) => false,
-            );
-            return;
-          });
- } else {
-       Navigator.pop(context); 
-      Toast(
-        context,
-        title: "Error",
-        message: result['message'],
-        type: alert_type.error,
-      );
+  @override
+  void initState() {
+    super.initState();
+    if (widget.email != null) {
+      _emailController.text = widget.email!;
     }
-      
-    
   }
 
-  void _Validar() async {
+  @override
+  void dispose() {
+    _timer?.cancel();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _passwordConfirmarController.dispose();
+    super.dispose();
+  }
+
+  // ───────────────────────── Lógica de red ─────────────────────────
+
+  /// Envía (o reenvía) el código OTP al correo.
+  Future<bool> _crearToken() async {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => Indicador(),
+      builder: (_) => const Indicador(),
     );
 
-    final result = await ValidarAccounthService.Crear(email: _emailController.text);
+    final result = await ValidarAccounthService.Crear(
+      email: _emailController.text.trim(),
+    );
 
-    Navigator.pop(context);
+    if (!mounted) return false;
+    Navigator.pop(context); // cerrar loader
 
     if (result['success'] == true) {
-      final data = result['data'];
       setState(() {
-        codigovalidation = data;
-        enviado = true;
-        iniciarContador();
+        _enviado = true;
+        _verificado = false; // nuevo código → hay que volver a verificar
+        _codigo = '';
+        _errorCodigo = false;
       });
-    } else {
-      Future.microtask(() async {
-        await Toast(
-          context,
-          title: "Error",
-          message: result['message'],
-          type: alert_type.error,
-        );
-      });
+      _iniciarContador();
+      return true;
     }
+
+    await Toast(
+      context,
+      title: "Error",
+      message: result['message'] ?? 'No se pudo enviar el código',
+      type: alert_type.error,
+    );
+    return false;
   }
 
-  void iniciarContador() {
+  /// Valida el OTP contra el backend y guarda el recoveryToken.
+  Future<void> _validarToken() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Indicador(),
+    );
+
+    final result = await ValidarOtpService.Crear(
+      email: _emailController.text.trim(),
+      otp: _codigo,
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context); // cerrar loader
+
+    if (result['success'] == true) {
+      _timer?.cancel();
+      setState(() {
+        _recoveryToken = result['data'];
+        _verificado = true;
+        _errorCodigo = false;
+        _paginaActual++;
+      });
+      return;
+    }
+
+    setState(() => _errorCodigo = true);
+    await Toast(
+      context,
+      title: "Código incorrecto",
+      message: result['message'] ?? 'Verifica el código e inténtalo de nuevo',
+      type: alert_type.error,
+    );
+  }
+
+  /// Actualiza la contraseña con el recoveryToken obtenido.
+  void _update() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => UpdateLoader(
+        onRun: () => UpdatePasswordService.Update(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+          recoveryToken: _recoveryToken,
+        ),
+        onSuccess: (result) async {
+          if (!mounted) return;
+          Navigator.pop(context); // cerrar loader
+
+          await Toast(
+            context,
+            title: "Password actualizado",
+            message:
+                "Contraseña actualizada correctamente. Ahora puedes iniciar sesión con tu nueva contraseña.",
+            type: alert_type.exito,
+          );
+
+          if (!mounted) return;
+
+          if (widget.email != null) {
+            Navigator.pop(context); // cerrar UpdatePassword
+            return;
+          }
+
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => LoginPage()),
+            (route) => false,
+          );
+        },
+      ),
+    );
+  }
+
+  // ───────────────────────── Contador ─────────────────────────
+
+  void _iniciarContador() {
     _timer?.cancel();
 
     setState(() {
-      segundosRestantes = 120;
-      timeout = false;
+      _segundosRestantes = 240;
+      _timeout = false;
     });
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (segundosRestantes <= 0) {
+      if (!mounted) {
         timer.cancel();
-        if (!mounted) return;
+        return;
+      }
+      if (_segundosRestantes <= 1) {
+        timer.cancel();
         setState(() {
-          timeout = true;
+          _segundosRestantes = 0;
+          _timeout = true;
         });
       } else {
-        if (!mounted) return;
-        setState(() {
-          segundosRestantes--;
-        });
+        setState(() => _segundosRestantes--);
       }
     });
   }
 
-  String get tiempoTexto {
-    int min = segundosRestantes ~/ 60;
-    int sec = segundosRestantes % 60;
-
+  String get _tiempoTexto {
+    final min = _segundosRestantes ~/ 60;
+    final sec = _segundosRestantes % 60;
     return "${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}";
   }
+
+  // ───────────────────────── Navegación ─────────────────────────
+
 
   bool salir() {
     if (_paginaActual != 0) {
@@ -173,23 +231,11 @@ class _UpdatepasswordState extends State<Updatepassword> {
     }
   }
 
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.email != null) {
-      _emailController.text = widget.email!;
-    }
-  }
+  // ───────────────────────── Build ─────────────────────────
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
+    return  WillPopScope(
       onWillPop: () async {
         return salir();
       },
@@ -208,9 +254,9 @@ class _UpdatepasswordState extends State<Updatepassword> {
                   ),
                   child: Column(
                     children: [
-                      if (_paginaActual == 0) _buidFormulario(),
-                      if (_paginaActual == 1) _buildverificacion(),
-                      if (_paginaActual == 2) _buidFormularioPassword(),
+                      if (_paginaActual == 0) _buildFormulario(),
+                      if (_paginaActual == 1) _buildVerificacion(),
+                      if (_paginaActual == 2) _buildFormularioPassword(),
                       const SizedBox(height: 20),
                       _buildDots(),
                     ],
@@ -228,9 +274,9 @@ class _UpdatepasswordState extends State<Updatepassword> {
     return SliverAppBar(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       expandedHeight: 70,
-      pinned: true, //  deja solo la barra pequeña visible
-      floating: false, //  NO aparece al subir
-      snap: false, // NO animación automática
+      pinned: true,
+      floating: false,
+      snap: false,
       elevation: 0,
       toolbarHeight: 70,
       shape: const RoundedRectangleBorder(
@@ -242,18 +288,8 @@ class _UpdatepasswordState extends State<Updatepassword> {
       leading: IconButton(
         icon: const Icon(Icons.arrow_back),
         color: Theme.of(context).colorScheme.surface,
-        onPressed: () {
-          salir();
-        },
+        onPressed: salir,
       ),
-      // bottom: PreferredSize(
-      //   preferredSize: const Size.fromHeight(1),
-      //   child: Divider(
-      //     height: 1,
-      //     thickness: 0.5,
-      //     color: Theme.of(context).colorScheme.surface.withOpacity(0.5),
-      //   ),
-      // ),
       flexibleSpace: FlexibleSpaceBar(
         centerTitle: true,
         title: Text(
@@ -268,8 +304,9 @@ class _UpdatepasswordState extends State<Updatepassword> {
     );
   }
 
-  Widget _buidFormulario() {
-    final screenHeight = MediaQuery.of(context).size.height;
+  // ───────────────────────── Página 0: correo ─────────────────────────
+
+  Widget _buildFormulario() {
     return Form(
       key: _formKey,
       child: Column(
@@ -292,21 +329,22 @@ class _UpdatepasswordState extends State<Updatepassword> {
             icon: Icons.person,
             validator: _validateEmail,
           ),
-
           const SizedBox(height: 50),
-          _nextButton('Siguiente', () {
+          _nextButton('Siguiente', () async {
             if (!(_formKey.currentState?.validate() ?? false)) return;
-            setState(() {
-              _paginaActual++;
-            });
+            final ok = await _crearToken();
+            if (ok && mounted) {
+              setState(() => _paginaActual++);
+            }
           }),
         ],
       ),
     );
   }
 
-  Widget _buildverificacion() {
-    final yaVerificado = _codigoVerificado && _mismoCorroeQueVerificado;
+  // ───────────────────────── Página 1: verificación ─────────────────────────
+
+  Widget _buildVerificacion() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -335,205 +373,131 @@ class _UpdatepasswordState extends State<Updatepassword> {
         ),
         const SizedBox(height: 20),
 
-        // ── CASO: ya verificado con el mismo correo ─────────────────────
-        if (yaVerificado) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.07),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: Colors.green.withOpacity(0.22),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.check_circle_outline_rounded,
-                  color: Colors.green,
-                  size: 20,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Correo verificado. Puedes continuar.',
-                    style: GoogleFonts.poppins(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                      color: Colors.green,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+        // ── Ya verificado ──────────────────────────────────────────────
+        if (_verificado) ...[
+          _buildBanner(
+            icon: Icons.check_circle_outline_rounded,
+            color: Colors.green,
+            text: 'Correo verificado. Puedes continuar.',
           ),
           const SizedBox(height: 20),
           _nextButton('Continuar', () => setState(() => _paginaActual++)),
           const SizedBox(height: 8),
         ]
-        // ── CASO: flujo normal (nuevo código o correo distinto) ─────────
+        // ── Flujo normal ───────────────────────────────────────────────
         else ...[
-          // Aviso si el correo cambió y había un caché previo
-          if (_codigoVerificado && !_mismoCorroeQueVerificado) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: Colors.orange.withOpacity(0.22),
-                  width: 1,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.orange,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Cambiaste el correo. Debes verificar de nuevo.',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.orange,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          if (_enviado) ...[
+            _buildTimer(),
             const SizedBox(height: 16),
-          ],
-
-          // Timer
-          if (enviado) ...[
-            Center(
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: timeout
-                      ? Colors.red.withOpacity(0.07)
-                      : Theme.of(context).colorScheme.surface.withOpacity(0.05),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      timeout ? Icons.timer_off_outlined : Icons.timer_outlined,
-                      size: 14,
-                      color: timeout
-                          ? Colors.red.withOpacity(0.7)
-                          : Theme.of(
-                              context,
-                            ).colorScheme.surface.withOpacity(0.45),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      timeout ? 'Código expirado' : 'Válido por $tiempoTexto',
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: timeout
-                            ? Colors.red.withOpacity(0.8)
-                            : Theme.of(
-                                context,
-                              ).colorScheme.surface.withOpacity(0.5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // OTP boxes
             OtpBoxclass(
-              isError: errorCodigo,
+              isError: _errorCodigo,
               onChanged: (value) {
                 setState(() {
-                  codigo = value;
-                  if (codigo.length == 5) {
-                    if (_codigoOk) {
-                      errorCodigo = false;
-                      // Guardar caché de verificación
-                      _codigoVerificado = true;
-                      _emailVerificado = _emailController.text.trim();
-                    } else {
-                      errorCodigo = true;
-                    }
-                  } else {
-                    errorCodigo = false;
-                  }
+                  _codigo = value;
+                  _errorCodigo = false; // limpiar error al editar
                 });
               },
             ),
             const SizedBox(height: 16),
           ],
-
-          // Botón enviar / reenviar
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: _Validar,
-              icon: Icon(
-                enviado ? Icons.refresh_rounded : Icons.send_outlined,
-                size: 18,
-                color: Theme.of(context).colorScheme.surface.withOpacity(0.55),
-              ),
-              label: Text(
-                enviado ? 'Reenviar código' : 'Enviar código',
-                style: GoogleFonts.poppins(
-                  fontSize: 14,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.55),
-                ),
-              ),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                side: BorderSide(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.surface.withOpacity(0.12),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
+          _buildValidarButton(),
           const SizedBox(height: 20),
-
           _buildInfoCard(
             icon: Icons.lightbulb,
             text:
                 'En caso de no visualizar el correo en su bandeja principal, le recomendamos revisar la carpeta de spam o correo no deseado.',
           ),
-          // Continuar — solo visible cuando el código es correcto
-          if (enviado && _codigoOk && !errorCodigo) ...[
-            _nextButton('Continuar', () => setState(() => _paginaActual++)),
-            const SizedBox(height: 8),
-          ],
         ],
       ],
     );
   }
 
-  Widget _buidFormularioPassword() {
-    final screenHeight = MediaQuery.of(context).size.height;
+  Widget _buildTimer() {
+    return Center(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _timeout
+              ? Colors.red.withOpacity(0.07)
+              : Theme.of(context).colorScheme.surface.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _timeout ? Icons.timer_off_outlined : Icons.timer_outlined,
+              size: 14,
+              color: _timeout
+                  ? Colors.red.withOpacity(0.7)
+                  : Theme.of(context).colorScheme.surface.withOpacity(0.45),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              _timeout ? 'Código expirado' : 'Válido por $_tiempoTexto',
+              style: GoogleFonts.poppins(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: _timeout
+                    ? Colors.red.withOpacity(0.8)
+                    : Theme.of(context).colorScheme.surface.withOpacity(0.5),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Botón que valida el OTP o lo reenvía cuando expiró.
+  Widget _buildValidarButton() {
+    final esReenviar = _timeout;
+    final VoidCallback? onTap = esReenviar
+        ? () => _crearToken()
+        : (_codigoOk ? () => _validarToken() : null);
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onTap,
+        style: ElevatedButton.styleFrom(
+          foregroundColor: Colors.white,
+          backgroundColor: colorsecundario,
+          disabledBackgroundColor:
+              Theme.of(context).colorScheme.surface.withOpacity(0.12),
+          disabledForegroundColor:
+              Theme.of(context).colorScheme.surface.withOpacity(0.4),
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(esReenviar ? Icons.refresh_rounded : Icons.send_outlined,
+                size: 20),
+            const SizedBox(width: 8),
+            Text(
+              esReenviar ? 'Reenviar código' : 'Validar',
+              style: GoogleFonts.poppins(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ───────────────────────── Página 2: nueva contraseña ─────────────────────────
+
+  Widget _buildFormularioPassword() {
     return Form(
-      key: _formKeyinfo,
+      key: _formKeyPassword,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -543,7 +507,6 @@ class _UpdatepasswordState extends State<Updatepassword> {
             title: 'Nuevas credenciales de cuenta',
             subtitle: 'Ingrese su nueva contraseña.',
           ),
-
           const SizedBox(height: 20),
           CustomPasswordFormField(
             controller: _passwordController,
@@ -553,11 +516,10 @@ class _UpdatepasswordState extends State<Updatepassword> {
           const SizedBox(height: 20),
           CustomPasswordFormField(
             label: 'Confirmar Contraseña',
-            controller: _passwordconfirmarController,
+            controller: _passwordConfirmarController,
             max: 10,
           ),
           const SizedBox(height: 20),
-
           _buildInfoCard(
             icon: Icons.shield_outlined,
             text:
@@ -565,7 +527,8 @@ class _UpdatepasswordState extends State<Updatepassword> {
           ),
           const SizedBox(height: 40),
           _nextButton('Siguiente', () {
-            if (_passwordController.text != _passwordconfirmarController.text) {
+            if (!(_formKeyPassword.currentState?.validate() ?? false)) return;
+            if (_passwordController.text != _passwordConfirmarController.text) {
               Toast(
                 context,
                 title: 'Las contraseñas no coinciden',
@@ -574,7 +537,6 @@ class _UpdatepasswordState extends State<Updatepassword> {
               );
               return;
             }
-            if (!(_formKeyinfo.currentState?.validate() ?? false)) return;
             _update();
           }),
         ],
@@ -582,12 +544,14 @@ class _UpdatepasswordState extends State<Updatepassword> {
     );
   }
 
+  // ───────────────────────── Validadores ─────────────────────────
+
   String? _validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
+    if (value == null || value.trim().isEmpty) {
       return 'Por favor ingrese su correo';
     }
     final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) {
+    if (!emailRegex.hasMatch(value.trim())) {
       return 'Ingrese un correo válido';
     }
     return null;
@@ -601,6 +565,39 @@ class _UpdatepasswordState extends State<Updatepassword> {
       return 'La contraseña debe tener al menos 6 caracteres';
     }
     return null;
+  }
+
+  // ───────────────────────── Widgets reutilizables ─────────────────────────
+
+  Widget _buildBanner({
+    required IconData icon,
+    required Color color,
+    required String text,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.22), width: 1),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.poppins(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildSectionHeader({
@@ -631,7 +628,6 @@ class _UpdatepasswordState extends State<Updatepassword> {
                       ),
                     ),
                   )
-                  // pulso sutil y continuo para que el ícono se sienta vivo
                   .animate(onPlay: (c) => c.repeat(reverse: true))
                   .scaleXY(
                     begin: 1,
@@ -640,9 +636,7 @@ class _UpdatepasswordState extends State<Updatepassword> {
                     curve: Curves.easeInOut,
                   ),
         ),
-
         const SizedBox(height: 20),
-
         Text(
           title,
           textAlign: TextAlign.center,
@@ -713,9 +707,8 @@ class _UpdatepasswordState extends State<Updatepassword> {
           backgroundColor: colorsecundario,
           foregroundColor: colorWhite,
           padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         ),
       ),
     );

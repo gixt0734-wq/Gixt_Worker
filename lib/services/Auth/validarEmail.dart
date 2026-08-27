@@ -14,21 +14,17 @@ class ValidarEmailService {
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
-      final uri = Uri.parse('${dotenv.env['API_URL']}/api/Users/verification/email');
+        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Verfication/email');
 
-        var request = http.MultipartRequest('POST', uri);
+        var response = await http.post(
+          uri,
+          headers: {'Content-Type': 'application/json',},
+          body: json.encode({'email': email,}),
+        );
 
-        // Campos de texto
-        request.fields['email'] = email;
-
-        var streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-
-        // Convertir la respuesta a String
-        final response = await streamedResponse.stream.bytesToString();
-
-        if (streamedResponse.statusCode == 200) {
-          
-            final data = jsonDecode(response)['message'];
+        if (response.statusCode == 200) {
+            print(response.body);
+            final data = jsonDecode(response.body)['message'];
             print(data);
             return {
               'success': true,
@@ -36,25 +32,25 @@ class ValidarEmailService {
             };
           
         }
-        if (streamedResponse.statusCode == 401) {
+        if (response.statusCode == 401) {
           return {
             'success': false,
-            'message': jsonDecode(response)['message'],
+            'message': jsonDecode(response.body)['message'],
           };
         }
 
-        if(streamedResponse.statusCode == 400)
+        if(response.statusCode == 400)
         {
           return {
             'success': false,
-            'message': jsonDecode(response)['message'],
+            'message': jsonDecode(response.body)['message'],
           };
         }
-        if(streamedResponse.statusCode == 500)
+        if(response.statusCode == 500)
         {
           return {
             'success': false,
-            'message': jsonDecode(response)['message'],
+            'message': jsonDecode(response.body)['message'],
           };
         }
       } on TimeoutException {
@@ -83,7 +79,7 @@ class ValidarEmailService {
 
     return {
       'success': false,
-      'message': 'No se pudo completar el registro',
+      'message': 'No se pudo completar el proceso',
     };
   }
 }

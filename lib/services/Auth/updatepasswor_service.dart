@@ -8,6 +8,7 @@ class UpdatePasswordService {
   static Future<Map<String, dynamic>> Update({
     required String email,
     required String password,
+    required String recoveryToken
   }) async {
     int attempts = 0;
     const int maxAttempts = 3;
@@ -15,13 +16,13 @@ class UpdatePasswordService {
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/password');
+        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Users/password');
 
         // Crear MultipartRequest
         var response = await http.put(
           uri,
           headers: {'Content-Type': 'application/json'},
-          body: json.encode({'email': email, 'password': password}),
+          body: json.encode({'email': email, 'password': password, 'recoveryToken' :recoveryToken}),
         );
 
         if (response.statusCode == 200) {

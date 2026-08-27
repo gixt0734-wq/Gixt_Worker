@@ -141,18 +141,18 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
   }
 
   Future<void> marker() async {
+  
+    final w = MediaQuery.of(context).size.width * .27;
 
-        final w = MediaQuery.of(context).size.width * .27;
     const ImageConfiguration configuration = ImageConfiguration(
       size: Size(80, 80),
     );
 
-    markericon = await getMarkerIcon("assets/marker.png", w.toInt());
+    markericon = await getMarkerIcon("assets/marker.png",w.toInt());
 
     if (mounted) {
       setState(() {
         markericon;
-   
       });
     }
   }
@@ -805,12 +805,41 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
               ),
             },
           ),
+
+          
           Positioned(
             top: 12,
             left: 15,
             right: 15,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+               GestureDetector(
+              onTap: () => setState(() => _paginaActual = 0),
+              child: Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.arrow_back_rounded,
+                  color: colorsecundario,
+                  size: 20,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: 
+             Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               decoration: BoxDecoration(
                 color: Theme.of(
                   context,
@@ -879,38 +908,10 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                     ),
                 ],
               ),
+             )
             ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 80,
-            left: 12,
-            child: GestureDetector(
-              onTap: () => setState(() => _paginaActual = 0),
-              child: Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 8,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.arrow_back_rounded,
-                  color: colorsecundario,
-                  size: 20,
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 80,
-            right: 12,
-            child: GestureDetector(
+            const SizedBox(width: 8),
+             GestureDetector(
               onTap: _GoMyLocation,
               child: Container(
                 width: 42,
@@ -932,7 +933,10 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                 ),
               ),
             ),
+            ]
+            )
           ),
+
           Positioned(
             bottom: 0,
             left: 0,

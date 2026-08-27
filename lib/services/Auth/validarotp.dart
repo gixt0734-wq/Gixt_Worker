@@ -4,52 +4,47 @@ import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-class ValidarAccounthService {
+class ValidarOtpService {
   static Future<Map<String, dynamic>> Crear({
     required String email,
+    required String otp
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
-
+    http.Response? response;
     while (attempts < maxAttempts) {
-      print("llamando a crear");
+      print("llamando a validar token");
       try {
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Verfication/account');
-
-        var response = await http.post(
-          uri,
-          headers: {'Content-Type': 'application/json',},
-          body: json.encode({'email': email,}),
-        );
-
+ 
+        response = await http
+            .post(
+              Uri.parse('${dotenv.env['API_URL']}/api/Verfication/reset-otp'),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({
+                'email': email,
+                'otp': otp,
+              }),
+            )
+            .timeout(const Duration(seconds: 30));
+        print(response.body);
+        final data = jsonDecode(response.body);
         if (response.statusCode == 200) {
-            print(response.body);
-            return {
-              'success': true,
-            };
-          
-        }
-        if (response.statusCode == 401) {
+          // f
           return {
-            'success': false,
-            'message': jsonDecode(response.body)['message'],
+            'success': true,
+            'data': data['recoveryToken'],
           };
         }
 
-        if(response.statusCode == 400)
-        {
-          return {
+        else
+        { return {
             'success': false,
-            'message': jsonDecode(response.body)['message'],
+            'message': data['message'],
           };
+
         }
-        if(response.statusCode == 500)
-        {
-          return {
-            'success': false,
-            'message': jsonDecode(response.body)['message'],
-          };
-        }
+
+       
       } on TimeoutException {
         return {
           'success': false,
@@ -61,13 +56,11 @@ class ValidarAccounthService {
           'message': 'No hay conexión a Internet',
         };
       } catch (e) {
-        print(e);
         return {
           'success': false,
           'message': 'Error inesperado',
         };
       }
-
       attempts++;
       if (attempts < maxAttempts) {
         await Future.delayed(const Duration(seconds: 2));
@@ -76,7 +69,7 @@ class ValidarAccounthService {
 
     return {
       'success': false,
-      'message': 'No se pudo completar el proceso',
+      'message': 'No se pudo completar el registro',
     };
   }
 }

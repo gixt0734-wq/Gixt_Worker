@@ -87,9 +87,11 @@ class _ExpressPageState extends State<ExpressPage>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     marker();
+    WidgetsBinding.instance.addObserver(this);
+    
     _initial();
+    
     print('viendo express');
     expressNotifier.addListener(_onRefresh);
     cancelexpressNotifier.addListener(_cancelreload);
@@ -99,6 +101,7 @@ class _ExpressPageState extends State<ExpressPage>
     });
     _statusSub = FlutterBackgroundService().on("status").listen((event) {
       final state = event?["state"];
+      final id = event?["id"];
       if (state != null && mounted) {
         setState(() {
           if (state != 'enviando ubicación') {
@@ -109,7 +112,7 @@ class _ExpressPageState extends State<ExpressPage>
               isError: state == 'reconectando' ? true : false,
             );
           }
-
+          _gpsid = id;
           _StatusGps = state;
         }); // o lo que quieras hacer con el estado
         print("✅ Status recibido: $state");
@@ -162,7 +165,7 @@ class _ExpressPageState extends State<ExpressPage>
   // Datos que se mandan en el formulario
   double? _diagnostic_cost;
   TextEditingController _priceController = TextEditingController();
-
+  String _gpsid = '';
   // Datos del renderizado del mapa
   GoogleMapController? _mapController;
   List<LatLng> polylineCoordinates = [];
@@ -175,6 +178,9 @@ class _ExpressPageState extends State<ExpressPage>
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   late ScrollController _sheetScrollController;
+  //Inconos de marker mapa
+  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
   // Variables de mapa
   String get _mapsKey => dotenv.env['MAPS_API_KEY'] ?? '';
@@ -505,10 +511,6 @@ class _ExpressPageState extends State<ExpressPage>
     }
   }
 
-  //Inconos de marker mapa
-  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
-  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
-
   Future<BitmapDescriptor> getMarkerIcon(String imagePath, int width) async {
     final ByteData data = await rootBundle.load(imagePath);
 
@@ -531,7 +533,7 @@ class _ExpressPageState extends State<ExpressPage>
     const ImageConfiguration configuration = ImageConfiguration(
       size: Size(80, 80),
     );
-
+    
     markericon = await getMarkerIcon("assets/marker.png",w.toInt());
 
     workericon = await getMarkerIcon("assets/worker.png",w.toInt());
@@ -544,8 +546,11 @@ class _ExpressPageState extends State<ExpressPage>
     }
   }
 
+
+
   // Validacion inicial
   Future<void> _initial() async {
+    
     bool ok = await express.fetchServicioData(widget.express_id);
     if (!ok) {
       if (!mounted) return;
@@ -563,7 +568,8 @@ class _ExpressPageState extends State<ExpressPage>
     setState(() {
       isMantenimiento = express.express[0].type_category == 1;
       print('Es de mantenimiento $isMantenimiento');
-    });  
+    });   
+    // await marker();
     await GetRute();
     await _GoMyLocation();
     _startTracking();
@@ -901,192 +907,389 @@ class _ExpressPageState extends State<ExpressPage>
             markers: markers,
           ),
         ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 62,
-          right: 12,
-          child: Gpsstatus(status: _StatusGps), // 👈 una sola línea
-        ),
-
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          right: 12,
-          child: GestureDetector(
-            onTap: _GoMyLocation,
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.my_location_rounded,
-                color: colorsecundario,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 160,
-          right: 12,
-          child: GestureDetector(
-            onTap: () {
-              abrirGoogleMaps(
-                express.express[0].latitude,
-                express.express[0].longitude,
-              );
-            },
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: colorsecundario,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.directions_rounded,
-                color: colorWhite,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 110,
-          right: 12,
-          child: GestureDetector(
-            onTap: () {
-              if (positionclient != null) {
-                _mapController?.animateCamera(
-                  CameraUpdate.newCameraPosition(
-                    CameraPosition(target: positionclient!, zoom: 17),
-                  ),
-                );
-              }
-            },
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(context).scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 8,
-                  ),
-                ],
-              ),
-              child: Icon(
-                Icons.person_pin_circle_rounded,
-                color: Colors.deepOrange,
-                size: 20,
-              ),
-            ),
-          ),
-        ),
+        
         Positioned(
           top: MediaQuery.of(context).padding.top + 12,
           left: 12,
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).scaffoldBackgroundColor.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(12),
+          right: 12,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ── Botón atrás ───────────────────────────────────
+              GestureDetector(
+                onTap: () => Navigator.pop(context),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    size: 17,
+                    color: Theme.of(context).colorScheme.surface,
+                  ),
+                ),
               ),
-              child: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 17,
-                color: Theme.of(context).colorScheme.surface,
-              ),
-            ),
-          ),
-        ),
-        if (street != null)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 65,
-            right: 64,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).scaffoldBackgroundColor.withOpacity(0.92),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              const SizedBox(width: 8),
+
+              // ── Tarjeta "Ubicación seleccionada" ──────────────
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .scaffoldBackgroundColor
+                        .withOpacity(0.92),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: colorsecundario,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Ubicación seleccionada',
-                          style: GoogleFonts.poppins(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: colorsecundario,
-                            letterSpacing: 0.3,
+                      Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: colorsecundario,
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Ubicación seleccionada',
+                              style: GoogleFonts.poppins(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: colorsecundario,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 6),
+                      Text(
+                        "${street} ${city} a ${express.express[0].maps_address}",
+                        style: GoogleFonts.poppins(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Theme.of(context).colorScheme.surface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (state != null || city != null)
+                        Text(
+                          "${distanceText} en ${durationText}",
+                          style: GoogleFonts.poppins(
+                            fontSize: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .surface
+                                .withOpacity(0.5),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "${street} ${city} a ${express.express[0].maps_address}",
-                    style: GoogleFonts.poppins(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: Theme.of(context).colorScheme.surface,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  if (state != null || city != null)
-                    Text(
-                      "${distanceText} en ${durationText}",
-                      style: GoogleFonts.poppins(
-                        fontSize: 12,
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surface.withOpacity(0.5),
+                ),
+              ),
+              const SizedBox(width: 8),
+
+              // ── Columna de botones ────────────────────────────
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Ir a mi ubicación
+                  GestureDetector(
+                    onTap: _GoMyLocation,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                          ),
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      child: Icon(
+                        Icons.my_location_rounded,
+                        color: colorsecundario,
+                        size: 20,
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Estado GPS
+                  Gpsstatus(status: _StatusGps, is_active: _gpsid == express.express[0].express_id,),
+                  const SizedBox(height: 8),
+
+                  // Ir a ubicación del cliente
+                  GestureDetector(
+                    onTap: () {
+                      if (positionclient != null) {
+                        _mapController?.animateCamera(
+                          CameraUpdate.newCameraPosition(
+                            CameraPosition(target: positionclient!, zoom: 17),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.person_pin_circle_rounded,
+                        color: Colors.deepOrange,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Abrir en Google Maps
+                  GestureDetector(
+                    onTap: () {
+                      abrirGoogleMaps(
+                        express.express[0].latitude,
+                        express.express[0].longitude,
+                      );
+                    },
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: colorsecundario,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.directions_rounded,
+                        color: colorWhite,
+                        size: 20,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
+            ],
+          ),
+        ),
+
+        // Positioned(
+        //   top: MediaQuery.of(context).padding.top + 62,
+        //   right: 12,
+        //   child: Gpsstatus(status: _StatusGps), // 👈 una sola línea
+        // ),
+
+        // Positioned(
+        //   top: MediaQuery.of(context).padding.top + 12,
+        //   right: 12,
+        //   child: GestureDetector(
+        //     onTap: _GoMyLocation,
+        //     child: Container(
+        //       width: 42,
+        //       height: 42,
+        //       decoration: BoxDecoration(
+        //         color: Theme.of(context).scaffoldBackgroundColor,
+        //         borderRadius: BorderRadius.circular(12),
+        //         boxShadow: [
+        //           BoxShadow(
+        //             color: Colors.black.withOpacity(0.15),
+        //             blurRadius: 8,
+        //           ),
+        //         ],
+        //       ),
+        //       child: Icon(
+        //         Icons.my_location_rounded,
+        //         color: colorsecundario,
+        //         size: 20,
+        //       ),
+        //     ),
+        //   ),
+        // ),
+        // Positioned(
+        //   top: MediaQuery.of(context).padding.top + 160,
+        //   right: 12,
+        //   child: GestureDetector(
+        //     onTap: () {
+        //       abrirGoogleMaps(
+        //         express.express[0].latitude,
+        //         express.express[0].longitude,
+        //       );
+        //     },
+        //     child: Container(
+        //       width: 42,
+        //       height: 42,
+        //       decoration: BoxDecoration(
+        //         color: colorsecundario,
+        //         borderRadius: BorderRadius.circular(12),
+        //         boxShadow: [
+        //           BoxShadow(
+        //             color: Colors.black.withOpacity(0.15),
+        //             blurRadius: 8,
+        //           ),
+        //         ],
+        //       ),
+        //       child: Icon(
+        //         Icons.directions_rounded,
+        //         color: colorWhite,
+        //         size: 20,
+        //       ),
+        //     ),
+        //   ),
+        // ),
+        // Positioned(
+        //   top: MediaQuery.of(context).padding.top + 110,
+        //   right: 12,
+        //   child: GestureDetector(
+        //     onTap: () {
+        //       if (positionclient != null) {
+        //         _mapController?.animateCamera(
+        //           CameraUpdate.newCameraPosition(
+        //             CameraPosition(target: positionclient!, zoom: 17),
+        //           ),
+        //         );
+        //       }
+        //     },
+        //     child: Container(
+        //       width: 42,
+        //       height: 42,
+        //       decoration: BoxDecoration(
+        //         color: Theme.of(context).scaffoldBackgroundColor,
+        //         borderRadius: BorderRadius.circular(12),
+        //         boxShadow: [
+        //           BoxShadow(
+        //             color: Colors.black.withOpacity(0.15),
+        //             blurRadius: 8,
+        //           ),
+        //         ],
+        //       ),
+        //       child: Icon(
+        //         Icons.person_pin_circle_rounded,
+        //         color: Colors.deepOrange,
+        //         size: 20,
+        //       ),
+        //     ),
+        //   ),
+        // ),
+        // Positioned(
+        //   top: MediaQuery.of(context).padding.top + 12,
+        //   left: 12,
+        //   child: GestureDetector(
+        //     onTap: () => Navigator.pop(context),
+        //     child: Container(
+        //       width: 42,
+        //       height: 42,
+        //       decoration: BoxDecoration(
+        //         color: Theme.of(
+        //           context,
+        //         ).scaffoldBackgroundColor.withOpacity(0.92),
+        //         borderRadius: BorderRadius.circular(12),
+        //       ),
+        //       child: Icon(
+        //         Icons.arrow_back_ios_new_rounded,
+        //         size: 17,
+        //         color: Theme.of(context).colorScheme.surface,
+        //       ),
+        //     ),
+        //   ),
+        // ),
+        // if (street != null)
+        //   Positioned(
+        //     top: MediaQuery.of(context).padding.top + 12,
+        //     left: 65,
+        //     right: 64,
+        //     child: Container(
+        //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        //       decoration: BoxDecoration(
+        //         color: Theme.of(
+        //           context,
+        //         ).scaffoldBackgroundColor.withOpacity(0.92),
+        //         borderRadius: BorderRadius.circular(12),
+        //       ),
+        //       child: Column(
+        //         crossAxisAlignment: CrossAxisAlignment.start,
+        //         children: [
+        //           Row(
+        //             children: [
+        //               Container(
+        //                 width: 8,
+        //                 height: 8,
+        //                 decoration: const BoxDecoration(
+        //                   color: colorsecundario,
+        //                   shape: BoxShape.circle,
+        //                 ),
+        //               ),
+        //               const SizedBox(width: 8),
+        //               Expanded(
+        //                 child: Text(
+        //                   'Ubicación seleccionada',
+        //                   style: GoogleFonts.poppins(
+        //                     fontSize: 11,
+        //                     fontWeight: FontWeight.w600,
+        //                     color: colorsecundario,
+        //                     letterSpacing: 0.3,
+        //                   ),
+        //                 ),
+        //               ),
+        //             ],
+        //           ),
+        //           const SizedBox(height: 6),
+        //           Text(
+        //             "${street} ${city} a ${express.express[0].maps_address}",
+        //             style: GoogleFonts.poppins(
+        //               fontSize: 12,
+        //               fontWeight: FontWeight.w500,
+        //               color: Theme.of(context).colorScheme.surface,
+        //             ),
+        //             maxLines: 1,
+        //             overflow: TextOverflow.ellipsis,
+        //           ),
+        //           if (state != null || city != null)
+        //             Text(
+        //               "${distanceText} en ${durationText}",
+        //               style: GoogleFonts.poppins(
+        //                 fontSize: 12,
+        //                 color: Theme.of(
+        //                   context,
+        //                 ).colorScheme.surface.withOpacity(0.5),
+        //               ),
+        //               maxLines: 1,
+        //               overflow: TextOverflow.ellipsis,
+        //             ),
+        //         ],
+        //       ),
+        //     ),
+        //   ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
 
         // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],

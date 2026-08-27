@@ -12,6 +12,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 @pragma('vm:entry-point')
 class LocationService {
+ 
   /// INITIALIZE
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
@@ -52,11 +53,12 @@ class LocationService {
         autoStart: false,
         onForeground: onStart,
         onBackground: onIosBackground,
+        
       ),
     );
   }
 
-    /// Callback de iOS cuando la app pasa a segundo plano.
+  /// Callback de iOS cuando la app pasa a segundo plano.
   /// DEBE ser static (o top-level) para poder pasarse como tear-off
   /// dentro de un método estático; si no, no compila.
   @pragma('vm:entry-point')
@@ -86,6 +88,8 @@ class LocationService {
 
   @pragma('vm:entry-point')
   static Future<void> onStart(ServiceInstance service) async {
+
+     bool isactive = false;
     DartPluginRegistrant.ensureInitialized();
     await dotenv.load(fileName: ".env");
 
@@ -101,64 +105,66 @@ class LocationService {
     /// RECIBIR ID
     service.on("setId").listen((event) {
       userId = event?["id"];
-
+      service.invoke("status", {"state": "conectado",  "id": userId,});
       print("🆔 ID recibido: $userId");
     });
 
     /// ================= SIGNALR =================
 
-   Future<void> initSignalR() async {
-    print("🆔");
-  hubConnectionGps = HubConnectionBuilder()
-      .withUrl(hubUrl)
-      .withAutomaticReconnect(retryDelays: [
-        0, 2000, 5000, 10000, 15000, 30000, 30000, 30000, // ← reintenta indefinido
-      ])
-      .build();
+    Future<void> initSignalR() async {
+      print("🆔");
+      hubConnectionGps = HubConnectionBuilder()
+          .withUrl(hubUrl)
+          .withAutomaticReconnect(
+            retryDelays: [
+              0,
+              2000,
+              5000,
+              10000,
+              15000,
+              30000,
+              30000,
+              30000, // ← reintenta indefinido
+            ],
+          )
+          .build();
 
-  // ← Estos dos son los más importantes
-  hubConnectionGps!.serverTimeoutInMilliseconds = 60000;
-  hubConnectionGps!.keepAliveIntervalInMilliseconds = 15000;
+      // ← Estos dos son los más importantes
+      hubConnectionGps!.serverTimeoutInMilliseconds = 60000;
+      hubConnectionGps!.keepAliveIntervalInMilliseconds = 15000;
 
-hubConnectionGps!.onreconnecting(({Exception? error}) {
-  print("🔄 SignalR GPS reconectando...");
-  service.invoke("status", {"state": "reconectando"});   // 👈
-});
+      hubConnectionGps!.onreconnecting(({Exception? error}) {
+        print("🔄 SignalR GPS reconectando...");
+        isactive = false;
+        service.invoke("status", {"state": "reconectando",  "id": userId,}); // 👈
+      });
 
-hubConnectionGps!.onreconnected(({String? connectionId}) {
-  print("✅ SignalR GPS reconectado: $connectionId");
-  service.invoke("status", {"state": "conectado"});      // 👈
-});
+      hubConnectionGps!.onreconnected(({String? connectionId}) {
+        print("✅ SignalR GPS reconectado: $connectionId");
+         isactive = false;
+        service.invoke("status", {"state": "conectado",  "id": userId,}); // 👈
+      });
 
-hubConnectionGps!.onclose(({Exception? error}) {
-  print("❌ SignalR GPS desconectado");
-  service.invoke("status", {"state": "error"});          // 👈
-});
+      hubConnectionGps!.onclose(({Exception? error}) {
+        print("❌ SignalR GPS desconectado");
+         isactive = false;
+        service.invoke("status", {"state": "error",  "id": userId,}); // 👈
+      
 
+      });
 
-  try {
-    await hubConnectionGps!.start();
-    print("✅ SignalR GPS conectado (2do plano)");
-     service.invoke("status", {"state": "conectado"});
-     
-  } catch (e) {
-    print("🚫 Error SignalR GPS : $e");
-    await Future.delayed(const Duration(seconds: 5));
-    FlutterBackgroundService().invoke("stop");
-    service.invoke("status", {"state": "ubicando"});  
-  }
-}
-
-Future<void> _reconnectManual() async {
-  await Future.delayed(const Duration(seconds: 5));
-  try {
-    await hubConnectionGps!.start();
-    print("✅ Reconectado GPS manual");
-  } catch (e) {
-    print("🚫 Fallo reconexión  GPS manual: $e");
-    await _reconnectManual();
-  }
-}
+      try {
+        await hubConnectionGps!.start();
+        print("✅ SignalR GPS conectado (2do plano)");
+         isactive = true;
+        service.invoke("status", {"state": "conectado",  "id": userId,});
+      } catch (e) {
+        print("🚫 Error SignalR GPS : $e");
+        await Future.delayed(const Duration(seconds: 5));
+        FlutterBackgroundService().invoke("stop");
+        service.invoke("status", {"state": "ubicando",  "id": userId,});
+      }
+    }
 
     /// ================= GPS =================
 
@@ -187,23 +193,23 @@ Future<void> _reconnectManual() async {
           Geolocator.getPositionStream(
             locationSettings: const LocationSettings(
               accuracy: LocationAccuracy.bestForNavigation,
-              distanceFilter: 1,
+              distanceFilter: 0,
             ),
           ).listen((position) async {
             try {
               if (hubConnectionGps?.state == HubConnectionState.Connected &&
                   userId != null) {
-                await hubConnectionGps!.invoke(
+                await hubConnectionGps!.send(
                   "SendLocation",
                   args: [userId!, position.latitude, position.longitude],
                 );
-                service.invoke("status", {"state": "enviando ubicación"});
+                service.invoke("status", {"state": "enviando ubicación" ,  "id": userId});
                 print(
                   "📍 Ubicación enviada: $userId ${position.latitude}, ${position.longitude}",
                 );
               }
             } catch (e) {
-               FlutterBackgroundService().invoke("stop");
+              FlutterBackgroundService().invoke("stop");
               print("❌ Error enviando ubicación: $e");
             }
           });
@@ -216,25 +222,30 @@ Future<void> _reconnectManual() async {
       }
     }
 
+    
+    Future<void> start() async {
+          FlutterBackgroundService().invoke("stop");
+         await startTracking();
+
+    }
+
     /// ================= INICIO =================
 
     await initSignalR();
 
-    await startTracking();
+    await start();
 
     /// ================= STOP EVENT =================
 
+
     service.on("stop").listen((event) {
       print("🛑 Servicio detenido");
-
       positionStream?.cancel();
-
       hubConnectionGps?.stop();
-  service.invoke("status", {"state": "detenido"});
+      service.invoke("status", {"state": "detenido"});
       service.stopSelf();
     });
   }
 
-    
+  
 }
-
