@@ -451,7 +451,8 @@ class _ViewJobPageState extends State<ViewJobPage>
           ),
         );
       });
-      await GetRoute();
+      // await GetRoute();
+
     } catch (e) {
       print(e);
     }
@@ -520,9 +521,9 @@ class _ViewJobPageState extends State<ViewJobPage>
       size: Size(80, 80),
     );
 
-    markericon = await getMarkerIcon("assets/marker.png", w.toInt());
+      workericon = await getMarkerIcon("assets/marker.png",w.toInt());
 
-    workericon = await getMarkerIcon("assets/worker.png", w.toInt());
+    markericon = await getMarkerIcon("assets/worker.png",w.toInt());
 
     if (mounted) {
       setState(() {
@@ -552,9 +553,9 @@ class _ViewJobPageState extends State<ViewJobPage>
       isMantenimiento = job.job[0].type_category == 1;
       print('Es de mantenimiento $isMantenimiento');
     });  
+   await _GoMyLocation();
     await marker();
     await GetRute();
-    await _GoMyLocation();
     _startTracking();
     setState(() {});
   }

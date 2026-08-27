@@ -467,7 +467,7 @@ class _ExpressPageState extends State<ExpressPage>
           ),
         );
       });
-      await GetRoute();
+
     } catch (e) {
       print(e);
     }
@@ -534,9 +534,9 @@ class _ExpressPageState extends State<ExpressPage>
       size: Size(80, 80),
     );
     
-    markericon = await getMarkerIcon("assets/marker.png",w.toInt());
+    workericon = await getMarkerIcon("assets/marker.png",w.toInt());
 
-    workericon = await getMarkerIcon("assets/worker.png",w.toInt());
+    markericon = await getMarkerIcon("assets/worker.png",w.toInt());
 
     if (mounted) {
       setState(() {
@@ -545,8 +545,6 @@ class _ExpressPageState extends State<ExpressPage>
       });
     }
   }
-
-
 
   // Validacion inicial
   Future<void> _initial() async {
@@ -569,9 +567,10 @@ class _ExpressPageState extends State<ExpressPage>
       isMantenimiento = express.express[0].type_category == 1;
       print('Es de mantenimiento $isMantenimiento');
     });   
+    
+    await _GoMyLocation();
     await marker();
     await GetRute();
-    await _GoMyLocation();
     _startTracking();
     if (!mounted) return;
     setState(() {
