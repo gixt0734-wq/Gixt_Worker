@@ -569,7 +569,7 @@ class _ExpressPageState extends State<ExpressPage>
       isMantenimiento = express.express[0].type_category == 1;
       print('Es de mantenimiento $isMantenimiento');
     });   
-    // await marker();
+    await marker();
     await GetRute();
     await _GoMyLocation();
     _startTracking();

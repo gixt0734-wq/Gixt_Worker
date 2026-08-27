@@ -552,6 +552,7 @@ class _ViewJobPageState extends State<ViewJobPage>
       isMantenimiento = job.job[0].type_category == 1;
       print('Es de mantenimiento $isMantenimiento');
     });  
+    await marker();
     await GetRute();
     await _GoMyLocation();
     _startTracking();
