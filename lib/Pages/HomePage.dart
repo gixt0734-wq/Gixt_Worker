@@ -21,6 +21,7 @@ import 'package:gixt_worker/components/sketor/cardsCategoria.dart';
 import 'package:gixt_worker/components/sketor/cardsServicios.dart';
 import 'package:gixt_worker/routes/BottomNavigationBar.dart';
 import 'package:gixt_worker/services/Agenda/Agenda_service.dart';
+import 'package:gixt_worker/services/Catalogo/Catalog_service.dart';
 import 'package:gixt_worker/services/Express/Express_service.dart';
 import 'package:gixt_worker/services/Job/Jobs_service.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
@@ -46,6 +47,7 @@ class _HomePageState extends State<HomePage> {
   final Agenda_service jobs = Agenda_service();
   final Categorias_service categorias = Categorias_service();
   final Express_service express = Express_service();
+  final Catalog_service api = Catalog_service();
   final ScrollController _scrollController = ScrollController();
   final ValueNotifier<int> _currentIndexNotifier = ValueNotifier<int>(0);
   int pageNumber = 1;
@@ -109,6 +111,7 @@ class _HomePageState extends State<HomePage> {
     await categorias.updatedata();
     await express.updatedata();
     await jobs.fetchFromApi(1);
+    await api.fetchFromApi();
     if (!mounted) return;
     setState(() {
       isLoading = false;
@@ -130,12 +133,12 @@ class _HomePageState extends State<HomePage> {
     });
     bool okData = await categorias.fetchCategoriasData();
     bool okEx = await express.fetchFromApi();
-    bool okjob = await jobs.fetchAgendaData();
+    bool okjob =  await api.fetchFromApi();
     if (!mounted) return;
     setState(() {
       isLoading = false;
     });
-    if (!okData || !okEx) {
+    if (!okData || !okEx || !okjob) {
       Toast(
         context,
         title: "Error",
@@ -444,7 +447,7 @@ class _HomePageState extends State<HomePage> {
     final List<Agenda> filtrados = jobs.agenda.where((a) {
       return a.job_status == 'in_progress' ||
           a.job_status == 'going' ||
-          a.job_status == 'arrived';
+          a.job_status == 'arrived'|| a.job_status == 'accepted' && a.type == 'express';
     }).toList();
 
     if (filtrados.isEmpty && !isLoading) {
@@ -719,8 +722,7 @@ class _HomePageState extends State<HomePage> {
               j.job_status == 'arrived',
         )
         .length;
-    final activeExpress = express.express
-        .where((e) => e.job_status != 'completed')
+    final activeExpress = api.catalog
         .length;
 
     return Padding(
@@ -728,16 +730,16 @@ class _HomePageState extends State<HomePage> {
       child: Row(
         children: [
           _statCard(
-            Icons.work_outline_rounded,
+            Icons.work_rounded,
             activeJobs.toString(),
             'En Curso',
             Colors.orange,
           ),
           const SizedBox(width: 12),
           _statCard(
-            Icons.bolt_rounded,
+            Icons.person_add_alt_1_rounded,
             activeExpress.toString(),
-            'Express',
+            'Nuevos',
             colorsecundario,
           ),
         ],

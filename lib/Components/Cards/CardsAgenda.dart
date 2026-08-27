@@ -55,6 +55,7 @@ class CardsAgenda extends StatelessWidget {
       case 'finalized':
         return Colors.red;
       case 'canceled':
+      case 'rejected':
         return Colors.red;
       default:
         return Colors.grey;
@@ -80,6 +81,7 @@ class CardsAgenda extends StatelessWidget {
       case 'completed':
         return 'Completado';
       case 'canceled':
+      case 'rejected':
         return 'Cancelado';
       default:
         return status;
@@ -112,7 +114,6 @@ class CardsAgenda extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: scheme.surface.withOpacity(0.06), width: 0),
       ),
       color: scheme.primary,
       child: InkWell(
@@ -223,10 +224,10 @@ class CardsAgenda extends StatelessWidget {
                             vertical: 4,
                           ),
                           decoration: BoxDecoration(
-                            color: _getStatusColor().withOpacity(0.5),
+                            color: _getStatusColor().withOpacity(1),
                             borderRadius: BorderRadius.circular(20),
                             border: Border.all(
-                              color: _getStatusColor().withOpacity(0.5),
+                              color: _getStatusColor().withOpacity(1),
                               width: 0,
                             ),
                           ),
@@ -288,7 +289,7 @@ class CardsAgenda extends StatelessWidget {
                       child: Row(
                         children: [
                           Icon(
-                            Icons.calendar_today_outlined,
+                            Icons.calendar_month_rounded,
                             size: 14,
                             color: scheme.surface.withOpacity(0.6),
                           ),
@@ -314,7 +315,7 @@ class CardsAgenda extends StatelessWidget {
                           const SizedBox(width: 10),
                           
                           Icon(
-                            Icons.access_time_outlined,
+                            Icons.access_time_filled_rounded,
                             size: 14,
                             color: scheme.surface.withOpacity(0.6),
                           ),

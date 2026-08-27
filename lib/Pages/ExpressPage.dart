@@ -1387,7 +1387,7 @@ class _ExpressPageState extends State<ExpressPage>
             SizedBox(
               width: double.infinity,
               child: InfoChip(
-                icon: Icons.location_on_outlined,
+                icon: Icons.location_on_rounded,
                 label: (express.express[0].maps_address?.trim().isNotEmpty ?? false)
                     ? express.express[0].maps_address!
                     : 'Buscando ubicación...',
@@ -1395,12 +1395,12 @@ class _ExpressPageState extends State<ExpressPage>
               ),
             ),
             InfoChip(
-              icon: Icons.event_outlined,
+              icon: Icons.calendar_month_rounded,
               label: express.express[0].job_date,
               color: Colors.transparent,
             ),
             InfoChip(
-              icon: Icons.access_time_outlined,
+              icon: Icons.access_time_filled_rounded,
               label: express.express[0].job_time,
               color: Colors.transparent,
             ),
@@ -1684,8 +1684,12 @@ class _ExpressPageState extends State<ExpressPage>
         bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+    return Container(
+      height: 86,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+      ),
       child: Button(bgColor: bgColor, text: text, icon: icon, action: action),
     );
   }

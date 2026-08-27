@@ -237,7 +237,7 @@ class CardsCatalog extends StatelessWidget {
                         child: Row(
                           children: [
                             Icon(
-                              Icons.calendar_today_outlined,
+                              Icons.calendar_month_rounded,
                               size: 14,
                               color: scheme.surface.withOpacity(0.6),
                             ),
@@ -263,7 +263,7 @@ class CardsCatalog extends StatelessWidget {
                             const SizedBox(width: 10),
 
                             Icon(
-                              Icons.access_time_outlined,
+                              Icons.access_time_filled_rounded,
                               size: 14,
                               color: scheme.surface.withOpacity(0.6),
                             ),

@@ -1172,7 +1172,7 @@ class _ViewJobPageState extends State<ViewJobPage>
             SizedBox(
               width: double.infinity,
               child: InfoChip(
-                icon: Icons.location_on_outlined,
+                icon: Icons.location_on_rounded,
                 label: (job.job[0].maps_address?.trim().isNotEmpty ?? false)
                     ? job.job[0].maps_address!
                     : 'Buscando ubicación...',
@@ -1180,12 +1180,12 @@ class _ViewJobPageState extends State<ViewJobPage>
               ),
             ),
             InfoChip(
-              icon: Icons.event_outlined,
+              icon: Icons.calendar_month_rounded,
               label: job.job[0].job_date,
               color: Colors.transparent,
             ),
             InfoChip(
-              icon: Icons.access_time_outlined,
+              icon: Icons.access_time_filled_rounded,
               label: job.job[0].job_time,
               color: Colors.transparent,
             ),
