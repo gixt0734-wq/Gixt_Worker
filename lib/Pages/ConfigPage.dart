@@ -19,6 +19,7 @@ import 'package:gixt_worker/Pages/Skeletor/ConfigSkeletor.dart';
 import 'package:gixt_worker/Pages/UpdatePerfilPage.dart';
 import 'package:gixt_worker/Pages/WalletPage.dart';
 import 'package:gixt_worker/providers/theme_provider.dart' show ThemeProvider;
+import 'package:gixt_worker/services/Auth/LogOutService.dart';
 import 'package:gixt_worker/services/user/User_service.dart';
 import 'package:gixt_worker/services/user/update_active_service.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -103,15 +104,26 @@ class _ConfigPageState extends State<ConfigPage> {
     );
     if (!continuar!) return;
     final prefs = await SharedPreferences.getInstance();
+    final logok = await LogOutService.logout();
+
 
     bool ok = await SignalRService.disconnectServer();
-    if (ok) {
+    if (ok && logok['success'] == true) {
       await prefs.clear();
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (context) => LoginPage()),
       );
       return;
+    }
+    else
+    {
+      Toast(
+        context,
+        title: "Error",
+        message: logok['message'],
+        type: alert_type.error,
+      );
     }
   }
 
