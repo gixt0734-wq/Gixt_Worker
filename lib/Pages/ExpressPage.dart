@@ -88,10 +88,8 @@ class _ExpressPageState extends State<ExpressPage>
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    
     _initial();
-    
+    WidgetsBinding.instance.addObserver(this);
     print('viendo express');
     expressNotifier.addListener(_onRefresh);
     cancelexpressNotifier.addListener(_cancelreload);
