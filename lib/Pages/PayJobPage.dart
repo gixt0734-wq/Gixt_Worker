@@ -58,10 +58,21 @@ class _PayPageState extends State<PayJobPage> {
     'Se realizara el trabajo como lo pidio el cliente',
   ];
 
-  double get _total {
-    double price = double.tryParse(_priceController.text) ?? 0.0;
+  double get _price{
+    double price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+    double iva = price *0.16;
+    double comision = price *0.10;
+    return price +comision;
+  }
 
-    return price + widget.km_priece + _subtotalMateriales + _iva;
+  double get _price_iva {
+    double price = double.tryParse(_priceController.text.trim()) ?? 0.0;
+    double iva = _price *0.16;
+    double comision = price *0.10;
+    return iva;
+  }
+  double get _total {
+    return _price + widget.km_priece + _subtotalMateriales + _price_iva;
   }
 
   double get _iva =>
@@ -316,7 +327,10 @@ class _PayPageState extends State<PayJobPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _priceLine('Mano de obra', '${_priceController.text}'),
+                _priceLine('Mano de obra + comsion', '${_price.toStringAsFixed(2)}'),
+                const SizedBox(height: 12),
+                  
+                _priceLine('Mano de obra(IVA)', '${_price_iva.toStringAsFixed(2)}'),
                 const SizedBox(height: 12),
                 _priceLine(
                   'Tarifa de traslado',
@@ -327,8 +341,7 @@ class _PayPageState extends State<PayJobPage> {
                   'Materiales',
                   '${_subtotalMateriales.toStringAsFixed(2)}',
                 ),
-                const SizedBox(height: 12),
-                _priceLine('Iva', '${_iva.toStringAsFixed(2)}'),
+              
                 const SizedBox(height: 16),
                 Divider(
                   height: 1,
@@ -626,7 +639,7 @@ class _PayPageState extends State<PayJobPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '\$${_total.toStringAsFixed(0)}',
+                  '\$${_total.toStringAsFixed(2)}',
                   style: GoogleFonts.dmSans(
                     fontSize: 24,
                     fontWeight: FontWeight.w800,

@@ -1520,7 +1520,7 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                             if (precio == null) {
                               return 'Ingresa un número válido';
                             }
-                            if (precio < 50) {
+                            if (precio < 10) {
                               return 'La tarifa mínima es de \$50';
                             }
                             return null;

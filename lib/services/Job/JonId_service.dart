@@ -41,7 +41,7 @@ class Job {
   double diagnostic_cost;
   double materials;
   double total;
-  double iva;
+  double labor;
   // images
   String? image;
   List<String> images_evicence;
@@ -67,7 +67,7 @@ class Job {
     required this.labor_cost,
     required this.materials,
     required this.total,
-    required this.iva,
+    required this.labor,
     required this.worker_price,
     required this.payment_method,
     required this.is_active,
@@ -107,11 +107,11 @@ class Job {
       job_time: json['job_time'] ?? '',
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
-      diagnostic_cost: (json['payment']?['diagnostic_cost']) ?? 0.0,
+      diagnostic_cost: (json['payment']?['diagnostic_total']) ?? 0.0,
       payment_method: (json['payment']?['payment_method']) ?? 0.0,
-      labor_cost: (json['payment']?['labor_cost']) ?? 0.0,
+      labor_cost: (json['payment']?['labor_total']) ?? 0.0,
       materials: (json['payment']?['materials']) ?? 0.0,
-      iva: (json['payment'] ? ['iva']) ?? 0.0,
+      labor: (json['payment'] ? ['labor_cost']) ?? 0.0,
       total : (json['payment'] ? ['total']) ?? 0.0,
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',

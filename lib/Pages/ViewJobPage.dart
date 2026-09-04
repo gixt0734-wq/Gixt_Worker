@@ -121,14 +121,15 @@ class _ViewJobPageState extends State<ViewJobPage>
     print("Entrando otravez a express");
     switch (state) {
       case AppLifecycleState.resumed:
-      // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
-      // sin que el widget se reconstruya: verificamos y reconectamos.
+        // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
+        // sin que el widget se reconstruya: verificamos y reconectamos.
+        _initial();
+        break;
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
         // La app pasó a segundo plano: mantenemos la conexión abierta para
         // no perder notificaciones mientras el SO no la mate, pero evitamos
         // mostrar la pantalla de "sin conexión" mientras el usuario no la ve.
-        _initial();
         break;
       case AppLifecycleState.detached:
         // La app se está cerrando por completo: cerramos el hub de forma
@@ -137,7 +138,6 @@ class _ViewJobPageState extends State<ViewJobPage>
 
         break;
       case AppLifecycleState.hidden:
-        _initial();
         break;
     }
   }
@@ -1271,7 +1271,7 @@ class _ViewJobPageState extends State<ViewJobPage>
     final labor = job.job[0].labor_cost;
     final diagnostic = job.job[0].diagnostic_cost;
     final materials = job.job[0].materials;
-    final iva = job.job[0].iva;
+    final iva = job.job[0].labor;
     final total = job.job[0].total;
 
     return PriceBreakdown(
@@ -1431,7 +1431,7 @@ class _ViewJobPageState extends State<ViewJobPage>
               builder: (context) => PayJobPage(
                 isExpress: false,
                 job_id: job.job[0].job_id,
-                price: job.job[0].labor_cost,
+                price: job.job[0].labor,
                 km_priece: job.job[0].diagnostic_cost,
               ),
             ),

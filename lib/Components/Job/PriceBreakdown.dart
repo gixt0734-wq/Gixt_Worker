@@ -32,18 +32,16 @@ class PriceBreakdown extends StatelessWidget {
       title: 'Pago y método de pago',
       child: Column(
         children: [
-          _priceLine(context, 'Mano de obra', labor),
-          const SizedBox(height: 12),
           if(diagnostic != 0.0)
-          _priceLine(context, 'Visita / diagnóstico', diagnostic),
+          _priceLine(context, 'Visita / diagnóstico ', diagnostic),
           if(diagnostic != 0.0)
           const SizedBox(height: 12),
+          _priceLine(context, 'Mano de obra ', labor),
+          const SizedBox(height: 12),
           if(materials != 0.0)
-          _priceLine(context, 'Materiales (estimado)', materials),
+          _priceLine(context, 'Materiales', materials),
           if(materials != 0.0)
           const SizedBox(height: 12),
-          _priceLine(context, 'IVA', iva),
-          const SizedBox(height: 16),
           Divider(
             height: 1,
             thickness: 0.7,
@@ -73,11 +71,39 @@ class PriceBreakdown extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          _buildIvaNote(context),
         ],
       ),
     );
   }
   
+   Widget _buildIvaNote(BuildContext context) {
+    final surface = Theme.of(context).colorScheme.surface;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.info_outline_rounded,
+          size: 13,
+          color: surface.withValues(alpha: 0.45),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            'Los precios mostrados ya incluyen IVA (16%) y comisiones.',
+            style: GoogleFonts.poppins(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w400,
+              height: 1.3,
+              color: surface.withValues(alpha: 0.45),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
    Widget _priceLine( BuildContext context,String label, double value) {
     final surface = Theme.of(context).colorScheme.surface;
     return Row(

@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gixt_worker/Config/LocalNotificationService.dart';
-import 'package:gixt_worker/Config/Notification.dart';   
+import 'package:gixt_worker/Config/Notification.dart';
+import 'package:gixt_worker/Components/alert_bar.dart';
 import 'package:gixt_worker/Pages/ErrorConnectionPage.dart';
 import 'package:gixt_worker/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -191,33 +192,69 @@ class SignalRService {
   }
 
   // ------------------- PAGINA DE ERROR -------------------
+  // Se deja comentado el flujo anterior (navegaba a ErrorConnectionPage).
+  // No se elimina la pagina ni este codigo por si se necesita reactivar.
+  //
+  // static void _mostrarErrorPage() {
+  //   if (suppressErrorPage) return; // flujo de pago u otro -> no navegar
+  //   if (!_appEnPrimerPlano) return; // fuera de la app no molestamos
+  //   if (_errorPageVisible) return; // ya esta mostrada, no duplicar
+  //   final navigator = NavigationService.navigatorKey.currentState;
+  //   if (navigator == null) return;
+  //
+  //   _errorPageVisible = true;
+  //   _errorRoute = MaterialPageRoute(
+  //     builder: (_) => const ErrorConnectionPage(),
+  //   );
+  //
+  //   // push (no pushAndRemoveUntil) para que al quitarla el usuario
+  //   // regrese exactamente a donde estaba.
+  //   navigator.push(_errorRoute!);
+  // }
+  //
+  // static void _ocultarErrorPage() {
+  //   if (!_errorPageVisible) return;
+  //
+  //   final navigator = NavigationService.navigatorKey.currentState;
+  //   if (navigator != null && _errorRoute != null) {
+  //     navigator.removeRoute(_errorRoute!);
+  //   }
+  //
+  //   _errorRoute = null;
+  //   _errorPageVisible = false;
+  // }
+
+  // ------------------- ALERTA DE ERROR -------------------
+  // Nuevo flujo: en vez de navegar a ErrorConnectionPage, solo se muestra
+  // una alerta tipo banner (igual que en alert_bar.dart) sobre la pagina
+  // actual, sin mover al usuario de donde esta.
 
   static void _mostrarErrorPage() {
-    if (suppressErrorPage) return; // flujo de pago u otro -> no navegar
+    if (suppressErrorPage) return; // flujo de pago u otro -> no molestar
     if (!_appEnPrimerPlano) return; // fuera de la app no molestamos
-    if (_errorPageVisible) return; // ya esta mostrada, no duplicar
-    final navigator = NavigationService.navigatorKey.currentState;
-    if (navigator == null) return;
+    if (_errorPageVisible) return; // ya hay una alerta mostrandose
+
+    // OJO: navigatorKey.currentContext es el contexto del propio
+    // Navigator, y el Overlay vive por debajo de el -> Overlay.of(context)
+    // no lo encuentra. Por eso se usa el OverlayState directamente.
+    final overlay = NavigationService.navigatorKey.currentState?.overlay;
+    if (overlay == null) return;
 
     _errorPageVisible = true;
-    _errorRoute = MaterialPageRoute(
-      builder: (_) => const ErrorConnectionPage(),
-    );
 
-    // push (no pushAndRemoveUntil) para que al quitarla el usuario
-    // regrese exactamente a donde estaba.
-    navigator.push(_errorRoute!);
+    ViewAlertBarOverlay(
+      overlay,
+      title: "Sin conexión, reconectando...",
+      isError: true,
+    ).then((_) {
+      _errorPageVisible = false;
+    });
   }
 
   static void _ocultarErrorPage() {
-    if (!_errorPageVisible) return;
-
-    final navigator = NavigationService.navigatorKey.currentState;
-    if (navigator != null && _errorRoute != null) {
-      navigator.removeRoute(_errorRoute!);
-    }
-
-    _errorRoute = null;
+    // Ya no hay una pagina que remover: la alerta se oculta sola.
+    // Solo reseteamos el flag para permitir una nueva alerta si se
+    // vuelve a caer la conexion.
     _errorPageVisible = false;
   }
 

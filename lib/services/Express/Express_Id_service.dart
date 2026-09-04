@@ -58,7 +58,7 @@ class Express {
   double labor_cost;
   double materials;
   double total;
-  double iva;
+  double labor;
   List<String> images_evicence;
   List<Express_proposal> express_proposal;
   // images
@@ -82,7 +82,7 @@ class Express {
     required this.problem,
     required this.price,
     required this.total,
-    required this.iva,
+    required this.labor,
     required this.payment_method,
     required this.is_active,
     required this.job_status,
@@ -114,11 +114,11 @@ class Express {
       maps_address: json['maps_address'],
       worker_price : (json['worker'] ? ['diagnostic_cost']) ?? 0.0,
 
-      diagnostic_cost : (json['payment'] ? ['diagnostic_cost']) ?? 0.0,
+      diagnostic_cost : (json['payment'] ? ['diagnostic_total']) ?? 0.0,
       payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
-      labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
+      labor_cost: (json['payment'] ? ['labor_total']) ?? 0.0,
       materials: (json['payment'] ? ['materials']) ?? 0.0,
-      iva: (json['payment'] ? ['iva']) ?? 0.0,
+      labor: (json['payment'] ? ['labor_cost']) ?? 0.0,
       total : (json['payment'] ? ['total']) ?? 0.0,
       // job
       job_date: formatDate(json['job_date'] ?? ''),

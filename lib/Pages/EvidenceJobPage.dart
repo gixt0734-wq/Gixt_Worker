@@ -71,6 +71,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
       );
       return;
     }
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,

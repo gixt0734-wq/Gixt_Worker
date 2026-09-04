@@ -7,7 +7,27 @@ Future<bool?> ViewAlertBar(
   BuildContext context, {
   required String title,
   required bool isError,
-}) async {
+}) {
+  return _showAlertOnOverlay(Overlay.of(context), title: title, isError: isError);
+}
+
+/// Igual que [ViewAlertBar] pero recibe el [OverlayState] directamente.
+/// Util cuando no se tiene un [BuildContext] por debajo del Navigator
+/// (p.ej. desde un servicio como SignalRService, usando
+/// `NavigationService.navigatorKey.currentState?.overlay`).
+Future<bool?> ViewAlertBarOverlay(
+  OverlayState overlay, {
+  required String title,
+  required bool isError,
+}) {
+  return _showAlertOnOverlay(overlay, title: title, isError: isError);
+}
+
+Future<bool?> _showAlertOnOverlay(
+  OverlayState overlay, {
+  required String title,
+  required bool isError,
+}) {
   final completer = Completer<bool?>();
 
   late OverlayEntry entry;
@@ -22,7 +42,7 @@ Future<bool?> ViewAlertBar(
     ),
   );
 
-  Overlay.of(context).insert(entry);
+  overlay.insert(entry);
   return completer.future;
 }
 

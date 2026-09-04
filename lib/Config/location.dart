@@ -12,7 +12,33 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 @pragma('vm:entry-point')
 class LocationService {
- 
+
+  /// Estado de conexión a nivel de app (isolate principal):
+  /// idle -> connecting -> connected (o de vuelta a idle si falla/se detiene)
+  static String _connectionState = 'idle';
+  static Completer<void>? _pendingStart;
+  static StreamSubscription? _statusSubscription;
+
+  static void _listenStatusOnce() {
+    _statusSubscription ??= FlutterBackgroundService().on("status").listen((
+      event,
+    ) {
+      final state = event?["state"];
+
+      if (state == "conectado" || state == "enviando ubicación") {
+        _connectionState = 'connected';
+        if (_pendingStart != null && !_pendingStart!.isCompleted) {
+          _pendingStart!.complete();
+        }
+      } else if (state == "error" || state == "detenido") {
+        _connectionState = 'idle';
+        if (_pendingStart != null && !_pendingStart!.isCompleted) {
+          _pendingStart!.complete();
+        }
+      }
+    });
+  }
+
   /// INITIALIZE
   static Future<void> initialize() async {
     final service = FlutterBackgroundService();
@@ -71,6 +97,21 @@ class LocationService {
 
   /// START (envía el id al servicio)
   static Future<void> start(String id) async {
+    if (_connectionState == 'connected') {
+      print("📡 Ya conectado, se ignora nueva solicitud de start");
+      return;
+    }
+
+    if (_connectionState == 'connecting') {
+      print("⏳ Ya hay una conexión en curso, esperando resultado...");
+      await _pendingStart?.future;
+      return;
+    }
+
+    _connectionState = 'connecting';
+    _pendingStart = Completer<void>();
+    _listenStatusOnce();
+
     final service = FlutterBackgroundService();
 
     await service.startService();
@@ -81,6 +122,10 @@ class LocationService {
 
   /// STOP
   static Future<void> stop() async {
+    _connectionState = 'idle';
+    if (_pendingStart != null && !_pendingStart!.isCompleted) {
+      _pendingStart!.complete();
+    }
     FlutterBackgroundService().invoke("stop");
   }
 
