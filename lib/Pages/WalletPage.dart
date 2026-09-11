@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:gixt_worker/Components/Cards/CardsTransaction.dart';
+import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Sketor/CardsTransactionSkeleton.dart';
 import 'package:gixt_worker/Components/Toast.dart';
+import 'package:gixt_worker/Components/inputs/Input_Description.dart';
 import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/components/sketor/cardsCategoria.dart';
 import 'package:gixt_worker/services/Wallet/wallet_service.dart';
+import 'package:gixt_worker/services/user/Bank_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 
@@ -20,7 +23,8 @@ class WalletPage extends StatefulWidget {
 class _WalletPageState extends State<WalletPage> {
   final WorkerWallet_service wallet = WorkerWallet_service();
   final ScrollController _scrollController = ScrollController();
-
+  final _accountHolderController = TextEditingController();
+  final _clabeController = TextEditingController();
   bool isLoading = false;
 
   @override
@@ -34,6 +38,8 @@ class _WalletPageState extends State<WalletPage> {
   void dispose() {
     jobsStatusNotifier.removeListener(_onRefresh);
     _scrollController.dispose();
+    _accountHolderController.dispose();
+    _clabeController.dispose();
     super.dispose();
   }
 
@@ -65,6 +71,43 @@ class _WalletPageState extends State<WalletPage> {
     setState(() => isLoading = false);
   }
 
+ void _Update() async {
+   
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await BankService.Create(
+      account_holder: _accountHolderController.text ,
+      clabe:_clabeController.text, 
+    );
+
+
+
+    if (result['success'] == true) {
+       
+     await  _onRefresh();
+      Toast(
+        context,
+        title: "Cuenta bancaria actualizada",
+        message: "Tu información bancaria se ha guardado correctamente",
+        type: alert_type.exito,
+      );
+      Navigator.pop(context);
+    } else {
+      Toast(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+      Navigator.pop(context);
+    }
+  }
+
+
   // Lista plana de transacciones del wallet (si existe).
   List<dynamic> get _transactions => wallet.workerWallet.isNotEmpty
       ? wallet.workerWallet.first.transactions
@@ -92,6 +135,7 @@ class _WalletPageState extends State<WalletPage> {
                     _buildHero(),
                     const SizedBox(height: 20),
                     _buildBalanceCard(),
+                    _buildBalanceBank(),
                     const SizedBox(height: 28),
                     _buildData(),
                     const SizedBox(height: 100),
@@ -175,7 +219,6 @@ class _WalletPageState extends State<WalletPage> {
 
   Widget _buildBalanceCard() {
     final onSurface = Theme.of(context).colorScheme.surface;
-
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -255,43 +298,6 @@ class _WalletPageState extends State<WalletPage> {
     ).animate().fadeIn(duration: 400.ms).scale(begin: const Offset(0.97, 0.97));
   }
 
-  Widget _buildRetirarButton() {
-    final hasBalance =
-        !isLoading && wallet.workerWallet.isNotEmpty && wallet.workerWallet[0].balance > 0;
-
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: hasBalance ? _onRetirarPressed : null,
-        icon: const Icon(Icons.arrow_upward_rounded, size: 18),
-        label: Text(
-          'Retirar',
-          style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.w600),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: colorsecundario,
-          disabledBackgroundColor: Colors.white.withValues(alpha: 0.25),
-          disabledForegroundColor: Colors.white.withValues(alpha: 0.6),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          elevation: 0,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _onRetirarPressed() async {
-    await Toast(
-      context,
-      title: 'Próximamente',
-      message: 'La opción para retirar tu saldo estará disponible pronto.',
-      type: alert_type.advertencia,
-    );
-  }
-
   Widget _glow(double size, double opacity) => Container(
     width: size,
     height: size,
@@ -300,6 +306,7 @@ class _WalletPageState extends State<WalletPage> {
       color: Colors.white.withValues(alpha: opacity),
     ),
   );
+  
   Widget _buildData() {
     if (isLoading) {
       return Column(
@@ -420,144 +427,371 @@ class _WalletPageState extends State<WalletPage> {
       ),
     ).animate().fade(duration: 400.ms);
   }
-}
 
-/// Card propio para una transacción del wallet.
-class _WalletTransactionCard extends StatelessWidget {
-  final String paymentMethod;
-  final String transactionType;
-  final double amount;
-  final String date;
-
-  const _WalletTransactionCard({
-    required this.paymentMethod,
-    required this.transactionType,
-    required this.amount,
-    required this.date,
-  });
-
-  // Determina si es entrada de dinero según el tipo (ajusta las palabras a tus valores reales).
-  bool get _isIncome {
-    final t = transactionType.toLowerCase();
-    const outflow = [
-      'retiro',
-      'withdraw',
-      'comision',
-      'comisión',
-      'fee',
-      'cargo',
-    ];
-    return !outflow.any((k) => t.contains(k));
-  }
-
-  IconData get _icon {
-    final t = transactionType.toLowerCase();
-    if (t.contains('retiro') || t.contains('withdraw'))
-      return Icons.arrow_upward_rounded;
-    if (t.contains('comis') || t.contains('fee') || t.contains('cargo')) {
-      return Icons.remove_circle_outline_rounded;
-    }
-    return Icons.arrow_downward_rounded;
-  }
-
-  String _labelTipo() {
-    final t = transactionType.trim();
-    if (t.isEmpty) return 'Movimiento';
-    return t[0].toUpperCase() + t.substring(1);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+ Widget _buildBalanceBank() {
+    final scheme = Theme.of(context).colorScheme;
     final onSurface = Theme.of(context).colorScheme.surface;
-    final accent = _isIncome
-        ? const Color(0xFF2E9E5B)
-        : const Color(0xFFE0524B);
-    final signo = _isIncome ? '+' : '-';
+
+    final holderRaw = wallet.workerWallet.isNotEmpty
+        ? '${wallet.workerWallet[0].account_holder}'.trim()
+        : '';
+    final holder = (holderRaw.isEmpty || holderRaw == 'null')
+        ? 'Sin titular'
+        : holderRaw;
+
+    final last4Raw = wallet.workerWallet.isNotEmpty
+        ? '${wallet.workerWallet[0].clabe_last4}'.trim()
+        : '';
+    final last4 = (last4Raw.isEmpty || last4Raw == 'null') ? '----' : last4Raw;
+
+    final isActivePayment = wallet.workerWallet.isNotEmpty
+        ? wallet.workerWallet[0].is_active_payment
+        : true;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: onSurface.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: onSurface.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(_icon, color: accent, size: 22),
+          width: double.infinity,
+          margin: const EdgeInsets.only(top: 14),
+          decoration: BoxDecoration(
+            color: scheme.primary,
+            borderRadius: BorderRadius.circular(20),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          clipBehavior: Clip.antiAlias,
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: isLoading ? null : _showBankAccountFormSheet,
+              child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: (!isLoading && !isActivePayment)
+                ? _buildBankAccountMissing()
+                : Row(
               children: [
-                Text(
-                  _labelTipo(),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                    color: onSurface,
+                // Icono banco
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: colorsecundario.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.account_balance_rounded,
+                    color: colorsecundario,
+                    size: 22,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    Icon(
-                      Icons.credit_card_rounded,
-                      size: 13,
-                      color: onSurface.withValues(alpha: 0.4),
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        paymentMethod,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                const SizedBox(width: 14),
+                // Etiqueta + titular
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Cuenta bancaria',
                         style: GoogleFonts.poppins(
                           fontSize: 12,
+                          fontWeight: FontWeight.w500,
                           color: onSurface.withValues(alpha: 0.5),
                         ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 3),
+                      isLoading
+                          ? Container(
+                              width: 120,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: onSurface.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                            )
+                          : Text(
+                              holder,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.poppins(
+                                height: 1.15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.9,
+                                fontSize: 15,
+                                color: onSurface,
+                              ),
+                            ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // CLABE enmascarada
+                isLoading
+                    ? Container(
+                        width: 74,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: onSurface.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      )
+                    : Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              '••••••',
+                              style: GoogleFonts.poppins(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.5,
+                                color: colorsecundario.withValues(alpha: 0.55),
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              last4,
+                              style: GoogleFonts.poppins(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1,
+                                color: colorsecundario,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                const SizedBox(width: 6),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: onSurface.withValues(alpha: 0.3),
+                  size: 20,
                 ),
               ],
             ),
+              ),
+            ),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+        )
+        .animate()
+        .fadeIn(duration: 400.ms)
+        .slideY(begin: 0.06, curve: Curves.easeOutCubic);
+  }
+
+ Widget _buildBankAccountMissing() {
+    final onSurface = Theme.of(context).colorScheme.surface;
+    return Row(
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: colorsecundario.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Icon(
+            Icons.account_balance_rounded,
+            color: colorsecundario,
+            size: 22,
+          ),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '$signo\$${amount.abs().toStringAsFixed(2)}',
+                'Cuenta bancaria',
                 style: GoogleFonts.poppins(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: accent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: onSurface.withValues(alpha: 0.5),
                 ),
               ),
-              if (date.isNotEmpty) ...[
-                const SizedBox(height: 3),
-                Text(
-                  date,
-                  style: GoogleFonts.poppins(
-                    fontSize: 11,
-                    color: onSurface.withValues(alpha: 0.4),
-                  ),
+              const SizedBox(height: 3),
+              Text(
+                'Agrega tu cuenta para recibir tus pagos',
+                maxLines: 2,
+                style: GoogleFonts.poppins(
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                  color: onSurface.withValues(alpha: 0.7),
                 ),
-              ],
+              ),
             ],
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 10),
+        ElevatedButton(
+          onPressed: _showBankAccountFormSheet,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: colorsecundario,
+            foregroundColor: Colors.white,
+            elevation: 0,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            'Agregar',
+            style: GoogleFonts.poppins(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
+
+ void _showBankAccountFormSheet() {
+    final formKey = GlobalKey<FormState>();
+
+    final holderRaw = wallet.workerWallet.isNotEmpty
+        ? '${wallet.workerWallet[0].account_holder}'.trim()
+        : '';
+    _accountHolderController.text = (holderRaw.isEmpty || holderRaw == 'null')
+        ? ''
+        : holderRaw;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _fieldLabel('Datos de tu cuenta bancaria'),
+                        const SizedBox(height: 20),
+                        CustomDescriptionFormField(
+                          controller: _accountHolderController,
+                          label: 'Titular de la cuenta',
+                          hint: 'Ej: Juan Pérez López',
+                          minLines: 1,
+                          maxLines: 1,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) {
+                              return 'Por favor agrega el nombre del titular';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 25),
+                        CustomDescriptionFormField(
+                          controller: _clabeController,
+                          label: 'CLABE interbancaria',
+                          hint: 'Ej: 012345678901234567',
+                          minLines: 1,
+                          maxLines: 1,
+                          max: 18,
+                          validator: (value) {
+                            final clabe = value?.trim() ?? '';
+                            if (clabe.isEmpty) {
+                              return 'Por favor agrega tu CLABE';
+                            }
+                            if (!RegExp(r'^\d{18}$').hasMatch(clabe)) {
+                              return 'La CLABE debe tener 18 dígitos';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              if (formKey.currentState?.validate() ?? false) {
+                                _Update();
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: colorsecundario,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            child: Text(
+                              'Guardar información',
+                              style: GoogleFonts.dmSans(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  
+  Widget _fieldLabel(String label) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).colorScheme.surface,
+          ),
+        ),
+      ],
+    );
+  }
+
+
 }
+

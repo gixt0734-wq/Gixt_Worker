@@ -49,15 +49,38 @@ class WalletTransaction {
   }
 }
 
+class Bank {
+  String clabe_last4;
+  String account_holder;
+
+  Bank({
+    required this.clabe_last4,
+    required this.account_holder,
+  });
+
+  factory Bank.fromJson(Map<String, dynamic> json) {
+    return Bank(
+      clabe_last4: json['clabe_last4'] ?? '',
+      account_holder: (json['account_holder'] ?? ''),
+    );
+  }
+}
+
 class WorkerWallet {
   double balance;
   bool hasBalance;
   List<WalletTransaction> transactions;
+  String clabe_last4;
+  String account_holder;
+  bool is_active_payment;
 
   WorkerWallet({
     required this.balance,
     required this.hasBalance,
     required this.transactions,
+    required this.clabe_last4,
+    required this.account_holder,
+    required this.is_active_payment,
   });
 
   factory WorkerWallet.fromJson(Map<String, dynamic> json) {
@@ -67,6 +90,12 @@ class WorkerWallet {
       transactions: (json['transactions'] as List<dynamic>? ?? [])
           .map((e) => WalletTransaction.fromJson(e))
           .toList(),
+      // bank: (json['bank'] as List<dynamic>? ?? [])
+      //     .map((e) => Bank.fromJson(e))
+      //     .toList(),
+      clabe_last4:(json['bank']?['clabe_last4']?? ''),
+      account_holder: (json['bank']?['account_holder']?? ''),
+      is_active_payment:(json['is_active_payment'] ?? false),
     );
   }
 }

@@ -28,7 +28,7 @@ import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 import 'package:gixt_worker/services/servicios/categorias_service.dart';
 import 'package:gixt_worker/services/user/Worker_service.dart';
-import 'package:gixt_worker/services/user/update_info_service%20copy.dart';
+import 'package:gixt_worker/services/user/UpdateCatService.dart';
 import 'package:gixt_worker/services/user/update_info_service.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';

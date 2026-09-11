@@ -60,19 +60,12 @@ class _PayPageState extends State<PayJobPage> {
 
   double get _price{
     double price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-    double iva = price *0.16;
-    double comision = price *0.10;
-    return price +comision;
+    return price ;
   }
 
-  double get _price_iva {
-    double price = double.tryParse(_priceController.text.trim()) ?? 0.0;
-    double iva = _price *0.16;
-    double comision = price *0.10;
-    return iva;
-  }
+ 
   double get _total {
-    return _price + widget.km_priece + _subtotalMateriales + _price_iva;
+    return _price + widget.km_priece + _subtotalMateriales;
   }
 
   double get _iva =>
@@ -327,10 +320,7 @@ class _PayPageState extends State<PayJobPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _priceLine('Mano de obra + comsion', '${_price.toStringAsFixed(2)}'),
-                const SizedBox(height: 12),
-                  
-                _priceLine('Mano de obra(IVA)', '${_price_iva.toStringAsFixed(2)}'),
+                _priceLine('Mano de obra', '${_price.toStringAsFixed(2)}'),
                 const SizedBox(height: 12),
                 _priceLine(
                   'Tarifa de traslado',

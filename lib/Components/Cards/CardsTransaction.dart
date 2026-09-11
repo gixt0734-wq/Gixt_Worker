@@ -38,6 +38,13 @@ class CardsTransaction extends StatelessWidget {
           color: const Color.fromARGB(255, 30, 225, 82),
           isPositive: true,
         );
+      case 'payment':
+        return (
+          text: 'Pago',
+          icon: Icons.payment_rounded,
+          color: const Color.fromARGB(255, 225, 30, 30),
+          isPositive: false,
+        );
       case 'debt':
         return (
           text: 'Cargo',
