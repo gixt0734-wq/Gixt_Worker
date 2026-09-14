@@ -11,6 +11,7 @@ import 'package:gixt_worker/Components/CircleImage.dart';
 import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/registro_loader.dart';
+import 'package:gixt_worker/Config/BiometricService.dart';
 import 'package:gixt_worker/Config/SignalRService.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
@@ -152,6 +153,17 @@ class _ConfigPageState extends State<ConfigPage> {
   }
 
   void _active() async {
+    BiometricService biometricService = BiometricService();
+    bool isAuthenticated = await biometricService.authenticate();
+    if (!isAuthenticated) {
+      Toast(
+        context,
+        title: "Error",
+        message: "Autenticación fallida. No se puede cambiar el estado.",
+        type: alert_type.error,
+      );
+      return;
+    }
     await _preferencesService.clearPreferencesWorking();
     await _preferencesService.savePreferencesWorking(!is_working);
     setState(() {

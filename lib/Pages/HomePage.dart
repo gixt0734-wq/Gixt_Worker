@@ -69,7 +69,7 @@ class _HomePageState extends State<HomePage> {
   bool timeout = false;
   bool hayNotificacion = false;
   bool? isworking = false;
-
+  
   void initState() {
     super.initState();
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -747,7 +747,11 @@ class _HomePageState extends State<HomePage> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+      Row(
         children: [
           _statCard(
             Icons.work_rounded,
@@ -764,7 +768,82 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
+          if (isworking == false) ...[
+            const SizedBox(height: 12),
+            _restModeCard(),
+          ],
+        ]
+      )
     ).animate().fade(duration: 350.ms).slideY(begin: 0.1);
+  }
+
+  Widget _restModeCard() {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: () {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => AppBottomNavigation(index: 4),
+          ),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: scheme.primary,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.bedtime_rounded,
+                color: Colors.redAccent,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Modo descanso',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: scheme.surface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'No estás recibiendo trabajos. Toca para activarte',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: scheme.surface.withValues(alpha: 0.5),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: scheme.surface.withValues(alpha: 0.5),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _statCard(IconData icon, String value, String label, Color color) {
