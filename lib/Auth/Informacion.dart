@@ -1032,7 +1032,19 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
               controller: _priceController,
               label: 'Precio a proponer',
               validator: (value) {
-                if (value == null || value.isEmpty) return 'Ingresa el precio';
+                if (value == null || value.trim().isEmpty) {
+                  return 'Por favor ingresa una tarifa';
+                }
+                final precio = double.tryParse(value.trim());
+                if (precio == null) {
+                  return 'Ingresa un número válido';
+                }
+                if (precio < 50) {
+                  return 'La tarifa mínima es de \$50';
+                }
+                if (precio > 1000) {
+                  return 'La tarifa maxima es de \$1000';
+                }
                 return null;
               },
             ),
@@ -1110,8 +1122,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
             const SizedBox(height: 20),
             _buildInfoCard(
               icon: Icons.info_outline,
-              text:
-                  'El precio del diagnóstico y el rango debe estar relacionado, ya que esto te ayudará a proporcionar precios a futuros trabajos.',
+              text:  'El precio del diagnóstico y el rango debe estar relacionado, ya que esto te ayudará a proporcionar precios a futuros trabajos.',
             ),
             const SizedBox(height: 70),
             _nextButton('Siguiente', () {
@@ -1137,8 +1148,7 @@ class _CrearInfoState extends State<CrearInfo> with TickerProviderStateMixin {
           _buildSectionHeader(
             number: '3',
             title: '¿Qué tipo de trabajos realizas?',
-            subtitle:
-                'Selecciona las categorías que mejor describen los servicios que puedes ofrecer a los clientes.',
+            subtitle: 'Selecciona las categorías que mejor describen los servicios que puedes ofrecer a los clientes.',
           ),
           const SizedBox(height: 16),
           Row(

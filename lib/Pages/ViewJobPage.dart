@@ -152,7 +152,7 @@ class _ViewJobPageState extends State<ViewJobPage>
   // Datos que se mandan en el formulario
   double? _diagnostic_cost;
   TextEditingController _priceController = TextEditingController();
-
+  final _formKey = GlobalKey<FormState>();
   // Datos del renderizado del mapa
   GoogleMapController? _mapController;
   List<LatLng> polylineCoordinates = [];
@@ -625,6 +625,7 @@ class _ViewJobPageState extends State<ViewJobPage>
 
   // Funciones principales
   void _Send() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_priceController.text.isEmpty) {
       Toast(
         context,
@@ -1433,6 +1434,7 @@ class _ViewJobPageState extends State<ViewJobPage>
                 job_id: job.job[0].job_id,
                 price: job.job[0].labor,
                 km_priece: job.job[0].diagnostic_cost,
+                methodpayment:job.job[0].payment_method
               ),
             ),
           );
@@ -1484,6 +1486,7 @@ class _ViewJobPageState extends State<ViewJobPage>
 
     // Multiplicadores y su valor base
     final basePrice = job.job[0].worker_price;
+    final methodpayment = job.job[0].payment_method.toLowerCase();
     final multipliers = [1.10, 1.20, 2, 3];
 
     showModalBottomSheet(
@@ -1513,7 +1516,9 @@ class _ViewJobPageState extends State<ViewJobPage>
                       ),
                     ],
                   ),
-                  child: Column(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1582,18 +1587,34 @@ class _ViewJobPageState extends State<ViewJobPage>
                         ),
                       ),
                       const SizedBox(height: 12),
-                      CustomTextFormFieldPrice(
+                     CustomTextFormFieldPrice(
                         controller: _priceController,
                         label: '\$ 0.00',
                         validator: (value) {
-                          if (value == null || value.isEmpty)
+                          if (value == null || value.isEmpty) {
                             return 'Ingresa el precio';
+                          }
+
+                          final price = double.tryParse(value);
+
+                          if (price == null || price <= 0) {
+                            return 'Ingresa un precio válido';
+                          }
+
+                          final minimumPrice = methodpayment == 'cash' ? 2000 : 5000;
+
+                          if (price > minimumPrice || price < 30) {
+                            return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
+                          }
+
                           return null;
                         },
                       ),
                       const SizedBox(height: 24),
                        Button(text: 'Enviar propuesta', icon: Icons.send_rounded, bgColor: colorsecundario, action: _Send)
+                  
                     ],
+                    )
                   ),
                 ),
               ),

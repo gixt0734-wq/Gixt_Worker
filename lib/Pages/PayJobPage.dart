@@ -32,10 +32,12 @@ class PayJobPage extends StatefulWidget {
     required this.price,
     required this.job_id,
     required this.isExpress,
+    required this.methodpayment,
   });
   final double km_priece;
   final String job_id;
   final double price;
+  final String methodpayment;
   final bool isExpress;
   @override
   State<PayJobPage> createState() => _PayPageState();
@@ -201,6 +203,7 @@ class _PayPageState extends State<PayJobPage> {
 
   Widget _buildPay() {
     final surface = Theme.of(context).colorScheme.surface;
+
     return Form(
       key: _formKey,
       child: Column(
@@ -240,8 +243,21 @@ class _PayPageState extends State<PayJobPage> {
             },
             validator: (value) {
               if (value == null || value.isEmpty) {
-                return 'Por favor ingrese el precio';
+                return 'Ingresa el precio';
               }
+
+              final price = double.tryParse(value);
+
+              if (price == null || price <= 0) {
+                return 'Ingresa un precio válido';
+              }
+
+              final minimumPrice = widget.methodpayment == 'cash' ? 2000 : 15000;
+
+              if (price > minimumPrice || price < 30) {
+                return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
+              }
+
               return null;
             },
           ),

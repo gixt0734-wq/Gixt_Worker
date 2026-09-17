@@ -1520,8 +1520,11 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
                             if (precio == null) {
                               return 'Ingresa un número válido';
                             }
-                            if (precio < 10) {
+                            if (precio < 50) {
                               return 'La tarifa mínima es de \$50';
+                            }
+                            if (precio > 1000) {
+                              return 'La tarifa maxima es de \$1000';
                             }
                             return null;
                           },
@@ -1676,7 +1679,6 @@ class _PerfilWorkerPageState extends State<PerfilWorkerPage> {
       },
     );
   }
-
 
 Widget _buildCategory() {
     return Padding(

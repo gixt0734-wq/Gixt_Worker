@@ -170,6 +170,7 @@ class _ExpressPageState extends State<ExpressPage>
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
   AnimationController? _markerAnimController;
+  final _formKey = GlobalKey<FormState>();
   final LocationCacheService locationCache = LocationCacheService();
   // Controllers
   final ScrollController _scrollController = ScrollController();
@@ -636,6 +637,7 @@ class _ExpressPageState extends State<ExpressPage>
 
   // Funciones principales
   void _Send() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_priceController.text.isEmpty) {
       Toast(
         context,
@@ -1647,6 +1649,7 @@ class _ExpressPageState extends State<ExpressPage>
                   job_id: express.express[0].express_id,
                   price: express.express[0].labor,
                   km_priece: express.express[0].diagnostic_cost,
+                  methodpayment: express.express[0].payment_method,
                 ),
               ),
             );
@@ -1704,6 +1707,7 @@ class _ExpressPageState extends State<ExpressPage>
 
     // Multiplicadores y su valor base
     final basePrice = express.express[0].worker_price;
+    final methodpayment = express.express[0].payment_method;
     final multipliers = [1.10, 1.20, 2, 3];
 
     showModalBottomSheet(
@@ -1733,7 +1737,9 @@ class _ExpressPageState extends State<ExpressPage>
                       ),
                     ],
                   ),
-                  child: Column(
+                  child:Form(
+                    key: _formKey,
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1806,8 +1812,22 @@ class _ExpressPageState extends State<ExpressPage>
                         controller: _priceController,
                         label: '\$ 0.00',
                         validator: (value) {
-                          if (value == null || value.isEmpty)
+                         if (value == null || value.isEmpty) {
                             return 'Ingresa el precio';
+                          }
+
+                          final price = double.tryParse(value);
+
+                          if (price == null || price <= 0) {
+                            return 'Ingresa un precio válido';
+                          }
+
+                          final minimumPrice = methodpayment == 'cash' ? 2000 : 5000;
+
+                          if (price > minimumPrice || price < 30) {
+                            return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
+                          }
+
                           return null;
                         },
                       ),
@@ -1816,6 +1836,7 @@ class _ExpressPageState extends State<ExpressPage>
                       
                     ],
                   ),
+                 )
                 ),
               ),
             );
