@@ -145,13 +145,6 @@ class _PayPageState extends State<PayJobPage> {
         print(data);
 
         Future.microtask(() async {
-          await Toast(
-            context,
-            title: "Costos enviado",
-            message:
-                "Se mostrarán los precios y espera la confirmación del pago.",
-            type: alert_type.exito,
-          );
           if (widget.isExpress) {
             expressNotifier.refresh();
           } else {
@@ -159,6 +152,13 @@ class _PayPageState extends State<PayJobPage> {
           }
           homeNotifier.refresh();
           Navigator.pop(context);
+           await Toast(
+            context,
+            title: "Costos enviado",
+            message:"Se mostrarán los precios y espera la confirmación del pago.",
+            type: alert_type.exito,
+          );
+          
         });
       } else {
         Toast(

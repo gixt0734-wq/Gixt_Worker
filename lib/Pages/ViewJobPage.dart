@@ -72,47 +72,74 @@ class _ViewJobPageState extends State<ViewJobPage>
   @override
   void initState() {
     super.initState();
-    print("Entré a Mi trabajo");
+
+    // ⚡ El AnimationController del marcador se crea UNA sola vez y se reutiliza.
+    // Antes se creaba/destruía uno por cada tick de GPS (con distanceFilter: 0,
+    // eso eran muchísimos por minuto), lo que causaba jank y podía hacer
+    // dispose() sobre un controller en pleno forward().
+    _markerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _markerCurve = CurvedAnimation(
+      parent: _markerAnimController!,
+      curve: Curves.easeInOut,
+    );
+    _markerAnimController!.addListener(_onMarkerTick);
+
     _initial();
     WidgetsBinding.instance.addObserver(this);
+
     jobsStatusNotifierFinish.addListener(_Refresh);
     canceljobNotifier.addListener(_cancelreload);
     jobsStatusNotifier.addListener(_Refresh);
+
     FlutterBackgroundService().isRunning().then((running) {
       print("🔍 Servicio corriendo: $running");
     });
+
     _statusSub = FlutterBackgroundService().on("status").listen((event) {
       final state = event?["state"];
       final id = event?["id"];
-      if (state != null && mounted) {
-        setState(() {
-          if (state != 'enviando ubicación') {
-            if (!mounted) return;
-            ViewAlertBar(
-              context,
-              title: state,
-              isError: state == 'reconectando' ? true : false,
-            );
-          }
-          _gpsid = id;
-          _StatusGps = state;
-        }); // o lo que quieras hacer con el estado
-        print("✅ Status recibido: $state");
-        print("✅ Status recibido: $id");
+      if (state == null || !mounted) return;
+
+      // ⚠️ ANTES: el ViewAlertBar (efecto secundario / navegación de UI) se
+      // ejecutaba DENTRO de setState. Eso es incorrecto: setState solo debe
+      // mutar estado. Ahora el efecto va fuera y setState solo actualiza campos.
+      if (state != 'enviando ubicación') {
+        ViewAlertBar(
+          context,
+          title: state.toString(),
+          isError: state == 'reconectando',
+        );
       }
+      setState(() {
+        _gpsid = (id ?? '').toString();
+        _StatusGps = state.toString();
+      });
     });
-    _startTracking();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _statusSub?.cancel();
+    jobsStatusNotifierFinish.removeListener(_Refresh);
+    canceljobNotifier.removeListener(_cancelreload);
+    jobsStatusNotifier.removeListener(_Refresh);
     _positionStreamSubscription?.cancel();
+    _statusSub?.cancel();
+    _timer?.cancel();
+
+    _markerAnimController?.removeListener(_onMarkerTick);
     _markerAnimController?.stop();
     _markerAnimController?.dispose();
-    _mapController?.dispose();
-    _mapController = null;
+
+    _priceController.dispose();
+    _scrollController.dispose();
+
+    // ⚡ Notificadores aislados liberados.
+    _workerPos.dispose();
+
     super.dispose();
   }
 
@@ -148,28 +175,45 @@ class _ViewJobPageState extends State<ViewJobPage>
   // servicios
   final JobById_service job = JobById_service();
   String? motivoSeleccionado;
-  String _gpsid = '';
+
   // Datos que se mandan en el formulario
   double? _diagnostic_cost;
-  TextEditingController _priceController = TextEditingController();
-  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _priceController = TextEditingController();
+  String _gpsid = '';
+
   // Datos del renderizado del mapa
   GoogleMapController? _mapController;
   List<LatLng> polylineCoordinates = [];
+
+  // ⚡ `markers` ahora contiene SOLO el marcador del cliente (estático). El del
+  // trabajador se dibuja aparte desde _workerPos para no reconstruir todo el
+  // mapa en cada frame de la animación.
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
+
+  // ⚡ Animación del marcador del trabajador.
   AnimationController? _markerAnimController;
+  Animation<double>? _markerCurve;
+  LatLng _animFrom = const LatLng(20.9674, -89.5926);
+  LatLng _animTo = const LatLng(20.9674, -89.5926);
+  final ValueNotifier<LatLng?> _workerPos = ValueNotifier<LatLng?>(null);
+
+  final _formKey = GlobalKey<FormState>();
   final LocationCacheService locationCache = LocationCacheService();
-  
+
   // Controllers
   final ScrollController _scrollController = ScrollController();
-  final DraggableScrollableController _sheetController = DraggableScrollableController();
-  late ScrollController _sheetScrollController;
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+
+  //Inconos de marker mapa
+  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
+  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
   // Variables de mapa
   String get _mapsKey => dotenv.env['MAPS_API_KEY'] ?? '';
   LatLng positionActual = const LatLng(20.9674, -89.5926);
-  LatLng? positionclient = LatLng(20.9674, -89.5926);
+  LatLng? positionclient = const LatLng(20.9674, -89.5926);
   LatLng? posicionAnterior;
   double longitude = 0;
   double latitude = 0;
@@ -180,14 +224,12 @@ class _ViewJobPageState extends State<ViewJobPage>
   String? colonia;
   String distanceText = "";
   String durationText = "";
+  bool isMantenimiento = false;
 
   Timer? _timer;
+  // ⚡ El contador vive en un ValueNotifier: NO llama setState cada segundo.
   Duration _remaining = Duration.zero;
   DateTime? _countdownExpiresAt;
-
-  //Inconos de marker mapa
-  BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
-  BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
 
   // Estados de express
   bool isLoading = false;
@@ -196,7 +238,6 @@ class _ViewJobPageState extends State<ViewJobPage>
   bool isaccept = false;
   bool isSearch = false;
   bool timeout = false;
-  bool isMantenimiento = false;
   bool loadig = true;
   bool _tracking = false;
   bool onlocation = false;
@@ -209,6 +250,8 @@ class _ViewJobPageState extends State<ViewJobPage>
   StreamSubscription? _statusSub;
 
   Future<void> _startTracking() async {
+    if (job.job.isEmpty) return;
+
     final excludedStatuses = [
       'pending',
       'accepted',
@@ -245,16 +288,9 @@ class _ViewJobPageState extends State<ViewJobPage>
           if (!mounted) return; // ← CHECK MOUNTED PRIMERO
           final nuevaPosicion = LatLng(position.latitude, position.longitude);
           final anterior = positionActual; // ← guardar ANTES
-
-          try {
-            setState(() {
-              positionActual = nuevaPosicion;
-              _animarMovimiento(anterior, nuevaPosicion);
-            });
-          } catch (e) {
-            print("Error: $e");
-          }
+          _animarMovimiento(anterior, nuevaPosicion);
         });
+
     if (_StatusGps == 'desconocido' &&
         !excludedStatuses.contains(job.job[0].job_status)) {
       if (mounted) setState(() => _tracking = true);
@@ -267,42 +303,29 @@ class _ViewJobPageState extends State<ViewJobPage>
     await LocationService.stop();
   }
 
+  void _onMarkerTick() {
+    final t = _markerCurve!.value;
+    final lat =
+        _animFrom.latitude + (_animTo.latitude - _animFrom.latitude) * t;
+    final lng =
+        _animFrom.longitude + (_animTo.longitude - _animFrom.longitude) * t;
+    final pos = LatLng(lat, lng);
+
+    positionActual = pos; // origen para ruta/distancia
+    _workerPos.value = pos; // solo el mapa escucha
+    _mapController?.moveCamera(CameraUpdate.newLatLng(pos));
+  }
+
   void _animarMovimiento(LatLng desde, LatLng hasta) {
-    _markerAnimController?.dispose();
-
-    _markerAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
-    final tween = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeInOut),
-    );
-
-    _markerAnimController!.addListener(() {
-      final t = tween.value;
-      final lat = desde.latitude + (hasta.latitude - desde.latitude) * t;
-      final lng = desde.longitude + (hasta.longitude - desde.longitude) * t;
-
-      positionActual = LatLng(lat, lng);
-      markers.removeWhere((m) => m.markerId.value == "worker");
-      markers.add(
-        Marker(
-          markerId: const MarkerId("worker"),
-          position: positionActual!,
-          infoWindow: const InfoWindow(title: "Tu ubicación"),
-          icon: markericon,
-        ),
-      );
-      // Fuera del setState
-      _mapController?.animateCamera(CameraUpdate.newLatLng(positionActual!));
-      if (mounted) setState(() {});
-    });
-
-    _markerAnimController!.forward();
+    _animFrom = desde;
+    _animTo = hasta;
+    _markerAnimController!
+      ..reset()
+      ..forward();
   }
 
   Future<void> getDistanceAndTime() async {
+    if (positionclient == null) return;
     final String url =
         "https://maps.googleapis.com/maps/api/distancematrix/json"
         "?origins=${positionActual!.latitude},${positionActual!.longitude}"
@@ -320,9 +343,6 @@ class _ViewJobPageState extends State<ViewJobPage>
       String distance = element["distance"]["text"]; // km
       String duration = element["duration"]["text"]; // tiempo
 
-      print("Distancia: $distance");
-      print("Tiempo estimado: $duration");
-
       if (!mounted) return;
 
       setState(() {
@@ -339,33 +359,22 @@ class _ViewJobPageState extends State<ViewJobPage>
     final clientPos = LatLng(job.job[0].latitude, job.job[0].longitude);
 
     if (!mounted) return;
+    positionActual = workerPos;
+    positionclient = clientPos;
+    latitude = position.latitude;
+    longitude = position.longitude;
+
     setState(() {
-      positionActual = workerPos;
-      positionclient = clientPos;
-
-      latitude = position.latitude;
-      longitude = position.longitude;
-
-      /// MARCADOR WORKER
-      markers.add(
-        Marker(
-          markerId: const MarkerId("worker"),
-          position: workerPos,
-          infoWindow: const InfoWindow(title: "Tu ubicación"),
-          icon: markericon,
-        ),
-      );
-
-      /// MARCADOR CLIENTE
-      markers.add(
+      markers = {
         Marker(
           markerId: const MarkerId("client"),
           position: clientPos,
           infoWindow: const InfoWindow(title: "Cliente"),
           icon: workericon,
         ),
-      );
+      };
     });
+    _workerPos.value = workerPos;
 
     /// ajustar cámara para ver ambos puntos
     LatLngBounds bounds = LatLngBounds(
@@ -391,10 +400,12 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   Future<void> GetRoute() async {
+    if (positionclient == null) return;
+
     PolylinePoints polylinePoints = PolylinePoints(apiKey: _mapsKey);
 
     PolylineRequest request = PolylineRequest(
-      origin: PointLatLng(positionActual!.latitude, positionActual!.longitude),
+      origin: PointLatLng(positionActual.latitude, positionActual.longitude),
       destination: PointLatLng(
         positionclient!.latitude,
         positionclient!.longitude,
@@ -420,7 +431,7 @@ class _ViewJobPageState extends State<ViewJobPage>
   Future<void> createPolyline() async {
     polylines.add(
       Polyline(
-        polylineId: PolylineId("ruta"),
+        polylineId: const PolylineId("ruta"),
         points: polylineCoordinates,
         width: 5,
         color: colorsecundario,
@@ -429,15 +440,16 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   // Traer datos de ubicacion
-
-  Future<void> _GoMyLocation() async {
+  Future<void> _GoMyLocation({bool showLoader = true}) async {
     if (!mounted) return;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Indicador(),
-    );
+    if (showLoader) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Indicador(),
+      );
+    }
 
     try {
       Position pos = await GeoLocationService.obtenerUbicacion(context);
@@ -448,19 +460,18 @@ class _ViewJobPageState extends State<ViewJobPage>
         positionActual = LatLng(pos.latitude, pos.longitude);
         _mapController?.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: positionActual!, zoom: 17),
+            CameraPosition(target: positionActual, zoom: 17),
           ),
         );
       });
-      // await GetRoute();
-
     } catch (e) {
-      print(e);
+      debugPrint('$e');
     }
 
+    // ⚡ GetStreet fuera de setState (es async, no muta estado sincrónicamente).
     await GetStreet();
     if (mounted) setState(() => loadig = false);
-    if (mounted) Navigator.pop(context);
+    if (showLoader && mounted) Navigator.pop(context);
   }
 
   Future<void> GetStreet() async {
@@ -515,16 +526,10 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   Future<void> marker() async {
-
     final w = MediaQuery.of(context).size.width * .27;
-    
-    const ImageConfiguration configuration = ImageConfiguration(
-      size: Size(80, 80),
-    );
 
-      workericon = await getMarkerIcon("assets/marker.png",w.toInt());
-
-    markericon = await getMarkerIcon("assets/worker.png",w.toInt());
+    workericon = await getMarkerIcon("assets/marker.png", w.toInt());
+    markericon = await getMarkerIcon("assets/worker.png", w.toInt());
 
     if (mounted) {
       setState(() {
@@ -536,16 +541,16 @@ class _ViewJobPageState extends State<ViewJobPage>
 
   // Validacion inicial
   Future<void> _initial() async {
+    if (locationCache.hasPosicion) {
+      latitude = locationCache.latitud!;
+      longitude = locationCache.longitud!;
+      setState(() {
+        positionActual = LatLng(latitude, longitude);
+        positionclient = LatLng(latitude, longitude);
+      });
+      _workerPos.value = LatLng(latitude, longitude);
+    }
 
-      if (locationCache.hasPosicion) {
-          latitude = locationCache.latitud!;
-          longitude = locationCache.longitud!; 
-          setState(() {
-            positionActual = LatLng(latitude, longitude);
-            positionclient = LatLng(latitude, longitude);
-          });
-        }
-        
     bool ok = await job.fetchServicioData(widget.id_trabajo);
     if (!ok) {
       if (!mounted) return;
@@ -557,17 +562,21 @@ class _ViewJobPageState extends State<ViewJobPage>
           type: alert_type.error,
         );
       });
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
+      return;
     }
     if (!mounted) return;
     setState(() {
       isMantenimiento = job.job[0].type_category == 1;
-      print('Es de mantenimiento $isMantenimiento');
-    });  
-   await _GoMyLocation();
+    });
+    // ⚡ En el arranque NO bloqueamos con el diálogo modal: ya tenemos la
+    // posición del cache y GetRute vuelve a centrar con la real.
+    await _GoMyLocation(showLoader: false);
     await marker();
     await GetRute();
     _startTracking();
+
+    if (!mounted) return;
     setState(() {});
   }
 
@@ -584,7 +593,7 @@ class _ViewJobPageState extends State<ViewJobPage>
         message: 'se el usuario cancelo el trabajo',
         type: alert_type.error,
       );
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     });
   }
 
@@ -610,8 +619,7 @@ class _ViewJobPageState extends State<ViewJobPage>
     }
     if (!mounted) return;
     setState(() {
-    isMantenimiento = job.job[0].type_category == 1;
-    print('Es de mantenimiento $isMantenimiento');
+      isMantenimiento = job.job[0].type_category == 1;
     });
     _startTracking();
   }
@@ -621,6 +629,35 @@ class _ViewJobPageState extends State<ViewJobPage>
       _stopTracking();
     }
     _onRefresh();
+  }
+
+  void _startCountdown(DateTime expiresAt) {
+    _timer?.cancel();
+    _countdownExpiresAt = expiresAt;
+    _remaining = expiresAt.difference(DateTime.now());
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final difference = expiresAt.difference(DateTime.now());
+
+      if (difference.isNegative) {
+        timer.cancel();
+        setState(() {
+          _remaining = Duration.zero;
+        });
+      } else {
+        setState(() {
+          _remaining = difference;
+        });
+      }
+    });
+  }
+
+  String _formatTime(Duration duration) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final d = duration.isNegative ? Duration.zero : duration;
+    return "${two(d.inHours)}:"
+        "${two(d.inMinutes.remainder(60))}:"
+        "${two(d.inSeconds.remainder(60))}";
   }
 
   // Funciones principales
@@ -635,7 +672,7 @@ class _ViewJobPageState extends State<ViewJobPage>
       );
       return;
     }
-     if (_diagnostic_cost == null && isMantenimiento== false) {
+    if (_diagnostic_cost == null && isMantenimiento == false) {
       Toast(
         context,
         title: 'Selecciona un precio a tu diagnostico',
@@ -660,7 +697,6 @@ class _ViewJobPageState extends State<ViewJobPage>
     if (mounted) Navigator.pop(context);
 
     if (result['success'] == true) {
-      final data = result['data'];
       if (!mounted) return;
       Toast(
         context,
@@ -697,7 +733,6 @@ class _ViewJobPageState extends State<ViewJobPage>
     if (mounted) Navigator.pop(context);
 
     if (result['success'] == true) {
-      final data = result['data'];
       Toast(
         context,
         title: "Trabajo Actualizado",
@@ -763,36 +798,6 @@ class _ViewJobPageState extends State<ViewJobPage>
     }
   }
 
-  // Imagenes
-  void _startCountdown(DateTime expiresAt) {
-    _timer?.cancel();
-    _countdownExpiresAt = expiresAt;
-    _remaining = expiresAt.difference(DateTime.now());
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final difference = expiresAt.difference(DateTime.now());
-
-      if (difference.isNegative) {
-        timer.cancel();
-        setState(() {
-          _remaining = Duration.zero;
-        });
-      } else {
-        setState(() {
-          _remaining = difference;
-        });
-      }
-    });
-  }
-
-  String _formatTime(Duration duration) {
-    String two(int n) => n.toString().padLeft(2, '0');
-
-    return "${two(duration.inHours)}:"
-        "${two(duration.inMinutes.remainder(60))}:"
-        "${two(duration.inSeconds.remainder(60))}";
-  }
-
   @override
   Widget build(BuildContext context) {
     if (job.job.isEmpty) {
@@ -851,29 +856,45 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   Widget _buildMap() {
-    final h = MediaQuery.of(context).size.height;
-    final topPadding = MediaQuery.of(context).padding.top;
+    final theme = Theme.of(context);
+    final mq = MediaQuery.of(context);
+    final h = mq.size.height;
+
     return Stack(
       children: [
         SizedBox(
           height: h,
-          child: GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: positionActual,
-              zoom: 16,
-            ),
-            polylines: polylines,
-            scrollGesturesEnabled: true,
-            zoomGesturesEnabled: true,
-            rotateGesturesEnabled: true,
-            tiltGesturesEnabled: !isactive,
-            onMapCreated: (controller) => _mapController = controller,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<OneSequenceGestureRecognizer>(
-                () => EagerGestureRecognizer(),
-              ),
+          child: ValueListenableBuilder<LatLng?>(
+            valueListenable: _workerPos,
+            builder: (context, worker, _) {
+              return GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: positionActual,
+                  zoom: 16,
+                ),
+                polylines: polylines,
+                scrollGesturesEnabled: true,
+                zoomGesturesEnabled: true,
+                rotateGesturesEnabled: true,
+                tiltGesturesEnabled: !isactive,
+                onMapCreated: (controller) => _mapController = controller,
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<OneSequenceGestureRecognizer>(
+                    () => EagerGestureRecognizer(),
+                  ),
+                },
+                markers: {
+                  ...markers, // cliente (estático)
+                  if (worker != null)
+                    Marker(
+                      markerId: const MarkerId("worker"),
+                      position: worker,
+                      infoWindow: const InfoWindow(title: "Tu ubicación"),
+                      icon: markericon,
+                    ),
+                },
+              );
             },
-            markers: markers,
           ),
         ),
 
@@ -891,9 +912,9 @@ class _ViewJobPageState extends State<ViewJobPage>
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .scaffoldBackgroundColor
-                        .withOpacity(0.92),
+                    color: Theme.of(
+                      context,
+                    ).scaffoldBackgroundColor.withOpacity(0.92),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -908,11 +929,14 @@ class _ViewJobPageState extends State<ViewJobPage>
               // ── Tarjeta "Ubicación seleccionada" ──────────────
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .scaffoldBackgroundColor
-                        .withOpacity(0.92),
+                    color: Theme.of(
+                      context,
+                    ).scaffoldBackgroundColor.withOpacity(0.92),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -959,10 +983,9 @@ class _ViewJobPageState extends State<ViewJobPage>
                           "${distanceText} en ${durationText}",
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surface
-                                .withOpacity(0.5),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withOpacity(0.5),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1003,7 +1026,10 @@ class _ViewJobPageState extends State<ViewJobPage>
                   const SizedBox(height: 8),
 
                   // Estado GPS
-                  Gpsstatus(status: _StatusGps,is_active: _gpsid == job.job[0].job_id),
+                  Gpsstatus(
+                    status: _StatusGps,
+                    is_active: _gpsid == job.job[0].job_id,
+                  ),
                   const SizedBox(height: 8),
 
                   // Ir a ubicación del cliente
@@ -1119,7 +1145,7 @@ class _ViewJobPageState extends State<ViewJobPage>
               .fadeIn(duration: 500.ms)
               .slideX(begin: -0.15, curve: Curves.easeOutCubic),
           const SizedBox(height: 10),
-          
+
           // Evidence: desliza desde la derecha (efecto espejo con el anterior)
           _buildEvidence()
               .animate(delay: 450.ms)
@@ -1215,7 +1241,11 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   Widget _buildClient() {
-    return ClientInfo(img: job.job[0].client_image ,name: job.job[0].client_username ,id: job.job[0].client_id);
+    return ClientInfo(
+      img: job.job[0].client_image,
+      name: job.job[0].client_username,
+      id: job.job[0].client_id,
+    );
   }
 
   Widget _buildTrabajo() {
@@ -1287,7 +1317,7 @@ class _ViewJobPageState extends State<ViewJobPage>
   Widget _buildEvidence() {
     final evidence = job.job[0].images_evicence;
     final total = 1 + evidence.length;
-    return  SectionCard(
+    return SectionCard(
       title: 'Imágenes de evidencia',
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1304,22 +1334,30 @@ class _ViewJobPageState extends State<ViewJobPage>
           ),
         ),
       ),
-      child:SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              Imagen(imagen: job.job[0].image!, type: 'Cliente',icon: Icons.person_rounded)
-                  .animate()
-                  .fade(duration: 450.ms, delay: 60.ms)
-                  .slideX(begin: -0.2),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Imagen(
+                  imagen: job.job[0].image!,
+                  type: 'Cliente',
+                  icon: Icons.person_rounded,
+                )
+                .animate()
+                .fade(duration: 450.ms, delay: 60.ms)
+                .slideX(begin: -0.2),
+            const SizedBox(width: 20),
+            for (final img in evidence) ...[
+              Imagen(
+                imagen: img!,
+                type: 'Trabajador',
+                icon: Icons.handyman_rounded,
+              ),
               const SizedBox(width: 20),
-              for (final img in evidence) ...[
-                Imagen(imagen: img!,type: 'Trabajador',icon: Icons.handyman_rounded),
-                const SizedBox(width: 20),
-              ],
             ],
-          ),
+          ],
         ),
+      ),
     );
   }
 
@@ -1415,29 +1453,26 @@ class _ViewJobPageState extends State<ViewJobPage>
         break;
 
       case 'arrived':
-        icon =  isMantenimiento ?  Icons.home_repair_service :Icons.search;
-        text = isMantenimiento ? 'Empezar' :'Iniciar diagnóstico' ;
+        icon = isMantenimiento ? Icons.home_repair_service : Icons.search;
+        text = isMantenimiento ? 'Empezar' : 'Iniciar diagnóstico';
         action = () {
-          if(isMantenimiento == true)
-          {
+          if (isMantenimiento == true) {
             _Update(job.job[0].job_status);
-          }
-          else
-          {
-          _startTracking();
+          } else {
+            _startTracking();
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PayJobPage(
-                isExpress: false,
-                job_id: job.job[0].job_id,
-                price: job.job[0].labor,
-                km_priece: job.job[0].diagnostic_cost,
-                methodpayment:job.job[0].payment_method
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PayJobPage(
+                  isExpress: false,
+                  job_id: job.job[0].job_id,
+                  price: job.job[0].labor,
+                  km_priece: job.job[0].diagnostic_cost,
+                  methodpayment: job.job[0].payment_method,
+                ),
               ),
-            ),
-          );
+            );
           }
         };
         break;
@@ -1476,7 +1511,7 @@ class _ViewJobPageState extends State<ViewJobPage>
       decoration: BoxDecoration(
         color: Theme.of(context).scaffoldBackgroundColor,
       ),
-      child:  Button(bgColor: bgColor, text: text, icon: icon, action: action),
+      child: Button(bgColor: bgColor, text: text, icon: icon, action: action),
     );
   }
 
@@ -1519,102 +1554,116 @@ class _ViewJobPageState extends State<ViewJobPage>
                   child: Form(
                     key: _formKey,
                     child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surface.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(2),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                       FieldLabelDescription(label: 'Enviar propuesta' , value: 'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',),
-                      
-                      const SizedBox(height: 24),
-                      if(isMantenimiento == false)...[
-                      Text(
-                        'Tarifa de visita y diagnóstico',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.6),
+                        const SizedBox(height: 16),
+                        FieldLabelDescription(
+                          label: 'Enviar propuesta',
+                          value:
+                              'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: List.generate(multipliers.length, (index) {
-                            final value = basePrice * multipliers[index];
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                right: index == multipliers.length - 1 ? 0 : 10,
-                              ),
-                              child: PaymentChip(
-                                value: value,
-                                label: '\$${value.toStringAsFixed(0)}',
-                                icon: Icons.attach_money_rounded,
-                                isSelected: selectedChipIndex == index,
-                                onTap: () => setModalState(() {
-                                  _diagnostic_cost = value;
-                                  selectedChipIndex = index;
-                                }),
-                              ),
-                            );
-                          }),
+
+                        const SizedBox(height: 24),
+                        if (isMantenimiento == false) ...[
+                          Text(
+                            'Tarifa de visita y diagnóstico',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(multipliers.length, (
+                                index,
+                              ) {
+                                final value = basePrice * multipliers[index];
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    right: index == multipliers.length - 1
+                                        ? 0
+                                        : 10,
+                                  ),
+                                  child: PaymentChip(
+                                    value: value,
+                                    label: '\$${value.toStringAsFixed(0)}',
+                                    icon: Icons.attach_money_rounded,
+                                    isSelected: selectedChipIndex == index,
+                                    onTap: () => setModalState(() {
+                                      _diagnostic_cost = value;
+                                      selectedChipIndex = index;
+                                    }),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                        Text(
+                          'Tarifa de mano de obra',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surface.withValues(alpha: 0.6),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 12),
+                        CustomTextFormFieldPrice(
+                          controller: _priceController,
+                          label: '\$ 0.00',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Ingresa el precio';
+                            }
+
+                            final price = double.tryParse(value);
+
+                            if (price == null || price <= 0) {
+                              return 'Ingresa un precio válido';
+                            }
+
+                            final minimumPrice = methodpayment == 'cash'
+                                ? 2000
+                                : 5000;
+
+                            if (price > minimumPrice || price < 30) {
+                              return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
+                            }
+
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        Button(
+                          text: 'Enviar propuesta',
+                          icon: Icons.send_rounded,
+                          bgColor: colorsecundario,
+                          action: _Send,
+                        ),
                       ],
-                      Text(
-                        'Tarifa de mano de obra',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                     CustomTextFormFieldPrice(
-                        controller: _priceController,
-                        label: '\$ 0.00',
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Ingresa el precio';
-                          }
-
-                          final price = double.tryParse(value);
-
-                          if (price == null || price <= 0) {
-                            return 'Ingresa un precio válido';
-                          }
-
-                          final minimumPrice = methodpayment == 'cash' ? 2000 : 5000;
-
-                          if (price > minimumPrice || price < 30) {
-                            return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
-                          }
-
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                       Button(text: 'Enviar propuesta', icon: Icons.send_rounded, bgColor: colorsecundario, action: _Send)
-                  
-                    ],
-                    )
+                    ),
                   ),
                 ),
               ),
@@ -1694,7 +1743,7 @@ class _ViewJobPageState extends State<ViewJobPage>
 
     // 👇 Motivo seleccionado (null = ninguno → botón deshabilitado)
 
-   showModalBottomSheet(
+    showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
@@ -1709,83 +1758,90 @@ class _ViewJobPageState extends State<ViewJobPage>
             return Padding(
               padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
               child: KeyboardDismisser(
-                child:  Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.fromLTRB(
-                        isCompact ? 16 : 24,
-                        8,
-                        isCompact ? 16 : 24,
-                        mq.padding.bottom + 20,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    isCompact ? 16 : 24,
+                    8,
+                    isCompact ? 16 : 24,
+                    mq.padding.bottom + 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
                       ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(24),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Handle bar centrado
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: surface.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 24,
-                            offset: const Offset(0, -4),
-                          ),
-                        ],
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Handle bar centrado
-                          Center(
-                            child: Container(
-                              width: 36,
-                              height: 4,
-                              margin: const EdgeInsets.only(bottom: 20),
-                              decoration: BoxDecoration(
-                                color: surface.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          FieldLabelDescription(label:'¿Por qué cancelas el servicio?' , value: 'Selecciona un motivo para continuar',),
-                          const SizedBox(height: 20),
+                      const SizedBox(height: 8),
+                      FieldLabelDescription(
+                        label: '¿Por qué cancelas el servicio?',
+                        value: 'Selecciona un motivo para continuar',
+                      ),
+                      const SizedBox(height: 20),
 
-                          // 👇 Lista de opciones seleccionables (con scroll propio
-                          // para no desbordar en pantallas pequeñas)
-                          Flexible(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: motivos.map((motivo) {
-                                  final bool seleccionado = motivoSeleccionado == motivo;
-                                  
-                                  return OptionsButton(
-                                    motivo: motivo, 
-                                    seleccionado: 
-                                    seleccionado,
-                                    action: () {
-                                      setModalState(() {
-                                        motivoSeleccionado = motivo;
-                                      });
-                                    }
-                                  );
-                                }).toList(),
-                            )
-                        )
-                      
+                      // 👇 Lista de opciones seleccionables (con scroll propio
+                      // para no desbordar en pantallas pequeñas)
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: motivos.map((motivo) {
+                              final bool seleccionado =
+                                  motivoSeleccionado == motivo;
+
+                              return OptionsButton(
+                                motivo: motivo,
+                                seleccionado: seleccionado,
+                                action: () {
+                                  setModalState(() {
+                                    motivoSeleccionado = motivo;
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ),
 
-                          const SizedBox(height: 22),
-                          Button(text: 'Cancelar servicio', icon: Icons.send, bgColor: colorsecundario, action:  habilitado
+                      const SizedBox(height: 22),
+                      Button(
+                        text: 'Cancelar servicio',
+                        icon: Icons.send,
+                        bgColor: colorsecundario,
+                        action: habilitado
                             ? () {
                                 _Cancelar();
                               }
-                            : null,),
-                          // 👇 Botón: habilitado solo si hay motivo seleccionado
-                          
-                        ],
+                            : null,
                       ),
-                    ),
+
+                      // 👇 Botón: habilitado solo si hay motivo seleccionado
+                    ],
                   ),
+                ),
+              ),
             );
           },
         );

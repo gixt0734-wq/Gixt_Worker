@@ -9,6 +9,8 @@ import 'package:flutter_svg/svg.dart';
 import 'package:gixt_worker/Auth/Informacion.dart';
 import 'package:gixt_worker/Auth/Login.dart';
 import 'package:gixt_worker/Config/Notification.dart';
+import 'package:gixt_worker/Config/Notification2do.dart';
+import 'package:gixt_worker/Config/Notifiers/express_notifiers.dart';
 import 'package:gixt_worker/Config/Notifiers/reports_notifiers.dart';
 import 'package:gixt_worker/Config/SignalRService.dart';
 import 'package:gixt_worker/Config/colors.dart';
@@ -201,12 +203,9 @@ void didChangeAppLifecycleState(AppLifecycleState state) async {
       final notification = message.notification;
       final data = message.data;
 
-      print('🔔 Mensaje recibido en primer plano: ${data}');
-
-      if(data['type'] == 'Report') {
-        reportsNotifier.refresh();
-      }
-
+      print('🔔 Mensaje recibido en primer plano por firebase: ${data}');
+      handleNotification2do(context, data);
+     
       /// Mostrar notificación local solo si hay contenido
       if (notification != null) {
         const AndroidNotificationDetails androidDetails =

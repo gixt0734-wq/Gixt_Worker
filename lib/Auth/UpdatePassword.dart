@@ -557,16 +557,29 @@ class _UpdatepasswordState extends State<Updatepassword> {
     return null;
   }
 
-  String? _validatePassword(String? value) {
+String? _validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Por favor ingrese una contraseña';
     }
-    if (value.length < 6) {
-      return 'La contraseña debe tener al menos 6 caracteres';
+
+    if (value.length < 8) {
+      return 'La contraseña debe tener al menos 8 caracteres';
     }
+
+    if (!RegExp(r'[A-Z]').hasMatch(value)) {
+      return 'Debe contener al menos una mayúscula';
+    }
+
+    if (!RegExp(r'[0-9]').hasMatch(value)) {
+      return 'Debe contener al menos un número';
+    }
+
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-\\/\[\]+=]').hasMatch(value)) {
+      return 'Debe contener al menos un signo especial';
+    }
+
     return null;
   }
-
   // ───────────────────────── Widgets reutilizables ─────────────────────────
 
   Widget _buildBanner({

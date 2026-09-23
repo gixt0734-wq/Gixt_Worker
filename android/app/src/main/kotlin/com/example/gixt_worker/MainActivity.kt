@@ -1,4 +1,4 @@
-package com.example.gixt_worker
+package com.gixtworker.app
 
 import io.flutter.embedding.android.FlutterFragmentActivity
 

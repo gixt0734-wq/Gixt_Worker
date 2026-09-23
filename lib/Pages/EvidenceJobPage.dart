@@ -91,13 +91,6 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
       print(data);
 
       Future.microtask(() async {
-        await Toast(
-          context,
-          title: "Evidencia enviada",
-          message:
-              "Tu evidencia ha sido enviada correctamente, el cliente verificará el trabajo y te notificará si es necesario realizar algún cambio",
-          type: alert_type.exito,
-        );
         if (widget.isExpress) {
           finishexpressNotifier.refresh();
         } else {
@@ -105,6 +98,13 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
         }
         homeNotifier.refresh();
         Navigator.pop(context);
+        await Toast(
+          context,
+          title: "Evidencia enviada",
+          message:
+              "Tu evidencia ha sido enviada correctamente, el cliente verificará el trabajo y te notificará si es necesario realizar algún cambio",
+          type: alert_type.exito,
+        );
       });
     } else {
       Toast(

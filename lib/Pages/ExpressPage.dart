@@ -66,11 +66,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 import 'package:keyboard_dismisser/keyboard_dismisser.dart';
-import 'dart:async';
-import 'dart:io';
-import 'package:flutter/services.dart';
 import 'package:signalr_netcore/hub_connection.dart';
-import 'package:signalr_netcore/hub_connection_builder.dart';
+import 'dart:io';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
@@ -88,66 +85,93 @@ class _ExpressPageState extends State<ExpressPage>
   @override
   void initState() {
     super.initState();
+
+    // ⚡ El AnimationController del marcador se crea UNA sola vez y se reutiliza.
+    // Antes se creaba/destruía uno por cada tick de GPS (con distanceFilter: 0,
+    // eso eran muchísimos por minuto), lo que causaba jank y podía hacer
+    // dispose() sobre un controller en pleno forward().
+    _markerAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    );
+    _markerCurve = CurvedAnimation(
+      parent: _markerAnimController!,
+      curve: Curves.easeInOut,
+    );
+    _markerAnimController!.addListener(_onMarkerTick);
+
     _initial();
     WidgetsBinding.instance.addObserver(this);
-    print('viendo express');
+
     expressNotifier.addListener(_onRefresh);
     cancelexpressNotifier.addListener(_cancelreload);
     finishexpressNotifier.addListener(_Refresh);
+
     FlutterBackgroundService().isRunning().then((running) {
-      print("🔍 Servicio corriendo: $running");
+      debugPrint("🔍 Servicio corriendo: $running");
     });
+
     _statusSub = FlutterBackgroundService().on("status").listen((event) {
       final state = event?["state"];
       final id = event?["id"];
-      if (state != null && mounted) {
-        setState(() {
-          if (state != 'enviando ubicación') {
-            if (!mounted) return;
-            ViewAlertBar(
-              context,
-              title: state,
-              isError: state == 'reconectando' ? true : false,
-            );
-          }
-          _gpsid = id;
-          _StatusGps = state;
-        }); // o lo que quieras hacer con el estado
-        print("✅ Status recibido: $state");
+      if (state == null || !mounted) return;
+
+      // ⚠️ ANTES: el ViewAlertBar (efecto secundario / navegación de UI) se
+      // ejecutaba DENTRO de setState. Eso es incorrecto: setState solo debe
+      // mutar estado. Ahora el efecto va fuera y setState solo actualiza campos.
+      if (state != 'enviando ubicación') {
+        ViewAlertBar(
+          context,
+          title: state.toString(),
+          isError: state == 'reconectando',
+        );
       }
+      setState(() {
+        _gpsid = (id ?? '').toString();
+        _StatusGps = state.toString();
+      });
     });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
+    expressNotifier.removeListener(_onRefresh);
+    cancelexpressNotifier.removeListener(_cancelreload);
+    finishexpressNotifier.removeListener(_Refresh);
+
     _positionStreamSubscription?.cancel();
     _statusSub?.cancel();
+    _timer?.cancel();
+
+    _markerAnimController?.removeListener(_onMarkerTick);
     _markerAnimController?.stop();
     _markerAnimController?.dispose();
+
+    _priceController.dispose();
+    _scrollController.dispose();
+
+    // ⚡ Notificadores aislados liberados.
+    _workerPos.dispose();
+
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print("Entrando otravez a express");
     switch (state) {
       case AppLifecycleState.resumed:
-        // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
-        // sin que el widget se reconstruya: verificamos y reconectamos.
-        _initial();
+        // ⚡ ANTES: llamaba _initial() completo en cada resume (diálogo modal
+        // bloqueante + re-ruteo + re-adquisición de GPS). Ahora solo refresca
+        // datos y re-asegura el tracking, sin bloquear la pantalla.
+        _onRefresh();
         break;
       case AppLifecycleState.paused:
       case AppLifecycleState.inactive:
-        // La app pasó a segundo plano: mantenemos la conexión abierta para
-        // no perder notificaciones mientras el SO no la mate, pero evitamos
-        // mostrar la pantalla de "sin conexión" mientras el usuario no la ve.
+        // Segundo plano: mantenemos la conexión abierta.
         break;
       case AppLifecycleState.detached:
-        // La app se está cerrando por completo: cerramos el hub de forma
-        // ordenada (best-effort, el proceso puede terminar antes de que
-        // esta llamada asíncrona complete).
-
         break;
       case AppLifecycleState.hidden:
         break;
@@ -160,23 +184,37 @@ class _ExpressPageState extends State<ExpressPage>
   // servicios
   final ExpressById_service express = ExpressById_service();
   String? motivoSeleccionado;
+
   // Datos que se mandan en el formulario
   double? _diagnostic_cost;
-  TextEditingController _priceController = TextEditingController();
+  final TextEditingController _priceController = TextEditingController();
   String _gpsid = '';
+
   // Datos del renderizado del mapa
   GoogleMapController? _mapController;
   List<LatLng> polylineCoordinates = [];
+
+  // ⚡ `markers` ahora contiene SOLO el marcador del cliente (estático). El del
+  // trabajador se dibuja aparte desde _workerPos para no reconstruir todo el
+  // mapa en cada frame de la animación.
   Set<Marker> markers = {};
   Set<Polyline> polylines = {};
+
+  // ⚡ Animación del marcador del trabajador.
   AnimationController? _markerAnimController;
+  Animation<double>? _markerCurve;
+  LatLng _animFrom = const LatLng(20.9674, -89.5926);
+  LatLng _animTo = const LatLng(20.9674, -89.5926);
+  final ValueNotifier<LatLng?> _workerPos = ValueNotifier<LatLng?>(null);
+
   final _formKey = GlobalKey<FormState>();
   final LocationCacheService locationCache = LocationCacheService();
+
   // Controllers
   final ScrollController _scrollController = ScrollController();
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
-  late ScrollController _sheetScrollController;
+
   //Inconos de marker mapa
   BitmapDescriptor markericon = BitmapDescriptor.defaultMarker;
   BitmapDescriptor workericon = BitmapDescriptor.defaultMarker;
@@ -184,7 +222,7 @@ class _ExpressPageState extends State<ExpressPage>
   // Variables de mapa
   String get _mapsKey => dotenv.env['MAPS_API_KEY'] ?? '';
   LatLng positionActual = const LatLng(20.9674, -89.5926);
-  LatLng? positionclient = LatLng(20.9674, -89.5926);
+  LatLng? positionclient = const LatLng(20.9674, -89.5926);
   LatLng? posicionAnterior;
   double longitude = 0;
   double latitude = 0;
@@ -198,6 +236,7 @@ class _ExpressPageState extends State<ExpressPage>
   bool isMantenimiento = false;
 
   Timer? _timer;
+  // ⚡ El contador vive en un ValueNotifier: NO llama setState cada segundo.
   Duration _remaining = Duration.zero;
   DateTime? _countdownExpiresAt;
 
@@ -220,6 +259,9 @@ class _ExpressPageState extends State<ExpressPage>
   StreamSubscription? _statusSub;
 
   Future<void> _startTracking() async {
+    // Guarda: sin datos cargados no podemos leer job_status.
+    if (express.express.isEmpty) return;
+
     final excludedStatuses = [
       'pending',
       'canceled',
@@ -235,13 +277,11 @@ class _ExpressPageState extends State<ExpressPage>
     }
 
     LocationPermission permission = await Geolocator.checkPermission();
-
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
     if (permission == LocationPermission.deniedForever) {
       print("❌ Permiso GPS bloqueado");
-
       return;
     }
 
@@ -253,19 +293,15 @@ class _ExpressPageState extends State<ExpressPage>
             distanceFilter: 0,
           ),
         ).listen((position) {
-          if (!mounted) return; // ← CHECK MOUNTED PRIMERO
+          if (!mounted) return;
           final nuevaPosicion = LatLng(position.latitude, position.longitude);
-          final anterior = positionActual; // ← guardar ANTES
+          final anterior = _workerPos.value ?? positionActual;
 
-          try {
-            setState(() {
-              positionActual = nuevaPosicion;
-              _animarMovimiento(anterior, nuevaPosicion);
-            });
-          } catch (e) {
-            print("Error: $e");
-          }
+          // ⚡ Sin setState: la animación publica en _workerPos y solo el mapa
+          // escucha.
+          _animarMovimiento(anterior, nuevaPosicion);
         });
+
     if (_StatusGps == 'desconocido' &&
         !excludedStatuses.contains(express.express[0].job_status)) {
       if (mounted) setState(() => _tracking = true);
@@ -278,45 +314,34 @@ class _ExpressPageState extends State<ExpressPage>
     await LocationService.stop();
   }
 
+  // ⚡ Tick de la animación: interpola y publica en el ValueNotifier. Sigue al
+  // trabajador con moveCamera (no animateCamera, que pelearía frame a frame).
+  void _onMarkerTick() {
+    final t = _markerCurve!.value;
+    final lat =
+        _animFrom.latitude + (_animTo.latitude - _animFrom.latitude) * t;
+    final lng =
+        _animFrom.longitude + (_animTo.longitude - _animFrom.longitude) * t;
+    final pos = LatLng(lat, lng);
+
+    positionActual = pos; // origen para ruta/distancia
+    _workerPos.value = pos; // solo el mapa escucha
+    _mapController?.moveCamera(CameraUpdate.newLatLng(pos));
+  }
+
   void _animarMovimiento(LatLng desde, LatLng hasta) {
-    _markerAnimController?.dispose();
-
-    _markerAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-
-    final tween = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _markerAnimController!, curve: Curves.easeInOut),
-    );
-
-    _markerAnimController!.addListener(() {
-      final t = tween.value;
-      final lat = desde.latitude + (hasta.latitude - desde.latitude) * t;
-      final lng = desde.longitude + (hasta.longitude - desde.longitude) * t;
-
-      positionActual = LatLng(lat, lng);
-      markers.removeWhere((m) => m.markerId.value == "worker");
-      markers.add(
-        Marker(
-          markerId: const MarkerId("worker"),
-          position: positionActual!,
-          infoWindow: const InfoWindow(title: "Tu ubicación"),
-          icon: markericon,
-        ),
-      );
-      // Fuera del setState
-      _mapController?.animateCamera(CameraUpdate.newLatLng(positionActual!));
-      if (mounted) setState(() {});
-    });
-
-    _markerAnimController!.forward();
+    _animFrom = desde;
+    _animTo = hasta;
+    _markerAnimController!
+      ..reset()
+      ..forward();
   }
 
   Future<void> getDistanceAndTime() async {
+    if (positionclient == null) return;
     final String url =
         "https://maps.googleapis.com/maps/api/distancematrix/json"
-        "?origins=${positionActual!.latitude},${positionActual!.longitude}"
+        "?origins=${positionActual.latitude},${positionActual.longitude}"
         "&destinations=${positionclient!.latitude},${positionclient!.longitude}"
         "&mode=driving"
         "&key=$_mapsKey";
@@ -325,17 +350,12 @@ class _ExpressPageState extends State<ExpressPage>
 
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
-
       final element = data["rows"][0]["elements"][0];
 
       String distance = element["distance"]["text"]; // km
       String duration = element["duration"]["text"]; // tiempo
 
-      print("Distancia: $distance");
-      print("Tiempo estimado: $duration");
-
       if (!mounted) return;
-
       setState(() {
         distanceText = distance;
         durationText = duration;
@@ -344,6 +364,8 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   Future<void> GetRute() async {
+    if (express.express.isEmpty) return;
+
     final position = await Geolocator.getCurrentPosition();
 
     final workerPos = LatLng(position.latitude, position.longitude);
@@ -353,33 +375,25 @@ class _ExpressPageState extends State<ExpressPage>
     );
 
     if (!mounted) return;
+
+    positionActual = workerPos;
+    positionclient = clientPos;
+    latitude = position.latitude;
+    longitude = position.longitude;
+
+    // ⚡ Solo el marcador del CLIENTE va al set estático. El del trabajador se
+    // publica en _workerPos y lo dibuja el ValueListenableBuilder del mapa.
     setState(() {
-      positionActual = workerPos;
-      positionclient = clientPos;
-
-      latitude = position.latitude;
-      longitude = position.longitude;
-
-      /// MARCADOR WORKER
-      markers.add(
-        Marker(
-          markerId: const MarkerId("worker"),
-          position: workerPos,
-          infoWindow: const InfoWindow(title: "Tu ubicación"),
-          icon: markericon,
-        ),
-      );
-
-      /// MARCADOR CLIENTE
-      markers.add(
+      markers = {
         Marker(
           markerId: const MarkerId("client"),
           position: clientPos,
           infoWindow: const InfoWindow(title: "Cliente"),
           icon: workericon,
         ),
-      );
+      };
     });
+    _workerPos.value = workerPos;
 
     /// ajustar cámara para ver ambos puntos
     LatLngBounds bounds = LatLngBounds(
@@ -405,10 +419,12 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   Future<void> GetRoute() async {
+    if (positionclient == null) return;
+
     PolylinePoints polylinePoints = PolylinePoints(apiKey: _mapsKey);
 
     PolylineRequest request = PolylineRequest(
-      origin: PointLatLng(positionActual!.latitude, positionActual!.longitude),
+      origin: PointLatLng(positionActual.latitude, positionActual.longitude),
       destination: PointLatLng(
         positionclient!.latitude,
         positionclient!.longitude,
@@ -434,7 +450,7 @@ class _ExpressPageState extends State<ExpressPage>
   Future<void> createPolyline() async {
     polylines.add(
       Polyline(
-        polylineId: PolylineId("ruta"),
+        polylineId: const PolylineId("ruta"),
         points: polylineCoordinates,
         width: 5,
         color: colorsecundario,
@@ -443,15 +459,16 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   // Traer datos de ubicacion
-
-  Future<void> _GoMyLocation() async {
+  Future<void> _GoMyLocation({bool showLoader = true}) async {
     if (!mounted) return;
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => Indicador(),
-    );
+    if (showLoader) {
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => Indicador(),
+      );
+    }
 
     try {
       Position pos = await GeoLocationService.obtenerUbicacion(context);
@@ -462,18 +479,20 @@ class _ExpressPageState extends State<ExpressPage>
         positionActual = LatLng(pos.latitude, pos.longitude);
         _mapController?.animateCamera(
           CameraUpdate.newCameraPosition(
-            CameraPosition(target: positionActual!, zoom: 17),
+            CameraPosition(target: positionActual, zoom: 17),
           ),
         );
       });
-
+      
     } catch (e) {
-      print(e);
+      debugPrint('$e');
     }
 
+    // ⚡ GetStreet fuera de setState (es async, no muta estado sincrónicamente).
     await GetStreet();
+    GetRute();
     if (mounted) setState(() => loadig = false);
-    if (mounted) Navigator.pop(context);
+    if (showLoader && mounted) Navigator.pop(context);
   }
 
   Future<void> GetStreet() async {
@@ -529,13 +548,9 @@ class _ExpressPageState extends State<ExpressPage>
 
   Future<void> marker() async {
     final w = MediaQuery.of(context).size.width * .27;
-    const ImageConfiguration configuration = ImageConfiguration(
-      size: Size(80, 80),
-    );
-    
-    workericon = await getMarkerIcon("assets/marker.png",w.toInt());
 
-    markericon = await getMarkerIcon("assets/worker.png",w.toInt());
+    workericon = await getMarkerIcon("assets/marker.png", w.toInt());
+    markericon = await getMarkerIcon("assets/worker.png", w.toInt());
 
     if (mounted) {
       setState(() {
@@ -547,14 +562,16 @@ class _ExpressPageState extends State<ExpressPage>
 
   // Validacion inicial
   Future<void> _initial() async {
-        if (locationCache.hasPosicion) {
-          latitude = locationCache.latitud!;
-          longitude = locationCache.longitud!; 
-          setState(() {
-            positionActual = LatLng(latitude, longitude);
-            positionclient = LatLng(latitude, longitude);
-          });
-        }
+    if (locationCache.hasPosicion) {
+      latitude = locationCache.latitud!;
+      longitude = locationCache.longitud!;
+      setState(() {
+        positionActual = LatLng(latitude, longitude);
+        positionclient = LatLng(latitude, longitude);
+      });
+      _workerPos.value = LatLng(latitude, longitude);
+    }
+
     bool ok = await express.fetchServicioData(widget.express_id);
     if (!ok) {
       if (!mounted) return;
@@ -566,21 +583,23 @@ class _ExpressPageState extends State<ExpressPage>
           type: alert_type.error,
         );
       });
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
+      return;
     }
-     if (!mounted) return;
+    if (!mounted) return;
     setState(() {
       isMantenimiento = express.express[0].type_category == 1;
-      print('Es de mantenimiento $isMantenimiento');
-    });   
-    
-    await _GoMyLocation();
+    });
+
+    // ⚡ En el arranque NO bloqueamos con el diálogo modal: ya tenemos la
+    // posición del cache y GetRute vuelve a centrar con la real.
+    await _GoMyLocation(showLoader: false);
     await marker();
     await GetRute();
     _startTracking();
+
     if (!mounted) return;
-    setState(() {
-    });    
+    setState(() {});
   }
 
   // Fetchs de datos
@@ -605,14 +624,14 @@ class _ExpressPageState extends State<ExpressPage>
     }
     if (!mounted) return;
     setState(() {
-    isMantenimiento = express.express[0].type_category == 1;
-    print('Es de mantenimiento $isMantenimiento');
+      isMantenimiento = express.express[0].type_category == 1;
     });
     _startTracking();
   }
 
   void _Refresh() async {
-    if (express.express[0].images_evicence.isNotEmpty) {
+    if (express.express.isNotEmpty &&
+        express.express[0].images_evicence.isNotEmpty) {
       _stopTracking();
     }
     _onRefresh();
@@ -631,8 +650,37 @@ class _ExpressPageState extends State<ExpressPage>
         message: 'se cancelo el trabajo',
         type: alert_type.error,
       );
-      Navigator.pop(context);
+      if (mounted) Navigator.pop(context);
     });
+  }
+
+  void _startCountdown(DateTime expiresAt) {
+    _timer?.cancel();
+    _countdownExpiresAt = expiresAt;
+    _remaining = expiresAt.difference(DateTime.now());
+
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      final difference = expiresAt.difference(DateTime.now());
+
+      if (difference.isNegative) {
+        timer.cancel();
+        setState(() {
+          _remaining = Duration.zero;
+        });
+      } else {
+        setState(() {
+          _remaining = difference;
+        });
+      }
+    });
+  }
+
+  String _formatTime(Duration duration) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final d = duration.isNegative ? Duration.zero : duration;
+    return "${two(d.inHours)}:"
+        "${two(d.inMinutes.remainder(60))}:"
+        "${two(d.inSeconds.remainder(60))}";
   }
 
   // Funciones principales
@@ -647,7 +695,7 @@ class _ExpressPageState extends State<ExpressPage>
       );
       return;
     }
-    if (_diagnostic_cost == null && isMantenimiento== false) {
+    if (_diagnostic_cost == null && isMantenimiento == false) {
       Toast(
         context,
         title: 'Selecciona un precio a tu diagnostico',
@@ -672,7 +720,6 @@ class _ExpressPageState extends State<ExpressPage>
     if (mounted) Navigator.pop(context);
 
     if (result['success'] == true) {
-      final data = result['data'];
       if (!mounted) return;
       Toast(
         context,
@@ -709,7 +756,6 @@ class _ExpressPageState extends State<ExpressPage>
     if (mounted) Navigator.pop(context);
 
     if (result['success'] == true) {
-      final data = result['data'];
       Toast(
         context,
         title: "Trabajo Actualizado",
@@ -775,60 +821,6 @@ class _ExpressPageState extends State<ExpressPage>
     }
   }
 
-  // Imagenes
-  void _showFullImage(String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (_) {
-        return Dialog(
-          backgroundColor: Colors.black,
-          insetPadding: EdgeInsets.all(10),
-          child: GestureDetector(
-            onTap: () => Navigator.pop(context), // cerrar al tocar
-            child: InteractiveViewer(
-              panEnabled: true,
-              minScale: 0.5,
-              maxScale: 4,
-              child: CachedNetworkImage(
-                imageUrl: imageUrl,
-                fit: BoxFit.contain,
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _startCountdown(DateTime expiresAt) {
-    _timer?.cancel();
-    _countdownExpiresAt = expiresAt;
-    _remaining = expiresAt.difference(DateTime.now());
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      final difference = expiresAt.difference(DateTime.now());
-
-      if (difference.isNegative) {
-        timer.cancel();
-        setState(() {
-          _remaining = Duration.zero;
-        });
-      } else {
-        setState(() {
-          _remaining = difference;
-        });
-      }
-    });
-  }
-
-  String _formatTime(Duration duration) {
-    String two(int n) => n.toString().padLeft(2, '0');
-
-    return "${two(duration.inHours)}:"
-        "${two(duration.inMinutes.remainder(60))}:"
-        "${two(duration.inSeconds.remainder(60))}";
-  }
-
   @override
   Widget build(BuildContext context) {
     if (express.express.isEmpty) {
@@ -837,14 +829,15 @@ class _ExpressPageState extends State<ExpressPage>
         body: Indicador(),
       );
     }
+    final theme = Theme.of(context);
     return KeyboardDismisser(
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: theme.scaffoldBackgroundColor,
         body: Stack(
           children: [
-            // 🗺️ MAPA DE FONDO
-            Positioned.fill(child: _buildMap()),
+            // 🗺️ MAPA DE FONDO (aislado en su propio RepaintBoundary)
+            Positioned.fill(child: RepaintBoundary(child: _buildMap())),
 
             DraggableScrollableSheet(
               initialChildSize: 0.45,
@@ -856,13 +849,13 @@ class _ExpressPageState extends State<ExpressPage>
               builder: (context, scrollController) {
                 return Container(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).scaffoldBackgroundColor,
+                    color: theme.scaffoldBackgroundColor,
                     borderRadius: const BorderRadius.vertical(
                       top: Radius.circular(24),
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.25),
+                        color: Colors.black.withValues(alpha: 0.25),
                         blurRadius: 24,
                         offset: const Offset(0, -4),
                       ),
@@ -887,35 +880,51 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   Widget _buildMap() {
-    final h = MediaQuery.of(context).size.height;
+    final theme = Theme.of(context);
+    final mq = MediaQuery.of(context);
+    final h = mq.size.height;
 
     return Stack(
       children: [
         // ── Mapa ──────────────────────────────────────────────────────────
         SizedBox(
           height: h,
-          child: GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: positionActual,
-              zoom: 16,
-            ),
-            scrollGesturesEnabled: !isSearch,
-            rotateGesturesEnabled: true,
-            zoomGesturesEnabled: !isSearch,
-            tiltGesturesEnabled: !isactive,
-            onMapCreated: (controller) => _mapController = controller,
-            gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
-              Factory<OneSequenceGestureRecognizer>(
-                () => EagerGestureRecognizer(),
-              ),
+          child: ValueListenableBuilder<LatLng?>(
+            valueListenable: _workerPos,
+            builder: (context, worker, _) {
+              return GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: positionActual,
+                  zoom: 16,
+                ),
+                scrollGesturesEnabled: !isSearch,
+                rotateGesturesEnabled: true,
+                zoomGesturesEnabled: !isSearch,
+                tiltGesturesEnabled: !isactive,
+                onMapCreated: (controller) => _mapController = controller,
+                gestureRecognizers: <Factory<OneSequenceGestureRecognizer>>{
+                  Factory<OneSequenceGestureRecognizer>(
+                    () => EagerGestureRecognizer(),
+                  ),
+                },
+                polylines: polylines,
+                markers: {
+                  ...markers, // cliente (estático)
+                  if (worker != null)
+                    Marker(
+                      markerId: const MarkerId("worker"),
+                      position: worker,
+                      infoWindow: const InfoWindow(title: "Tu ubicación"),
+                      icon: markericon,
+                    ),
+                },
+              );
             },
-            polylines: polylines,
-            markers: markers,
           ),
         ),
-        
+
         Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
+          top: mq.padding.top + 12,
           left: 12,
           right: 12,
           child: Row(
@@ -928,15 +937,15 @@ class _ExpressPageState extends State<ExpressPage>
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .scaffoldBackgroundColor
-                        .withOpacity(0.92),
+                    color: theme.scaffoldBackgroundColor.withValues(
+                      alpha: 0.92,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     Icons.arrow_back_ios_new_rounded,
                     size: 17,
-                    color: Theme.of(context).colorScheme.surface,
+                    color: theme.colorScheme.surface,
                   ),
                 ),
               ),
@@ -945,11 +954,14 @@ class _ExpressPageState extends State<ExpressPage>
               // ── Tarjeta "Ubicación seleccionada" ──────────────
               Expanded(
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
-                    color: Theme.of(context)
-                        .scaffoldBackgroundColor
-                        .withOpacity(0.92),
+                    color: theme.scaffoldBackgroundColor.withValues(
+                      alpha: 0.92,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Column(
@@ -986,7 +998,7 @@ class _ExpressPageState extends State<ExpressPage>
                         style: GoogleFonts.poppins(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
-                          color: Theme.of(context).colorScheme.surface,
+                          color: theme.colorScheme.surface,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -996,10 +1008,9 @@ class _ExpressPageState extends State<ExpressPage>
                           "${distanceText} en ${durationText}",
                           style: GoogleFonts.poppins(
                             fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surface
-                                .withOpacity(0.5),
+                            color: theme.colorScheme.surface.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1016,21 +1027,21 @@ class _ExpressPageState extends State<ExpressPage>
                 children: [
                   // Ir a mi ubicación
                   GestureDetector(
-                    onTap: _GoMyLocation,
+                    onTap: () => _GoMyLocation(),
                     child: Container(
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
+                        color: theme.scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
+                            color: Colors.black.withValues(alpha: 0.15),
                             blurRadius: 8,
                           ),
                         ],
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.my_location_rounded,
                         color: colorsecundario,
                         size: 20,
@@ -1040,7 +1051,10 @@ class _ExpressPageState extends State<ExpressPage>
                   const SizedBox(height: 8),
 
                   // Estado GPS
-                  Gpsstatus(status: _StatusGps, is_active: _gpsid == express.express[0].express_id,),
+                  Gpsstatus(
+                    status: _StatusGps,
+                    is_active: _gpsid == express.express[0].express_id,
+                  ),
                   const SizedBox(height: 8),
 
                   // Ir a ubicación del cliente
@@ -1058,16 +1072,16 @@ class _ExpressPageState extends State<ExpressPage>
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
+                        color: theme.scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
+                            color: Colors.black.withValues(alpha: 0.15),
                             blurRadius: 8,
                           ),
                         ],
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.person_pin_circle_rounded,
                         color: Colors.deepOrange,
                         size: 20,
@@ -1092,12 +1106,12 @@ class _ExpressPageState extends State<ExpressPage>
                         borderRadius: BorderRadius.circular(12),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
+                            color: Colors.black.withValues(alpha: 0.15),
                             blurRadius: 8,
                           ),
                         ],
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.directions_rounded,
                         color: colorWhite,
                         size: 20,
@@ -1109,214 +1123,26 @@ class _ExpressPageState extends State<ExpressPage>
             ],
           ),
         ),
-
-        // Positioned(
-        //   top: MediaQuery.of(context).padding.top + 62,
-        //   right: 12,
-        //   child: Gpsstatus(status: _StatusGps), // 👈 una sola línea
-        // ),
-
-        // Positioned(
-        //   top: MediaQuery.of(context).padding.top + 12,
-        //   right: 12,
-        //   child: GestureDetector(
-        //     onTap: _GoMyLocation,
-        //     child: Container(
-        //       width: 42,
-        //       height: 42,
-        //       decoration: BoxDecoration(
-        //         color: Theme.of(context).scaffoldBackgroundColor,
-        //         borderRadius: BorderRadius.circular(12),
-        //         boxShadow: [
-        //           BoxShadow(
-        //             color: Colors.black.withOpacity(0.15),
-        //             blurRadius: 8,
-        //           ),
-        //         ],
-        //       ),
-        //       child: Icon(
-        //         Icons.my_location_rounded,
-        //         color: colorsecundario,
-        //         size: 20,
-        //       ),
-        //     ),
-        //   ),
-        // ),
-        // Positioned(
-        //   top: MediaQuery.of(context).padding.top + 160,
-        //   right: 12,
-        //   child: GestureDetector(
-        //     onTap: () {
-        //       abrirGoogleMaps(
-        //         express.express[0].latitude,
-        //         express.express[0].longitude,
-        //       );
-        //     },
-        //     child: Container(
-        //       width: 42,
-        //       height: 42,
-        //       decoration: BoxDecoration(
-        //         color: colorsecundario,
-        //         borderRadius: BorderRadius.circular(12),
-        //         boxShadow: [
-        //           BoxShadow(
-        //             color: Colors.black.withOpacity(0.15),
-        //             blurRadius: 8,
-        //           ),
-        //         ],
-        //       ),
-        //       child: Icon(
-        //         Icons.directions_rounded,
-        //         color: colorWhite,
-        //         size: 20,
-        //       ),
-        //     ),
-        //   ),
-        // ),
-        // Positioned(
-        //   top: MediaQuery.of(context).padding.top + 110,
-        //   right: 12,
-        //   child: GestureDetector(
-        //     onTap: () {
-        //       if (positionclient != null) {
-        //         _mapController?.animateCamera(
-        //           CameraUpdate.newCameraPosition(
-        //             CameraPosition(target: positionclient!, zoom: 17),
-        //           ),
-        //         );
-        //       }
-        //     },
-        //     child: Container(
-        //       width: 42,
-        //       height: 42,
-        //       decoration: BoxDecoration(
-        //         color: Theme.of(context).scaffoldBackgroundColor,
-        //         borderRadius: BorderRadius.circular(12),
-        //         boxShadow: [
-        //           BoxShadow(
-        //             color: Colors.black.withOpacity(0.15),
-        //             blurRadius: 8,
-        //           ),
-        //         ],
-        //       ),
-        //       child: Icon(
-        //         Icons.person_pin_circle_rounded,
-        //         color: Colors.deepOrange,
-        //         size: 20,
-        //       ),
-        //     ),
-        //   ),
-        // ),
-        // Positioned(
-        //   top: MediaQuery.of(context).padding.top + 12,
-        //   left: 12,
-        //   child: GestureDetector(
-        //     onTap: () => Navigator.pop(context),
-        //     child: Container(
-        //       width: 42,
-        //       height: 42,
-        //       decoration: BoxDecoration(
-        //         color: Theme.of(
-        //           context,
-        //         ).scaffoldBackgroundColor.withOpacity(0.92),
-        //         borderRadius: BorderRadius.circular(12),
-        //       ),
-        //       child: Icon(
-        //         Icons.arrow_back_ios_new_rounded,
-        //         size: 17,
-        //         color: Theme.of(context).colorScheme.surface,
-        //       ),
-        //     ),
-        //   ),
-        // ),
-        // if (street != null)
-        //   Positioned(
-        //     top: MediaQuery.of(context).padding.top + 12,
-        //     left: 65,
-        //     right: 64,
-        //     child: Container(
-        //       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        //       decoration: BoxDecoration(
-        //         color: Theme.of(
-        //           context,
-        //         ).scaffoldBackgroundColor.withOpacity(0.92),
-        //         borderRadius: BorderRadius.circular(12),
-        //       ),
-        //       child: Column(
-        //         crossAxisAlignment: CrossAxisAlignment.start,
-        //         children: [
-        //           Row(
-        //             children: [
-        //               Container(
-        //                 width: 8,
-        //                 height: 8,
-        //                 decoration: const BoxDecoration(
-        //                   color: colorsecundario,
-        //                   shape: BoxShape.circle,
-        //                 ),
-        //               ),
-        //               const SizedBox(width: 8),
-        //               Expanded(
-        //                 child: Text(
-        //                   'Ubicación seleccionada',
-        //                   style: GoogleFonts.poppins(
-        //                     fontSize: 11,
-        //                     fontWeight: FontWeight.w600,
-        //                     color: colorsecundario,
-        //                     letterSpacing: 0.3,
-        //                   ),
-        //                 ),
-        //               ),
-        //             ],
-        //           ),
-        //           const SizedBox(height: 6),
-        //           Text(
-        //             "${street} ${city} a ${express.express[0].maps_address}",
-        //             style: GoogleFonts.poppins(
-        //               fontSize: 12,
-        //               fontWeight: FontWeight.w500,
-        //               color: Theme.of(context).colorScheme.surface,
-        //             ),
-        //             maxLines: 1,
-        //             overflow: TextOverflow.ellipsis,
-        //           ),
-        //           if (state != null || city != null)
-        //             Text(
-        //               "${distanceText} en ${durationText}",
-        //               style: GoogleFonts.poppins(
-        //                 fontSize: 12,
-        //                 color: Theme.of(
-        //                   context,
-        //                 ).colorScheme.surface.withOpacity(0.5),
-        //               ),
-        //               maxLines: 1,
-        //               overflow: TextOverflow.ellipsis,
-        //             ),
-        //         ],
-        //       ),
-        //     ),
-        //   ).animate().fadeIn(delay: 300.ms).slideY(begin: -0.2),
-
-        // 🔥 RADAR EN EL MAPA — solo cuando isactive
       ],
     );
   }
 
   Widget _buildInformacion() {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(height: 20),
+          const SizedBox(height: 20),
           Center(
             child: Container(
               width: 40,
               height: 4,
               margin: const EdgeInsets.only(bottom: 16),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface.withOpacity(0.2),
+                color: theme.colorScheme.surface.withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1336,7 +1162,6 @@ class _ExpressPageState extends State<ExpressPage>
               .fade(duration: 450.ms, delay: 60.ms)
               .slideX(begin: -0.2),
           const SizedBox(height: 10),
-          
           _buildEvidence()
               .animate()
               .fade(duration: 450.ms, delay: 60.ms)
@@ -1394,7 +1219,9 @@ class _ExpressPageState extends State<ExpressPage>
               width: double.infinity,
               child: InfoChip(
                 icon: Icons.location_on_rounded,
-                label: (express.express[0].maps_address?.trim().isNotEmpty ?? false)
+                label:
+                    (express.express[0].maps_address?.trim().isNotEmpty ??
+                        false)
                     ? express.express[0].maps_address!
                     : 'Buscando ubicación...',
                 color: colorsecundario,
@@ -1415,7 +1242,6 @@ class _ExpressPageState extends State<ExpressPage>
               label: express.express[0].category.toUpperCase(),
               color: colorsecundario,
             ),
-          
           ],
         ),
       ],
@@ -1511,16 +1337,16 @@ class _ExpressPageState extends State<ExpressPage>
           ),
         ],
         const SizedBox(height: 10),
-        InfoCard(
+        const InfoCard(
           icon: Icons.info_outline,
           text:
               'El precio mostrado corresponde a la mano de obra y de ir al domicilio; el costo final puede variar según los materiales necesarios.',
         ),
         if (express.express[0].job_status != 'pending') ...[
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           _buildPriceBreakdown(),
         ],
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         _buildPaymentMethodCard(),
       ],
     );
@@ -1702,10 +1528,8 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   void _showofferSheet() {
-    // Estado local del sheet: índice del chip seleccionado
     int? selectedChipIndex;
 
-    // Multiplicadores y su valor base
     final basePrice = express.express[0].worker_price;
     final methodpayment = express.express[0].payment_method;
     final multipliers = [1.10, 1.20, 2, 3];
@@ -1717,6 +1541,7 @@ class _ExpressPageState extends State<ExpressPage>
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setModalState) {
+            final surface = Theme.of(context).colorScheme.surface;
             return Padding(
               padding: EdgeInsets.only(
                 bottom: MediaQuery.of(context).viewInsets.bottom,
@@ -1737,106 +1562,116 @@ class _ExpressPageState extends State<ExpressPage>
                       ),
                     ],
                   ),
-                  child:Form(
+                  child: Form(
                     key: _formKey,
                     child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          margin: const EdgeInsets.only(bottom: 8),
-                          decoration: BoxDecoration(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surface.withValues(alpha: 0.18),
-                            borderRadius: BorderRadius.circular(2),
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                       FieldLabelDescription(label: 'Enviar propuesta' , value: 'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',),
-                      
-                      const SizedBox(height: 24),
-                      if(isMantenimiento == false)...[
-                      Text(
-                        'Tarifa de visita y diagnóstico',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.6),
+                        const SizedBox(height: 16),
+                        const FieldLabelDescription(
+                          label: 'Enviar propuesta',
+                          value:
+                              'El cliente puede aceptar o rechazar tu propuesta antes de comenzar.',
                         ),
-                      ),
-                      const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: List.generate(multipliers.length, (index) {
-                            final value = basePrice * multipliers[index];
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                right: index == multipliers.length - 1 ? 0 : 10,
-                              ),
-                              child: PaymentChip(
-                                value: value,
-                                label: '\$${value.toStringAsFixed(0)}',
-                                icon: Icons.attach_money_rounded,
-                                isSelected: selectedChipIndex == index,
-                                onTap: () => setModalState(() {
-                                  _diagnostic_cost = value;
-                                  selectedChipIndex = index;
-                                }),
-                              ),
-                            );
-                          }),
+                        const SizedBox(height: 24),
+                        if (isMantenimiento == false) ...[
+                          Text(
+                            'Tarifa de visita y diagnóstico',
+                            style: GoogleFonts.poppins(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: surface.withValues(alpha: 0.6),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: List.generate(multipliers.length, (
+                                index,
+                              ) {
+                                final value = basePrice * multipliers[index];
+                                return Padding(
+                                  padding: EdgeInsets.only(
+                                    right: index == multipliers.length - 1
+                                        ? 0
+                                        : 10,
+                                  ),
+                                  child: PaymentChip(
+                                    value: value,
+                                    label: '\$${value.toStringAsFixed(0)}',
+                                    icon: Icons.attach_money_rounded,
+                                    isSelected: selectedChipIndex == index,
+                                    onTap: () => setModalState(() {
+                                      _diagnostic_cost = value;
+                                      selectedChipIndex = index;
+                                    }),
+                                  ),
+                                );
+                              }),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+                        Text(
+                          'Tarifa de mano de obra',
+                          style: GoogleFonts.poppins(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: surface.withValues(alpha: 0.6),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
+                        const SizedBox(height: 12),
+                        CustomTextFormFieldPrice(
+                          controller: _priceController,
+                          label: '\$ 0.00',
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Ingresa el precio';
+                            }
+
+                            final price = double.tryParse(value);
+                            if (price == null || price <= 0) {
+                              return 'Ingresa un precio válido';
+                            }
+
+                            if(price < 50) {
+                              return 'El precio debe ser mayor o igual a \$50';
+                            }
+
+                            final minimumPrice = methodpayment == 'cash'
+                                ? 2000
+                                : 150000;
+
+                            if (price > minimumPrice) {
+                              return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
+                            }
+
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 24),
+                        Button(
+                          text: 'Enviar propuesta',
+                          icon: Icons.send_rounded,
+                          bgColor: colorsecundario,
+                          action: _Send,
+                        ),
                       ],
-                      Text(
-                        'Tarifa de mano de obra',
-                        style: GoogleFonts.poppins(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withValues(alpha: 0.6),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      CustomTextFormFieldPrice(
-                        controller: _priceController,
-                        label: '\$ 0.00',
-                        validator: (value) {
-                         if (value == null || value.isEmpty) {
-                            return 'Ingresa el precio';
-                          }
-
-                          final price = double.tryParse(value);
-
-                          if (price == null || price <= 0) {
-                            return 'Ingresa un precio válido';
-                          }
-
-                          final minimumPrice = methodpayment == 'cash' ? 2000 : 5000;
-
-                          if (price > minimumPrice || price < 30) {
-                            return 'El precio debe ser menor o igual a \$${minimumPrice.toStringAsFixed(0)}';
-                          }
-
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      Button(text: 'Enviar propuesta', icon: Icons.send_rounded, bgColor: colorsecundario, action: _Send)
-                      
-                    ],
+                    ),
                   ),
-                 )
                 ),
               ),
             );
@@ -1907,7 +1742,6 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   void _showcancelSheet() {
-    // 👇 Opciones de motivo de cancelación
     const List<String> motivos = [
       'No puedo acudir al servicio',
       'Tuve una emergencia personal',
@@ -1916,8 +1750,6 @@ class _ExpressPageState extends State<ExpressPage>
       'No cuento con las herramientas necesarias',
       'Surgió un imprevisto',
     ];
-
-    // 👇 Motivo seleccionado (null = ninguno → botón deshabilitado)
 
     showModalBottomSheet(
       context: context,
@@ -1934,83 +1766,83 @@ class _ExpressPageState extends State<ExpressPage>
             return Padding(
               padding: EdgeInsets.only(bottom: mq.viewInsets.bottom),
               child: KeyboardDismisser(
-                child:  Container(
-                      width: double.infinity,
-                      padding: EdgeInsets.fromLTRB(
-                        isCompact ? 16 : 24,
-                        8,
-                        isCompact ? 16 : 24,
-                        mq.padding.bottom + 20,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(
+                    isCompact ? 16 : 24,
+                    8,
+                    isCompact ? 16 : 24,
+                    mq.padding.bottom + 20,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
                       ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).scaffoldBackgroundColor,
-                        borderRadius: const BorderRadius.vertical(
-                          top: Radius.circular(24),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 20),
+                          decoration: BoxDecoration(
+                            color: surface.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
-                            blurRadius: 24,
-                            offset: const Offset(0, -4),
-                          ),
-                        ],
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Handle bar centrado
-                          Center(
-                            child: Container(
-                              width: 36,
-                              height: 4,
-                              margin: const EdgeInsets.only(bottom: 20),
-                              decoration: BoxDecoration(
-                                color: surface.withOpacity(0.3),
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          FieldLabelDescription(label:'¿Por qué cancelas el servicio?' , value: 'Selecciona un motivo para continuar',),
-                          const SizedBox(height: 20),
-
-                          // 👇 Lista de opciones seleccionables (con scroll propio
-                          // para no desbordar en pantallas pequeñas)
-                          Flexible(
-                            child: SingleChildScrollView(
-                              child: Column(
-                                children: motivos.map((motivo) {
-                                  final bool seleccionado = motivoSeleccionado == motivo;
-                                  
-                                  return OptionsButton(
-                                    motivo: motivo, 
-                                    seleccionado: 
-                                    seleccionado,
-                                    action: () {
-                                      setModalState(() {
-                                        motivoSeleccionado = motivo;
-                                      });
-                                    }
-                                  );
-                                }).toList(),
-                            )
-                        )
-                      
+                      const SizedBox(height: 8),
+                      const FieldLabelDescription(
+                        label: '¿Por qué cancelas el servicio?',
+                        value: 'Selecciona un motivo para continuar',
                       ),
+                      const SizedBox(height: 20),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            children: motivos.map((motivo) {
+                              final bool seleccionado =
+                                  motivoSeleccionado == motivo;
 
-                          const SizedBox(height: 22),
-                          Button(text: 'Cancelar servicio', icon: Icons.send, bgColor: colorsecundario, action:  habilitado
+                              return OptionsButton(
+                                motivo: motivo,
+                                seleccionado: seleccionado,
+                                action: () {
+                                  setModalState(() {
+                                    motivoSeleccionado = motivo;
+                                  });
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      Button(
+                        text: 'Cancelar servicio',
+                        icon: Icons.send,
+                        bgColor: colorsecundario,
+                        action: habilitado
                             ? () {
                                 _Cancelar();
                               }
-                            : null,),
-                          // 👇 Botón: habilitado solo si hay motivo seleccionado
-                          
-                        ],
+                            : null,
                       ),
-                    ),
+                    ],
                   ),
+                ),
+              ),
             );
           },
         );
