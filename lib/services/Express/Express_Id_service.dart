@@ -34,6 +34,7 @@ class Express {
   String client_id;
   String category;
   int type_category;
+  bool is_blocked;
   // client
   String client_first_name;
   String client_username;
@@ -64,6 +65,7 @@ class Express {
   // images
   String? image;
   List<DetailsModel> listdetails;
+  String created_at;
 
   Express({
     required this.express_id,
@@ -71,6 +73,7 @@ class Express {
     required this.client_first_name,
     required this.client_username,
     required this.client_image,
+    required this.is_blocked,
     required this.category,
     required this.type_category,
     required this.maps_address,
@@ -94,7 +97,8 @@ class Express {
     required this.images_evicence,
     this.image,
     required this.express_proposal,
-    required this.listdetails
+    required this.listdetails,
+    required this.created_at,
   });
 
   factory Express.fromJson(Map<String, dynamic> json) {
@@ -103,6 +107,7 @@ class Express {
       client_id: json['client_id'] ?? '',
       category: json['category']? ['name']?? '',
       type_category : json['category'] ? ['type_id'] ?? 0,
+      is_blocked : json['is_blocked'] ?? false,
       // client
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',
@@ -137,6 +142,7 @@ class Express {
         .map((e) => DetailsModel.fromJson(e))
         .toList(),
       image: json['image'],
+      created_at: json['created_at'] ?? '',
 
     );
   }

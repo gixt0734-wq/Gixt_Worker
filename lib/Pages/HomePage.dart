@@ -69,7 +69,7 @@ class _HomePageState extends State<HomePage> {
   bool timeout = false;
   bool hayNotificacion = false;
   bool? isworking = false;
-  
+
   void initState() {
     super.initState();
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -135,7 +135,7 @@ class _HomePageState extends State<HomePage> {
     });
     bool okData = await categorias.fetchCategoriasData();
     bool okEx = await express.fetchFromApi();
-    bool okjob =  await api.fetchFromApi();
+    bool okjob = await api.fetchFromApi();
     if (!mounted) return;
     setState(() {
       isLoading = false;
@@ -185,7 +185,6 @@ class _HomePageState extends State<HomePage> {
         });
       }
     }
-
 
     Position pos = await GeoLocationService.obtenerUbicacion(context);
     latitude = pos.latitude;
@@ -467,7 +466,8 @@ class _HomePageState extends State<HomePage> {
     final List<Agenda> filtrados = jobs.agenda.where((a) {
       return a.job_status == 'in_progress' ||
           a.job_status == 'going' ||
-          a.job_status == 'arrived'|| a.job_status == 'accepted' && a.type == 'express';
+          a.job_status == 'arrived' ||
+          a.job_status == 'accepted' && a.type == 'express';
     }).toList();
 
     if (filtrados.isEmpty && !isLoading) {
@@ -742,38 +742,49 @@ class _HomePageState extends State<HomePage> {
               j.job_status == 'arrived',
         )
         .length;
-    final activeExpress = api.catalog
-        .length;
+    final activeExpress = api.catalog.length;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 15),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
-      Row(
-        children: [
-          _statCard(
-            Icons.work_rounded,
-            activeJobs.toString(),
-            'En Curso',
-            Colors.orange,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _statCard(
+                Icons.work_rounded,
+                activeJobs.toString(),
+                'En Curso',
+                Colors.orange,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AppBottomNavigation(index: 2),
+                      ),
+                    );
+                  },
+                  child: _statCard(
+                    Icons.person_add_alt_1_rounded,
+                    activeExpress.toString(),
+                    'Nuevos',
+                    colorsecundario,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          _statCard(
-            Icons.person_add_alt_1_rounded,
-            activeExpress.toString(),
-            'Nuevos',
-            colorsecundario,
-          ),
-        ],
-      ),
           if (isworking == false) ...[
             const SizedBox(height: 12),
             _restModeCard(),
           ],
-        ]
-      )
+        ],
+      ),
     ).animate().fade(duration: 350.ms).slideY(begin: 0.1);
   }
 

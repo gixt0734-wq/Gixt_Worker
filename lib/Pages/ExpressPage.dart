@@ -15,7 +15,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
 import 'package:gixt_worker/Components/Job/ActionsButton.dart';
+import 'package:gixt_worker/Components/Job/ArrivalTimer.dart';
 import 'package:gixt_worker/Components/Job/BarStatus.dart';
+import 'package:gixt_worker/Components/Job/Blocked.dart';
 import 'package:gixt_worker/Components/Job/Button.dart';
 import 'package:gixt_worker/Components/Job/Client.dart';
 import 'package:gixt_worker/Components/Job/DetailField.dart';
@@ -144,6 +146,7 @@ class _ExpressPageState extends State<ExpressPage>
     _positionStreamSubscription?.cancel();
     _statusSub?.cancel();
     _timer?.cancel();
+    _timercancel?.cancel();
 
     _markerAnimController?.removeListener(_onMarkerTick);
     _markerAnimController?.stop();
@@ -233,12 +236,16 @@ class _ExpressPageState extends State<ExpressPage>
   String? colonia;
   String distanceText = "";
   String durationText = "";
+  int durationMinutess = 0;
   bool isMantenimiento = false;
 
   Timer? _timer;
+  Timer? _timercancel;
   // ⚡ El contador vive en un ValueNotifier: NO llama setState cada segundo.
   Duration _remaining = Duration.zero;
+  Duration _remainingCancel = Duration.zero;
   DateTime? _countdownExpiresAt;
+  DateTime? _countdownExpiresAtCancel;
 
   // Estados de express
   bool isLoading = false;
@@ -338,31 +345,130 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   Future<void> getDistanceAndTime() async {
-    if (positionclient == null) return;
-    final String url =
-        "https://maps.googleapis.com/maps/api/distancematrix/json"
-        "?origins=${positionActual.latitude},${positionActual.longitude}"
-        "&destinations=${positionclient!.latitude},${positionclient!.longitude}"
-        "&mode=driving"
-        "&key=$_mapsKey";
+    if (positionclient == null) {
+      print('❌ positionclient es null');
+      return;
+    }
 
-    final response = await http.get(Uri.parse(url));
+    const String url =
+        'https://routes.googleapis.com/directions/v2:computeRoutes';
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final element = data["rows"][0]["elements"][0];
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _mapsKey,
+          'X-Goog-FieldMask':
+              'routes.distanceMeters,routes.duration',
+        },
+        body: jsonEncode({
+          'origin': {
+            'location': {
+              'latLng': {
+                'latitude': positionActual.latitude,
+                'longitude': positionActual.longitude,
+              },
+            },
+          },
+          'destination': {
+            'location': {
+              'latLng': {
+                'latitude': positionclient!.latitude,
+                'longitude': positionclient!.longitude,
+              },
+            },
+          },
+          'travelMode': 'DRIVE',
+          'routingPreference': 'TRAFFIC_AWARE',
+        }),
+      );
 
-      String distance = element["distance"]["text"]; // km
-      String duration = element["duration"]["text"]; // tiempo
+      print('════════ ROUTES API ════════');
+      print('Status: ${response.statusCode}');
+      print('Body: ${response.body}');
+      print('════════════════════════════');
+
+      if (response.statusCode != 200) {
+        print('❌ Error de Google Routes API');
+        return;
+      }
+
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      final routes = data['routes'];
+
+      if (routes == null || routes is! List || routes.isEmpty) {
+        print('❌ Google no encontró ninguna ruta.');
+        return;
+      }
+
+      final route = routes.first as Map<String, dynamic>;
+
+      print('Route: $route');
+
+      // ─────────────────────────────
+      // DISTANCIA
+      // ─────────────────────────────
+
+      final dynamic distanceValue = route['distanceMeters'];
+
+      if (distanceValue == null) {
+        print('❌ distanceMeters llegó null');
+        return;
+      }
+
+      final double distanceMeters =
+          (distanceValue as num).toDouble();
+
+      final double distanceKm =
+          distanceMeters / 1000.0;
+
+      // ─────────────────────────────
+      // DURACIÓN
+      // ─────────────────────────────
+
+      final String? durationString =
+          route['duration']?.toString();
+
+      if (durationString == null) {
+        print('❌ duration llegó null');
+        return;
+      }
+
+      final double durationSeconds =
+          double.tryParse(
+                durationString.replaceAll('s', ''),
+              ) ??
+              0;
+
+      final int durationMinutes =
+          (durationSeconds / 60).ceil();
+
+      // ─────────────────────────────
+      // UI
+      // ─────────────────────────────
 
       if (!mounted) return;
+
       setState(() {
-        distanceText = distance;
-        durationText = duration;
+        distanceText =
+            '${distanceKm.toStringAsFixed(1)} km';
+
+        durationText =
+            '$durationMinutes min';
+        durationMinutess = durationMinutes;
       });
+
+      print('📍 Distancia: $distanceKm km');
+      print('⏱ Tiempo: $durationMinutes min');
+    } catch (e, stackTrace) {
+      print('❌ Error calculando distancia: $e');
+      print(stackTrace);
     }
   }
-
+    
   Future<void> GetRute() async {
     if (express.express.isEmpty) return;
 
@@ -483,7 +589,6 @@ class _ExpressPageState extends State<ExpressPage>
           ),
         );
       });
-      
     } catch (e) {
       debugPrint('$e');
     }
@@ -590,7 +695,7 @@ class _ExpressPageState extends State<ExpressPage>
     setState(() {
       isMantenimiento = express.express[0].type_category == 1;
     });
-
+    _syncCancelCount();
     // ⚡ En el arranque NO bloqueamos con el diálogo modal: ya tenemos la
     // posición del cache y GetRute vuelve a centrar con la real.
     await _GoMyLocation(showLoader: false);
@@ -626,6 +731,7 @@ class _ExpressPageState extends State<ExpressPage>
     setState(() {
       isMantenimiento = express.express[0].type_category == 1;
     });
+    _syncCancelCount();
     _startTracking();
   }
 
@@ -821,6 +927,125 @@ class _ExpressPageState extends State<ExpressPage>
     }
   }
 
+   Future<void> InitCountCancel() async {
+    // ⚠️ ANTES: `express.express[0].created_at` sin validar la lista, y un
+    // `else { Send(); }` que reenviaba la alerta cada vez que se volvía a
+    // llamar con el mismo express (al reabrir la pantalla, por ejemplo).
+    if (express.express.isEmpty) {
+      print(
+        '⚠️ InitCount: aún no hay datos del express, no se inicia el contador',
+      );
+      return;
+    }
+
+    final createdAt = DateTime.parse(express.express[0].created_at);
+    final expiresAt = createdAt.add(
+      Duration(minutes: durationMinutess + 40),
+    );
+    _timercancel?.cancel();
+    _countdownExpiresAtCancel = expiresAt;
+    if (mounted) {
+      setState(() {
+      _remainingCancel = expiresAt.difference(DateTime.now());
+      });
+    }
+
+    _timercancel = Timer.periodic(const Duration(seconds: 1), (timerc) {
+      // La pantalla ya no existe: el timer se apaga solo en vez de llamar a
+      // setState()/Toast() sobre un widget desmontado.
+      if (!mounted) {
+        timerc.cancel();
+        return;
+      }
+
+      final difference = expiresAt.difference(DateTime.now());
+
+      if (difference.isNegative) {
+        timerc.cancel();
+        _countdownExpiresAtCancel = null;
+        setState(() {
+          _remainingCancel = Duration.zero;
+        });
+        Toast(
+          context,
+          title: "Tiempo de Express excedido",
+          message: "El tiempo límite ha finalizado Y NO AS LLEGADO AL DOMICILIO. Cancelando el trabajo.",
+          type: alert_type.advertencia,
+        );
+        _CancelarOftime();
+      } else {
+        setState(() {
+          _remainingCancel = difference;
+        });
+      }
+    });
+  }
+
+  void CancelCount() {
+    _timercancel?.cancel();
+    _timercancel = null;
+    if (!mounted) {
+      _countdownExpiresAtCancel = null;
+      return;
+    }
+    setState(() {
+      _countdownExpiresAtCancel = null;
+      _remainingCancel = Duration.zero;
+    });
+  }
+
+  // El contador de llegada solo corre mientras el express está en 'accepted'
+  // o 'going'. Se llama después de cada fetch para que el estado del servidor
+  // decida si se inicia o se detiene.
+  void _syncCancelCount() {
+    if (express.express.isEmpty) return;
+    final s = express.express[0].job_status;
+    if (s == 'accepted' || s == 'going') {
+      InitCountCancel();
+    } else {
+      CancelCount();
+    }
+  }
+
+  Future<void> _CancelarOftime() async {
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => Indicador(),
+    );
+
+    final result = await CancelExpressService.CancelExpress(
+      express_id: widget.express_id,
+      reason: "tiempo de express exedido",
+    );
+
+    if (mounted) Navigator.pop(context);
+    if (result['success'] == true) {
+      if (!mounted) return;
+        await _stopTracking();
+        await _positionStreamSubscription?.cancel();
+
+      homeNotifier.refresh();
+      setState(() {
+        isactive = false;
+        isaccept = false;
+        isSearch = false;
+        polylineCoordinates.clear();
+      });
+      CancelCount();
+      if (mounted) Navigator.pop(context);
+    } else {
+      Toast(
+        context,
+        title: "Error",
+        message: result['message'],
+        type: alert_type.error,
+      );
+    }
+  }
+
+
   @override
   Widget build(BuildContext context) {
     if (express.express.isEmpty) {
@@ -828,6 +1053,9 @@ class _ExpressPageState extends State<ExpressPage>
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Indicador(),
       );
+    }
+    if (express.express[0].is_blocked) {
+      return Blocked();
     }
     final theme = Theme.of(context);
     return KeyboardDismisser(
@@ -878,6 +1106,8 @@ class _ExpressPageState extends State<ExpressPage>
       ),
     );
   }
+
+ 
 
   Widget _buildMap() {
     final theme = Theme.of(context);
@@ -953,7 +1183,8 @@ class _ExpressPageState extends State<ExpressPage>
 
               // ── Tarjeta "Ubicación seleccionada" ──────────────
               Expanded(
-                child: Container(
+                child:  
+                                                   Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
@@ -1018,6 +1249,9 @@ class _ExpressPageState extends State<ExpressPage>
                     ],
                   ),
                 ),
+
+
+              
               ),
               const SizedBox(width: 8),
 
@@ -1205,6 +1439,14 @@ class _ExpressPageState extends State<ExpressPage>
           ),
         ),
         const SizedBox(height: 16),
+        if (_countdownExpiresAtCancel != null) ...[
+          ArrivalTimer(
+            timeRemaining: _remainingCancel,
+            expiresAt: _countdownExpiresAtCancel,
+            times: durationMinutess + 40
+          ).animate().fade(duration: 450.ms, delay: 60.ms).slideX(begin: -0.2),
+          const SizedBox(height: 16),
+        ],
         Barstatus(
           estadoTrabajo: express.express[0].job_status.isEmpty
               ? ''
@@ -1382,7 +1624,8 @@ class _ExpressPageState extends State<ExpressPage>
         // _Send();
         _showofferSheet();
         return;
-      } else if (express.express[0].job_status != 'in_progress') {
+      }
+      else if (express.express[0].job_status != 'in_progress') {
         await _Update(express.express[0].job_status);
         _startTracking();
       } else if (express.express[0].job_status == 'in_progress') {
@@ -1457,15 +1700,12 @@ class _ExpressPageState extends State<ExpressPage>
         break;
 
       case 'arrived':
-        icon =  isMantenimiento ?  Icons.home_repair_service :Icons.search;
-        text = isMantenimiento ? 'Empezar' :'Iniciar diagnóstico' ;
+        icon = isMantenimiento ? Icons.home_repair_service : Icons.search;
+        text = isMantenimiento ? 'Empezar' : 'Iniciar diagnóstico';
         action = () {
-          if(isMantenimiento == true)
-          {
+          if (isMantenimiento == true) {
             _Update(express.express[0].job_status);
-          }
-          else
-          {
+          } else {
             _startTracking();
             Navigator.push(
               context,
@@ -1647,7 +1887,7 @@ class _ExpressPageState extends State<ExpressPage>
                               return 'Ingresa un precio válido';
                             }
 
-                            if(price < 50) {
+                            if (price < 50) {
                               return 'El precio debe ser mayor o igual a \$50';
                             }
 

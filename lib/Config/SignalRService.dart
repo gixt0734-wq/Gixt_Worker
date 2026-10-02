@@ -112,6 +112,10 @@ class SignalRService {
         _ocultarErrorPage(); // reconecto -> quitamos el mensaje
         _startMonitor(); // vigila futuras caidas
 
+        // Lo que llego mientras estabamos caidos se perdio (SignalR no
+        // guarda mensajes) -> recargamos estatus para ponernos al dia.
+        refrescarTodoEstatus();
+
         _conectando = false;
         return;
       } catch (e) {
@@ -142,15 +146,27 @@ class SignalRService {
         final Map<String, dynamic> jsonResponse =
             Map<String, dynamic>.from(arguments[0] as Map);
 
+        final Map<String, dynamic> data = jsonResponse['data'] is Map
+            ? Map<String, dynamic>.from(jsonResponse['data'] as Map)
+            : {};
+
         final context = NavigationService.navigatorKey.currentContext;
-        if (context == null) return;
+        if (context == null) {
+          // Sin contexto no hay dialogos, pero el estatus si se refresca.
+          programarRefreshEstatus(data['type']?.toString());
+          return;
+        }
 
-        await LocalNotificationService.showNotification(
-          title: jsonResponse['title']?.toString() ?? 'Notificación',
-          body: jsonResponse['body']?.toString() ?? '',
-        );
+        handleNotification(context, data, jsonResponse);
 
-        handleNotification(context, jsonResponse['data'], jsonResponse);
+        try {
+          await LocalNotificationService.showNotification(
+            title: jsonResponse['title']?.toString() ?? 'Notificación',
+            body: jsonResponse['body']?.toString() ?? '',
+          );
+        } catch (e) {
+          print("❌ Error mostrando notificación local: $e");
+        }
       } catch (e) {
         print("❌ Error parsing notification: $e");
       }

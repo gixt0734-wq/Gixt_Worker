@@ -16,6 +16,7 @@ class Job {
   String client_id;
   String category;
   int type_category;
+  bool is_blocked;
 
   // client
   String client_first_name;
@@ -52,6 +53,7 @@ class Job {
     required this.job_id,
     required this.client_id,
     required this.category,
+    required this.is_blocked,
     required this.type_category,
     required this.client_first_name,
     required this.client_username,
@@ -86,7 +88,7 @@ class Job {
     return Job(
       job_id: json['job_id'] ?? '',
       client_id: json['client_id'] ?? '',
-
+      is_blocked : json['is_blocked'] ?? false,
       // client
       client_first_name: json['client']?['first_name'] ?? '',
       client_username: json['client']?['username'] ?? '',

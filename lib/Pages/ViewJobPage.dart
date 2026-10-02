@@ -18,6 +18,7 @@ import 'package:gixt_worker/Components/ActionAlert%20.dart';
 import 'package:gixt_worker/Components/GpsStatus.dart';
 import 'package:gixt_worker/Components/Job/ActionsButton.dart';
 import 'package:gixt_worker/Components/Job/BarStatus.dart';
+import 'package:gixt_worker/Components/Job/Blocked.dart';
 import 'package:gixt_worker/Components/Job/Button.dart';
 import 'package:gixt_worker/Components/Job/Client.dart';
 import 'package:gixt_worker/Components/Job/DetailField.dart';
@@ -325,30 +326,116 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   Future<void> getDistanceAndTime() async {
-    if (positionclient == null) return;
-    final String url =
-        "https://maps.googleapis.com/maps/api/distancematrix/json"
-        "?origins=${positionActual!.latitude},${positionActual!.longitude}"
-        "&destinations=${positionclient!.latitude},${positionclient!.longitude}"
-        "&mode=driving"
-        "&key=$_mapsKey";
+    if (positionclient == null) {
+      print('❌ positionclient es null');
+      return;
+    }
 
-    final response = await http.get(Uri.parse(url));
+    const String url =
+        'https://routes.googleapis.com/directions/v2:computeRoutes';
 
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
+    try {
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _mapsKey,
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
+        },
+        body: jsonEncode({
+          'origin': {
+            'location': {
+              'latLng': {
+                'latitude': positionActual.latitude,
+                'longitude': positionActual.longitude,
+              },
+            },
+          },
+          'destination': {
+            'location': {
+              'latLng': {
+                'latitude': positionclient!.latitude,
+                'longitude': positionclient!.longitude,
+              },
+            },
+          },
+          'travelMode': 'DRIVE',
+          'routingPreference': 'TRAFFIC_AWARE',
+        }),
+      );
 
-      final element = data["rows"][0]["elements"][0];
+      print('════════ ROUTES API ════════');
+      print('Status: ${response.statusCode}');
+      print('Body: ${response.body}');
+      print('════════════════════════════');
 
-      String distance = element["distance"]["text"]; // km
-      String duration = element["duration"]["text"]; // tiempo
+      if (response.statusCode != 200) {
+        print('❌ Error de Google Routes API');
+        return;
+      }
+
+      final Map<String, dynamic> data =
+          jsonDecode(response.body) as Map<String, dynamic>;
+
+      final routes = data['routes'];
+
+      if (routes == null || routes is! List || routes.isEmpty) {
+        print('❌ Google no encontró ninguna ruta.');
+        return;
+      }
+
+      final route = routes.first as Map<String, dynamic>;
+
+      print('Route: $route');
+
+      // ─────────────────────────────
+      // DISTANCIA
+      // ─────────────────────────────
+
+      final dynamic distanceValue = route['distanceMeters'];
+
+      if (distanceValue == null) {
+        print('❌ distanceMeters llegó null');
+        return;
+      }
+
+      final double distanceMeters = (distanceValue as num).toDouble();
+
+      final double distanceKm = distanceMeters / 1000.0;
+
+      // ─────────────────────────────
+      // DURACIÓN
+      // ─────────────────────────────
+
+      final String? durationString = route['duration']?.toString();
+
+      if (durationString == null) {
+        print('❌ duration llegó null');
+        return;
+      }
+
+      final double durationSeconds =
+          double.tryParse(durationString.replaceAll('s', '')) ?? 0;
+
+      final int durationMinutes = (durationSeconds / 60).ceil();
+
+      // ─────────────────────────────
+      // UI
+      // ─────────────────────────────
 
       if (!mounted) return;
 
       setState(() {
-        distanceText = distance;
-        durationText = duration;
+        distanceText = '${distanceKm.toStringAsFixed(1)} km';
+
+        durationText = '$durationMinutes min';
       });
+
+      print('📍 Distancia: $distanceKm km');
+      print('⏱ Tiempo: $durationMinutes min');
+    } catch (e, stackTrace) {
+      print('❌ Error calculando distancia: $e');
+      print(stackTrace);
     }
   }
 
@@ -625,7 +712,7 @@ class _ViewJobPageState extends State<ViewJobPage>
   }
 
   void _Refresh() async {
-    if (job.job[0].images_evicence.isNotEmpty) {
+    if (job.job.isNotEmpty && job.job[0].images_evicence.isNotEmpty) {
       _stopTracking();
     }
     _onRefresh();
@@ -805,6 +892,9 @@ class _ViewJobPageState extends State<ViewJobPage>
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: Indicador(),
       );
+    }
+    if (job.job[0].is_blocked) {
+      return Blocked();
     }
     return KeyboardDismisser(
       child: Scaffold(
