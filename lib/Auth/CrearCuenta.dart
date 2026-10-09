@@ -398,6 +398,18 @@ class _CrearcuentaState extends State<Crearcuenta> {
             ).animate()
               .fadeIn(duration: 700.ms, curve: Curves.easeOut)
               .slideY(begin: 0.06, end: 0, duration: 800.ms, curve: Curves.easeOutCubic),
+               // Botón regresar
+            Positioned(
+              top: MediaQuery.of(context).padding.top,
+              left: 0,
+              child: IconButton(
+                icon: const Icon(Icons.arrow_back),
+                color: Theme.of(context).colorScheme.surface,
+                onPressed: () {
+                  salir();
+                },
+              ),
+            ).animate().fadeIn(duration: 500.ms, curve: Curves.easeOut),
           ],
         ),
       );

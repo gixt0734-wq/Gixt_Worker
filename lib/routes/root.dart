@@ -9,15 +9,16 @@ import 'package:keyboard_dismisser/keyboard_dismisser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shimmer/shimmer.dart';
 
-class RootPage extends StatefulWidget  {
-  const RootPage({super.key});
-
+class RootPage extends StatefulWidget {
+  const RootPage({super.key, this.tuto = false});
+  final bool tuto ;
   @override
   State<RootPage> createState() => _RootPageState();
 }
 
 class _RootPageState extends State<RootPage> with WidgetsBindingObserver {
   int _backPressedCount = 0;
+
 
   @override
   void initState() {
@@ -31,9 +32,9 @@ class _RootPageState extends State<RootPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  @override
+@override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    print('Entro a la app ');
+    print('regresando a la app');
     switch (state) {
       case AppLifecycleState.resumed:
         // El usuario volvió a la app (otra app, bloqueo de pantalla, etc.)
@@ -60,6 +61,7 @@ class _RootPageState extends State<RootPage> with WidgetsBindingObserver {
         break;
     }
   }
+  
   @override
   Widget build(BuildContext context) {
     return WillPopScope(
@@ -87,7 +89,7 @@ class _RootPageState extends State<RootPage> with WidgetsBindingObserver {
       child: KeyboardDismisser(
         child: Scaffold(
           backgroundColor: colorfondo,
-          body: const AppBottomNavigation(index: 0,),
+          body: AppBottomNavigation(index: 0, showTuto: widget.tuto,),
         ),
       ),
     );

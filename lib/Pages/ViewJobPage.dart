@@ -815,6 +815,8 @@ class _ViewJobPageState extends State<ViewJobPage>
     final result = await UpdateJobsService.Update(
       action: actions,
       job_id: widget.id_trabajo,
+      longitude: positionActual.longitude,
+      latitude: positionActual.latitude,
     );
 
     if (mounted) Navigator.pop(context);
@@ -826,6 +828,7 @@ class _ViewJobPageState extends State<ViewJobPage>
         message: 'se notificara a tu cliente',
         type: alert_type.exito,
       );
+      homeNotifier.refresh();
       _onRefresh();
       _startTracking();
     } else {
@@ -1560,6 +1563,8 @@ class _ViewJobPageState extends State<ViewJobPage>
                   price: job.job[0].labor,
                   km_priece: job.job[0].diagnostic_cost,
                   methodpayment: job.job[0].payment_method,
+                  latitude: positionActual.latitude,
+                  longitude: positionActual.longitude,
                 ),
               ),
             );

@@ -16,6 +16,8 @@ class DiagnosticExpressService {
     required double? labor_cost,
     required String description,
     required bool isexpress,
+    required double? latitude,
+    required double? longitude,
     required List<MaterialModel> materials,
   }) async {
     int attempts = 0;
@@ -40,6 +42,8 @@ class DiagnosticExpressService {
                 'labor_cost': labor_cost,
                 'description': description,
                 'isexpress': isexpress,
+                'latitude_worker': latitude,
+                'longitude_worker': longitude,
                 'materiales': materials.map((m) => m.toJson()).toList(),
               }),
             )

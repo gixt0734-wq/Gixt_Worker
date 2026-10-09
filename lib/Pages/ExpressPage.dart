@@ -857,6 +857,8 @@ class _ExpressPageState extends State<ExpressPage>
     final result = await UpdateExpressService.Update(
       action: actions,
       job_id: widget.express_id,
+      latitude: positionActual.latitude,
+      longitude: positionActual.longitude,
     );
 
     if (mounted) Navigator.pop(context);
@@ -868,6 +870,7 @@ class _ExpressPageState extends State<ExpressPage>
         message: 'se notificara a tu cliente',
         type: alert_type.exito,
       );
+      homeNotifier.refresh();
       _onRefresh();
       _startTracking();
     } else {
@@ -899,6 +902,8 @@ class _ExpressPageState extends State<ExpressPage>
       final result = await CancelExpressService.CancelExpress(
         express_id: widget.express_id,
         reason: motivoSeleccionado!,
+        latitude: positionActual.latitude,
+        longitude: positionActual.longitude,
       );
 
       if (mounted) Navigator.pop(context);
@@ -1018,6 +1023,8 @@ class _ExpressPageState extends State<ExpressPage>
     final result = await CancelExpressService.CancelExpress(
       express_id: widget.express_id,
       reason: "tiempo de express exedido",
+      latitude: positionActual.latitude,
+      longitude: positionActual.longitude,
     );
 
     if (mounted) Navigator.pop(context);
@@ -1716,6 +1723,8 @@ class _ExpressPageState extends State<ExpressPage>
                   price: express.express[0].labor,
                   km_priece: express.express[0].diagnostic_cost,
                   methodpayment: express.express[0].payment_method,
+                  latitude: positionActual.latitude,
+                  longitude: positionActual.longitude,
                 ),
               ),
             );

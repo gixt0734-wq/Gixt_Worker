@@ -13,6 +13,7 @@ import 'package:gixt_worker/Components/Toast.dart';
 import 'package:gixt_worker/Components/registro_loader.dart';
 import 'package:gixt_worker/Config/BiometricService.dart';
 import 'package:gixt_worker/Config/SignalRService.dart';
+import 'package:gixt_worker/Config/TutorialKeys.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Pages/Reports/ReportsPage.dart';
@@ -20,6 +21,7 @@ import 'package:gixt_worker/Pages/Skeletor/ConfigSkeletor.dart';
 import 'package:gixt_worker/Pages/UpdatePerfilPage.dart';
 import 'package:gixt_worker/Pages/WalletPage.dart';
 import 'package:gixt_worker/providers/theme_provider.dart' show ThemeProvider;
+import 'package:gixt_worker/routes/BottomNavigationBar.dart';
 import 'package:gixt_worker/services/Auth/LogOutService.dart';
 import 'package:gixt_worker/services/user/User_service.dart';
 import 'package:gixt_worker/services/user/update_active_service.dart';
@@ -426,6 +428,7 @@ Widget _buildStatsRow() {
       child: Column(
         children: [
           _actionRowscroll(
+            key: TutorialKeys.modekey,
             icon: is_working ? Icons.work_outline : Icons.bedtime_outlined,
             iconBgColor: is_working
                 ? const Color(0xFF10B981).withOpacity(0.12)
@@ -440,6 +443,7 @@ Widget _buildStatsRow() {
             builder: (context, themeProvider, child) {
               final isDark = themeProvider.themeMode == ThemeMode.dark;
               return _actionRowscroll(
+                key: TutorialKeys.colorkey,
                 icon: isDark
                     ? Icons.dark_mode_outlined
                     : Icons.light_mode_outlined,
@@ -453,6 +457,7 @@ Widget _buildStatsRow() {
           ),
           _rowDivider(),
           _actionRow(
+            key: TutorialKeys.walletkey,
             icon: Icons.account_balance_wallet_rounded,
             iconBgColor: colorsecundario.withOpacity(0.12),
             iconColor: colorsecundario,
@@ -464,9 +469,25 @@ Widget _buildStatsRow() {
                 MaterialPageRoute(builder: (_) => const WalletPage()),
               );
             },
-          ),
+          ), 
           _rowDivider(),
           _actionRow(
+            key: TutorialKeys.infokey,
+            icon: Icons.update_outlined,
+            iconBgColor: colorsecundario.withOpacity(0.12),
+            iconColor: colorsecundario,
+            title: 'Mi Informacion',
+            subtitle: 'Actualiza tus datos personales',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const Updateperfilpage()),
+              );
+            },
+          ),
+           _rowDivider(),
+          _actionRow(
+            key: TutorialKeys.reportskey,
             icon: Icons.report_outlined,
             iconBgColor: colorsecundario.withOpacity(0.12),
             iconColor: colorsecundario,
@@ -479,22 +500,7 @@ Widget _buildStatsRow() {
               );
             },
           ),
-          
-          _rowDivider(),
-          _actionRow(
-            icon: Icons.update_outlined,
-            iconBgColor: colorsecundario.withOpacity(0.12),
-            iconColor: colorsecundario,
-            title: 'Mis Informacion',
-            subtitle: 'Actualiza tus datos personales',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const Updateperfilpage()),
-              );
-            },
-          ),
-          _rowDivider(),
+          // _rowDivider(),
           // _actionRow(
           //   icon: Icons.location_on_outlined,
           //   iconBgColor: colorsecundario.withOpacity(0.12),
@@ -523,6 +529,17 @@ Widget _buildStatsRow() {
                       Updatepassword(email: user.user[0].email),
                 ),
               );
+            },
+          ),
+          _rowDivider(),
+          _actionRow(
+            icon: Icons.help_outline_rounded,
+            iconBgColor: colorsecundario.withOpacity(0.12),
+            iconColor: colorsecundario,
+            title: 'Tutorial',
+            subtitle: 'Vuelve a ver el tutorial de la app',
+            onTap: () {
+             AppBottomNavigation.showTutorial(context);
             },
           ),
           _rowDivider(),
@@ -575,6 +592,7 @@ Widget _buildStatsRow() {
   }
 
   Widget _actionRow({
+    GlobalKey? key,
     required IconData icon,
     required Color iconBgColor,
     required Color iconColor,
@@ -593,6 +611,7 @@ Widget _buildStatsRow() {
           child: Row(
             children: [
               Container(
+                key: key,
                 width: 38,
                 height: 38,
                 decoration: BoxDecoration(
@@ -643,6 +662,7 @@ Widget _buildStatsRow() {
   }
 
   Widget _actionRowscroll({
+    GlobalKey? key,
     required IconData icon,
     required Color iconBgColor,
     required Color iconColor,
@@ -678,6 +698,7 @@ Widget _buildStatsRow() {
             child: Row(
               children: [
                 Container(
+                  key: key,
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(

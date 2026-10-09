@@ -33,11 +33,15 @@ class PayJobPage extends StatefulWidget {
     required this.job_id,
     required this.isExpress,
     required this.methodpayment,
+    required this.latitude,
+    required this.longitude,
   });
   final double km_priece;
   final String job_id;
   final double price;
   final String methodpayment;
+  final double latitude;
+  final double longitude;
   final bool isExpress;
   @override
   State<PayJobPage> createState() => _PayPageState();
@@ -136,6 +140,8 @@ class _PayPageState extends State<PayJobPage> {
         description: _descriptionController.text,
         materials: _materiales,
         isexpress: widget.isExpress,
+        latitude: widget.latitude,
+        longitude: widget.longitude,
       );
 
       Navigator.pop(context); // cerrar loader

@@ -260,7 +260,7 @@ class _LoginState extends State<LoginPage> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 60),
 
             // Botón de inicio de sesión
             ElevatedButton(

@@ -427,26 +427,6 @@ class _AddReportPageState extends State<AddReportPage> {
       i++;
     }
 
-    rows.add(_rowDivider());
-    rows.add(
-      _actionRow(
-        icon: Icons.report_outlined,
-        iconBgColor: colorsecundario.withOpacity(0.12),
-        iconColor: colorsecundario,
-        title: 'Otro',
-        subtitle: 'Otro motivo que no esté en la lista.',
-        onTap: () {
-          setState(() {
-            _isForward = true; // 👈 hacia adelante
-            _currentPage++;
-          });
-        },
-      )
-          .animate()
-          .fadeIn(duration: 350.ms, delay: (60 * i + 200).ms)
-          .slideY(begin: 0.18, curve: Curves.easeOutCubic),
-    );
-
     return Container(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.primary,

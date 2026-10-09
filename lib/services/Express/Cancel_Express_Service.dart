@@ -9,7 +9,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 class CancelExpressService {
   static Future<Map<String, dynamic>> CancelExpress({
     required String express_id,
-    required String reason
+    required String reason,
+    required double latitude,
+    required double longitude,
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
@@ -31,7 +33,9 @@ class CancelExpressService {
             .delete(uri, headers: headers,
             body:  json.encode({
                 'id': express_id,
-                'reason':reason
+                'reason':reason,
+                'latitude_worker': latitude,
+                'longitude_worker': longitude,
               }),
             )
             .timeout(const Duration(seconds: 30));

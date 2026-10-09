@@ -10,64 +10,58 @@ class UpdateJobsService {
   static Future<Map<String, dynamic>> Update({
     required String action,
     required String job_id,
+    required double? latitude,
+    required double? longitude,
   }) async {
     int attempts = 0;
     const int maxAttempts = 2;
     final prefs = await SharedPreferences.getInstance();
-
+    http.Response? response;
     while (attempts < maxAttempts) {
       print("llamando a crear");
       try {
         final token = prefs.getString('token');
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Jobs/Status');
-
-        // Crear MultipartRequest
-        var request = http.MultipartRequest('PATCH', uri);
-        request.headers.addAll({'Authorization': 'Bearer $token'});
-
-        // Campos de texto
-        request.fields['id'] = job_id;
-        request.fields['action'] = action;
-
-        // Enviar request
-        var streamedResponse = await request.send().timeout(
-          const Duration(seconds: 30),
-        );
-
-        // Convertir la respuesta a String
-        final responseString = await streamedResponse.stream.bytesToString();
-
-        print('Error :${responseString}');
-
-        if (streamedResponse.statusCode == 200) {
-          return {'success': true, 'data': jsonDecode(responseString)};
+        final headers = {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
+        response = await http
+            .patch(
+              Uri.parse('${dotenv.env['API_URL']}/api/Jobs/Status'),
+              headers: headers,
+              body: json.encode({
+                'id': job_id,
+                'action': action,
+                'latitude_worker': latitude,
+                'longitude_worker': longitude,
+              }),
+            )
+            .timeout(const Duration(seconds: 30));
+        print(response.statusCode);
+        print("response body: ${response.body}");
+        if (response.statusCode == 200) {
+          return {'success': true, 'data': jsonDecode(response.body)};
         }
 
-        if (streamedResponse.statusCode == 401) {
+        else if (response.statusCode == 401) {
           print("🔐 Token expirado. Refrescando token...");
 
           final ok = await RefreshAccesTokenService.refresh();
 
-          if (streamedResponse.statusCode == 401) {
-            print("🔐 Token expirado. Refrescando token...");
-
-            final ok = await RefreshAccesTokenService.refresh();
-
-            if (!ok) {
-              print("❌ No se pudo refrescar el token");
-              return {'success': false, 'message': 'Error inesperado'};
-            }
-
-            print("✅ Token actualizado. Reintentando petición...");
-
-            continue;
+          if (!ok) {
+            print("❌ No se pudo refrescar el token");
+            return {
+              'success': false,
+              'message': 'Error inesperado',
+            };
           }
+
+          print("✅ Token actualizado. Reintentando petición...");
+
+          continue;
         }
 
-        if (streamedResponse.statusCode == 400) {
+        else if (response.statusCode == 400) {
           return {
             'success': false,
-            'message': jsonDecode(responseString)['message'],
+            'message': jsonDecode(response.body)['message'],
           };
         }
       } on TimeoutException {
@@ -75,7 +69,6 @@ class UpdateJobsService {
       } on SocketException {
         return {'success': false, 'message': 'No hay conexión a Internet'};
       } catch (e) {
-        print(e);
         return {'success': false, 'message': 'Error inesperado'};
       }
 
@@ -84,7 +77,6 @@ class UpdateJobsService {
         await Future.delayed(const Duration(seconds: 2));
       }
     }
-
     return {'success': false, 'message': 'No se pudo completar el registro'};
   }
 }

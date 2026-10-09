@@ -332,7 +332,7 @@ class _WelcomePageState extends State<WelcomePage> {
       onTap: () {
           Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => RootPage()),
+          MaterialPageRoute(builder: (context) => RootPage(tuto: true,)),
         );
       },
       child: Container(

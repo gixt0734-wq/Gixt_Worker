@@ -198,47 +198,62 @@ void didChangeAppLifecycleState(AppLifecycleState state) async {
     );
   }
 
-  void _listenForeground() {
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      final notification = message.notification;
-      final data = message.data;
+StreamSubscription<RemoteMessage>? _firebaseMessageSubscription;
+  // 🔔 FOREGROUND LISTENER
+void _listenForeground() {
+  // Evita crear más de un listener
+  _firebaseMessageSubscription?.cancel();
 
-      print('🔔 Mensaje recibido en primer plano por firebase: ${data}');
-      handleNotification2do(context, data);
-     
-      /// Mostrar notificación local solo si hay contenido
-      if (notification != null) {
-        const AndroidNotificationDetails androidDetails =
-            AndroidNotificationDetails(
-              'canal',
-              'Notificaciones',
-              channelDescription: 'Notificaciones',
-              importance: Importance.max,
-              priority: Priority.high,
-              icon: '@mipmap/ic_launcher',
-            );
+  _firebaseMessageSubscription =
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+    final notification = message.notification;
+    final data = message.data;
 
-        const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
-          presentAlert: true,
-          presentBadge: true,
-          presentSound: true,
-        );
+    print('🔔 Mensaje recibido en primer plano por firebase: $data');
 
-        const NotificationDetails notificationDetails = NotificationDetails(
-          android: androidDetails,
-          iOS: iosDetails,
-        );
-
-        await flutterLocalNotificationsPlugin.show(
-          id: notification.hashCode,
-          title: notification.title,
-          body: notification.body,
-          notificationDetails: notificationDetails,
-          payload: data.toString(),
-        );
+    // 🔥 IMPORTANTE
+    // No usar context si SplashScreen ya fue eliminado
+      // SplashScreen ya fue reemplazada: usar el contexto global del navigator
+      final ctx = NavigationService.navigatorKey.currentContext;
+      if (ctx != null) {
+        handleNotification2do(ctx, data);
       }
-    });
-  }
+
+    // Mostrar notificación local
+    if (notification != null) {
+      const AndroidNotificationDetails androidDetails =
+          AndroidNotificationDetails(
+        'canal',
+        'Notificaciones',
+        channelDescription: 'Notificaciones',
+        importance: Importance.max,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      );
+
+      const DarwinNotificationDetails iosDetails =
+          DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const NotificationDetails notificationDetails =
+          NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await flutterLocalNotificationsPlugin.show(
+        id: notification.hashCode,
+        title: notification.title,
+        body: notification.body,
+        notificationDetails: notificationDetails,
+        payload: data.toString(),
+      );
+    }
+  });
+}
 
   void _startAnimation() async {
     await Future.delayed(const Duration(milliseconds: 1000));
@@ -279,6 +294,8 @@ void didChangeAppLifecycleState(AppLifecycleState state) async {
   void dispose() {
     _subscription?.cancel();
       WidgetsBinding.instance.removeObserver(this);
+        _firebaseMessageSubscription?.cancel();
+  _firebaseMessageSubscription = null;
     super.dispose();
   }
 
