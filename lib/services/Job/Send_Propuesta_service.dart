@@ -22,7 +22,6 @@ class SendPropuestaJobService {
   
       try {
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Jobs/Send');
 
         // Crear MultipartRequest
@@ -32,7 +31,6 @@ class SendPropuestaJobService {
         });
 
         // Campos de texto
-        request.fields['worker'] = id_user!;
         request.fields['id'] = job_id;
         request.fields['diagnostic_cost'] = diagnostic_cost.toString();
         request.fields['labor_price'] = labor_price.toString();

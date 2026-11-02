@@ -127,13 +127,12 @@ class Express_service {
       try {
         isLoading = true;
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
         final headers = {'Authorization': 'Bearer $token'};
 
         final response = await http
             .get(
               Uri.parse(
-                '${dotenv.env['API_URL']}/api/Expresss/worker/${id_user}',
+                '${dotenv.env['API_URL']}/api/Expresss/worker',
               ),
               headers: headers,
             )

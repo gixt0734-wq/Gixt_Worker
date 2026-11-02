@@ -123,14 +123,13 @@ class User_service {
         
 
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
         print('🌐 Llamando API user $token');
         final headers = {'Authorization': 'Bearer $token'};
         print(token);
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Workers/id/${id_user}'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Workers/id'),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

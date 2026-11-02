@@ -121,14 +121,13 @@ class WorkerWallet_service {
     while (attempts < maxAttempts) {
       try {
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
         final headers = {'Authorization': 'Bearer $token'};
         isLoading = true;
 
         final response = await http
             .get(
               Uri.parse(
-                '${dotenv.env['API_URL']}/api/Workers/wallet/${id_user}',
+                '${dotenv.env['API_URL']}/api/Workers/wallet',
               ),
               headers: headers,
             )

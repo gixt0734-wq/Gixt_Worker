@@ -23,7 +23,7 @@ class SendPropuestaExpressService {
         print('PRecio  de diagnostico $diagnostic_cost');
       
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
+
 
         final uri = Uri.parse('${dotenv.env['API_URL']}/api/Expresss/Send');
 
@@ -33,7 +33,6 @@ class SendPropuestaExpressService {
           'Authorization': 'Bearer $token',
         });
         // Campos de texto
-        request.fields['worker'] = id_user!;
         request.fields['id'] = express_id;
 
         if(diagnostic_cost != null)

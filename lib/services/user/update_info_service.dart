@@ -24,7 +24,6 @@ class UpdateInfoService {
       print("llamando a crear");
       try {
       
-      String? id_user = prefs.getString('id');
       final token = prefs.getString('token');
 
       final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/info');
@@ -34,8 +33,7 @@ class UpdateInfoService {
         request.headers.addAll({
           'Authorization': 'Bearer $token',
         });
-        // Campos de texto
-        request.fields['user_id'] = id_user!;
+
         request.fields['description'] = description;
         request.fields['city'] = city;
         request.fields['latitude'] = latitude.toString();

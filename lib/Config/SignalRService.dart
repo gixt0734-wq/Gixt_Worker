@@ -71,8 +71,7 @@ class SignalRService {
     _conectando = true;
 
     final prefs = await SharedPreferences.getInstance();
-    final String? id_user = prefs.getString('id');
-
+    final String token = prefs.getString('token') ?? '';
     int intentos = 0; // fallos consecutivos
 
     while (true) {
@@ -87,9 +86,10 @@ class SignalRService {
 
         hubConnection = HubConnectionBuilder()
             .withUrl(
-              "${dotenv.env['API_URL']}/notificationHub?userId=$id_user",
+              "${dotenv.env['API_URL']}/notificationHub",
               options: HttpConnectionOptions(
                 requestTimeout: 30000,
+                accessTokenFactory: () async => token,
               ),
             )
             .build();
@@ -102,9 +102,8 @@ class SignalRService {
 
         await hubConnection!.start();
 
-        if (id_user != null) {
-          await hubConnection!.invoke("JoinGroup", args: [id_user]);
-        }
+          await hubConnection!.invoke("JoinGroup");
+        
 
         print("✅ SignalR conectado");
 

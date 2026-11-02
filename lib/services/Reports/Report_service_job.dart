@@ -96,14 +96,13 @@ class ReportsServicejob {
     while (attempts < maxAttempts) {
       try {
         print("🌐 Llamando API");
-        String? id_user = prefs.getString('id');
         final token = prefs.getString('token');
         final headers = {'Authorization': 'Bearer $token'};
         isLoading = true;
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Report/Job/${id}'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Report/Job'),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

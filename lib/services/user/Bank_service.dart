@@ -21,7 +21,7 @@ class BankService {
     while (attempts < maxAttempts) {
       print("llamando a actualizar cat3egorias");
       try {
-        String? id_user = prefs.getString('id');
+
         final token = prefs.getString('token');
         final headers = {
           'Content-Type': 'application/json',
@@ -32,7 +32,6 @@ class BankService {
               Uri.parse('${dotenv.env['API_URL']}/api/Workers/bank'),
               headers: headers,
               body: json.encode({
-                'user_id': id_user,
                 'account_holder':account_holder,
                 'clabe':clabe,
               }),

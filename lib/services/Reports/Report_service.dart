@@ -57,7 +57,6 @@ class ReportsService {
     while (attempts < maxAttempts) {
       try {
         print("🌐 Llamando API");
-        String? id_user = prefs.getString('id');
         final token = prefs.getString('token');
         final headers = {'Authorization': 'Bearer $token'};
         isLoading = true;
@@ -65,7 +64,7 @@ class ReportsService {
         final response = await http
             .get(
               Uri.parse(
-                '${dotenv.env['API_URL']}/api/Report/Worker?id_user=${id_user}',
+                '${dotenv.env['API_URL']}/api/Report/Worker',
               ),
               headers: headers,
             )

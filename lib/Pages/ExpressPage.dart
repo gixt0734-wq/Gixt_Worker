@@ -350,6 +350,15 @@ class _ExpressPageState extends State<ExpressPage>
       return;
     }
 
+    if(express.express[0].job_status == 'canceled' || express.express[0].job_status == 'completed' || express.express[0].job_status == 'finalized' || express.express[0].job_status == 'rejected') {
+      print('❌ El trabajo ya no está activo, no se calcula distancia');
+      return;
+    }
+    if(express.express[0].job_status == 'in_progress') {
+      print('❌ El trabajo ya está en progreso, no se calcula distancia');
+      return;
+    }
+
     const String url =
         'https://routes.googleapis.com/directions/v2:computeRoutes';
 
@@ -384,10 +393,10 @@ class _ExpressPageState extends State<ExpressPage>
         }),
       );
 
-      print('════════ ROUTES API ════════');
-      print('Status: ${response.statusCode}');
-      print('Body: ${response.body}');
-      print('════════════════════════════');
+      // print('════════ ROUTES API ════════');
+      // print('Status: ${response.statusCode}');
+      // print('Body: ${response.body}');
+      // print('════════════════════════════');
 
       if (response.statusCode != 200) {
         print('❌ Error de Google Routes API');
@@ -2098,4 +2107,6 @@ class _ExpressPageState extends State<ExpressPage>
       },
     );
   }
+
+
 }

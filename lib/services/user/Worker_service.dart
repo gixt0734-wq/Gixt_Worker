@@ -119,13 +119,12 @@ class Worker_service {
     while (attempts < maxAttempts) {
       try {
       final token = prefs.getString('token');
-      String? id_user = prefs.getString('id');
       final headers = {'Authorization': 'Bearer $token'};
       isLoading = true;
 
         final response = await http
             .get(
-              Uri.parse('${dotenv.env['API_URL']}/api/Workers/info/${id_user}'),
+              Uri.parse('${dotenv.env['API_URL']}/api/Workers/info'),
               headers: headers,
             )
             .timeout(const Duration(seconds: 15));

@@ -330,7 +330,16 @@ class _ViewJobPageState extends State<ViewJobPage>
       print('❌ positionclient es null');
       return;
     }
-
+if (job.job.isEmpty) return;
+    if(job.job[0].job_status == 'canceled' || job.job[0].job_status == 'completed' || job.job[0].job_status == 'finalized' || job.job[0].job_status == 'rejected') {
+      print('❌ El trabajo ya no está activo, no se calcula distancia');
+      return;
+    }
+    if (job.job.isEmpty) return;
+    if(job.job[0].job_status == 'in_progress') {
+      print('❌ El trabajo ya está en progreso, no se calcula distancia');
+      return;
+    }
     const String url =
         'https://routes.googleapis.com/directions/v2:computeRoutes';
 
@@ -364,10 +373,10 @@ class _ViewJobPageState extends State<ViewJobPage>
         }),
       );
 
-      print('════════ ROUTES API ════════');
-      print('Status: ${response.statusCode}');
-      print('Body: ${response.body}');
-      print('════════════════════════════');
+      // print('════════ ROUTES API ════════');
+      // print('Status: ${response.statusCode}');
+      // print('Body: ${response.body}');
+      // print('════════════════════════════');
 
       if (response.statusCode != 200) {
         print('❌ Error de Google Routes API');
@@ -1584,6 +1593,7 @@ class _ViewJobPageState extends State<ViewJobPage>
         text = 'Finalizar';
         break;
       case 'finalized':
+    
         icon = Icons.home_repair_service;
         text = 'Esperando Pago';
         action = null;
@@ -1593,7 +1603,12 @@ class _ViewJobPageState extends State<ViewJobPage>
         text = 'Completado';
         action = null;
         break;
-
+      case 'canceled':
+      case 'regected':
+        icon = Icons.cancel;
+        text = 'cancelado';
+        action = null;
+        break;
       default:
         icon = Icons.help;
         text = expressStatus;

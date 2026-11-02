@@ -24,9 +24,8 @@ class UpdateService {
       try {
       
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
 
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/${id_user}');
+        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers');
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('PUT', uri);
@@ -35,7 +34,6 @@ class UpdateService {
         });
 
         // Campos de texto
-        request.fields['user_id'] = id_user!;
         request.fields['first_name'] = first_name;
         request.fields['last_name'] = last_name;
         request.fields['phone'] = phone;

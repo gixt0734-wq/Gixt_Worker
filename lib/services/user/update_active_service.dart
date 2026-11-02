@@ -21,9 +21,8 @@ class UpdateActvieService {
         print("llamando a crear");
       
         final token = prefs.getString('token');
-        String? id_user = prefs.getString('id');
    
-        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/working?id=${id_user}',);
+        final uri = Uri.parse('${dotenv.env['API_URL']}/api/Workers/working',);
 
         // Crear MultipartRequest
         var request = http.MultipartRequest('PATCH', uri);

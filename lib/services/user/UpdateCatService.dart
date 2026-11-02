@@ -20,7 +20,7 @@ class UpdateCatService {
     while (attempts < maxAttempts) {
       print("llamando a actualizar cat3egorias");
       try {
-        String? id_user = prefs.getString('id');
+
         final token = prefs.getString('token');
         final headers = {
           'Content-Type': 'application/json',
@@ -31,7 +31,6 @@ class UpdateCatService {
               Uri.parse('${dotenv.env['API_URL']}/api/Workers/categories'),
               headers: headers,
               body: json.encode({
-                'user_id': id_user,
                 'category_id':cat,
               }),
             )

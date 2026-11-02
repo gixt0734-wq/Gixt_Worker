@@ -6,6 +6,8 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:flutter_background_service_android/flutter_background_service_android.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:signalr_netcore/http_connection_options.dart';
 import 'package:signalr_netcore/hub_connection.dart';
 import 'package:signalr_netcore/hub_connection_builder.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -140,7 +142,9 @@ class LocationService {
 
     HubConnection? hubConnectionGps;
     StreamSubscription<Position>? positionStream;
-
+    final prefs = await SharedPreferences.getInstance();
+    final String token = prefs.getString('token') ?? '';
+    
     final String hubUrl = "${dotenv.env['API_URL']}/gpsHub";
 
     print("🚀 Servicio iniciado");
@@ -159,7 +163,10 @@ class LocationService {
     Future<void> initSignalR() async {
       print("🆔");
       hubConnectionGps = HubConnectionBuilder()
-          .withUrl(hubUrl)
+          .withUrl(hubUrl,
+           options: HttpConnectionOptions(
+                accessTokenFactory: () async => token,
+              ),)
           .withAutomaticReconnect(
             retryDelays: [
               0,
@@ -171,6 +178,7 @@ class LocationService {
               30000,
               30000, // ← reintenta indefinido
             ],
+            
           )
           .build();
 
@@ -218,7 +226,7 @@ class LocationService {
 
       if (!serviceEnabled) {
         print("❌ GPS apagado");
-
+service.invoke("status", {"state": "detenido"});
         return;
       }
 
