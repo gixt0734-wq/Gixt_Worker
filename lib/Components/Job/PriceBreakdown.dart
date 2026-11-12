@@ -7,23 +7,26 @@ import 'package:gixt_worker/Pages/ExpressPage.dart';
 import 'package:gixt_worker/Components/Loaders/Indicador.dart';
 import 'package:gixt_worker/components/circleimage.dart';
 import 'package:gixt_worker/pages/ViewJobPage.dart';
+import 'package:gixt_worker/services/Job/payment_model.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class PriceBreakdown extends StatelessWidget {
   const PriceBreakdown({
     super.key,
-    required this.labor,
-    required this.diagnostic,
-    required this.materials,
-    required this.iva,
+    this.tarifa = 0.0,
+    this.garantia = 0.0,
+    this.iva = 0.0,
     required this.total,
+    this.extra = const [],
+    this.details = const[],
   });
 
-  final double labor;
-  final double diagnostic;
-  final double materials;
-  final double iva;
+  final double tarifa;
+  final double garantia;
   final double total;
+  final double iva;
+  final List<double> extra;
+  final List<PaymentModel> details;
 
   @override
   Widget build(BuildContext context) {
@@ -32,16 +35,23 @@ class PriceBreakdown extends StatelessWidget {
       title: 'Pago y método de pago',
       child: Column(
         children: [
-          if(diagnostic != 0.0)
-          _priceLine(context, 'Visita / diagnóstico ', diagnostic),
-          if(diagnostic != 0.0)
+          for (var detail in details) ...[
+            _priceLine(context, '${detail.concept_type}', detail.cost),
+            const SizedBox(height: 12),
+          ],
+          _priceLine(context, 'Tarifa GIXT', tarifa),
           const SizedBox(height: 12),
-          _priceLine(context, 'Mano de obra ', labor),
+          _priceLine(context, 'Garantia ', garantia),
           const SizedBox(height: 12),
-          if(materials != 0.0)
-          _priceLine(context, 'Materiales', materials),
-          if(materials != 0.0)
+          _priceLine(context, 'IVA ', iva),
           const SizedBox(height: 12),
+          if(extra.isNotEmpty)
+          for (int i = 0; i < extra.length; i++) ...[
+            _priceLine(context, 'Extra ${i + 1}', extra[i]),
+            const SizedBox(height: 12),
+          ],
+          
+
           Divider(
             height: 1,
             thickness: 0.7,
@@ -90,8 +100,8 @@ class PriceBreakdown extends StatelessWidget {
         ),
         const SizedBox(width: 6),
         Expanded(
-          child: Text(
-            'Los precios mostrados ya incluyen IVA (16%) y comisiones.',
+       child: Text(
+  'Los precios mostrados no incluyen IVA. El total final ya incluye el IVA correspondiente a todos los conceptos.',
             style: GoogleFonts.poppins(
               fontSize: 11.5,
               fontWeight: FontWeight.w400,

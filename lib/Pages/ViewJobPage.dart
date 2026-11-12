@@ -50,6 +50,7 @@ import 'package:gixt_worker/services/Job/Cancel_Job_Service.dart';
 import 'package:gixt_worker/services/Job/JonId_service.dart';
 import 'package:gixt_worker/services/Job/Send_Propuesta_service.dart';
 import 'package:gixt_worker/services/Job/Update_Job_service.dart';
+import 'package:gixt_worker/services/Job/payment_model.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -1401,18 +1402,17 @@ if (job.job.isEmpty) return;
 
   Widget _buildPriceBreakdown() {
     final surface = Theme.of(context).colorScheme.surface;
-    final labor = job.job[0].labor_cost;
-    final diagnostic = job.job[0].diagnostic_cost;
-    final materials = job.job[0].materials;
-    final iva = job.job[0].labor;
     final total = job.job[0].total;
-
+    final garantia = job.job[0].garantia;
+    final tarifa = job.job[0].tarifa;
+    final iva = job.job[0].iva;
+    final List<PaymentModel> details = job.job[0].paymentdetails;
     return PriceBreakdown(
-      labor: labor,
-      diagnostic: diagnostic,
-      materials: materials,
-      iva: iva,
       total: total,
+      details: details,
+      tarifa: tarifa,
+      iva : iva,
+      garantia: garantia
     );
   }
 
@@ -1569,8 +1569,8 @@ if (job.job.isEmpty) return;
                 builder: (context) => PayJobPage(
                   isExpress: false,
                   job_id: job.job[0].job_id,
-                  price: job.job[0].labor,
-                  km_priece: job.job[0].diagnostic_cost,
+                  price: job.job[0].paymentdetails[1].cost,
+                  km_priece: job.job[0].paymentdetails[0].cost,
                   methodpayment: job.job[0].payment_method,
                   latitude: positionActual.latitude,
                   longitude: positionActual.longitude,

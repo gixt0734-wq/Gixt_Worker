@@ -143,8 +143,9 @@ class _PayPageState extends State<PayJobPage> {
         latitude: widget.latitude,
         longitude: widget.longitude,
       );
-
-      Navigator.pop(context); // cerrar loader
+      
+    if (!mounted) return;
+    Navigator.pop(context); // cerrar loader
 
       if (result['success'] == true) {
         final data = result['data'];

@@ -22,6 +22,7 @@ import 'package:gixt_worker/Components/Job/Button.dart';
 import 'package:gixt_worker/Components/Job/Client.dart';
 import 'package:gixt_worker/Components/Job/DetailField.dart';
 import 'package:gixt_worker/Components/Job/Extra.dart';
+import 'package:gixt_worker/Components/Job/ExtraJobCard.dart';
 import 'package:gixt_worker/Components/Job/FieldLabelDescription.dart';
 import 'package:gixt_worker/Components/Job/Image.dart';
 import 'package:gixt_worker/Components/Job/InfoCard.dart';
@@ -38,6 +39,7 @@ import 'package:gixt_worker/Config/Notifiers/home_notifiers.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Config/location_cache_service.dart';
+import 'package:gixt_worker/Pages/AddExtraJobPage.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayJobPage.dart';
 import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
@@ -61,6 +63,7 @@ import 'package:gixt_worker/services/Express/Express_Id_service.dart';
 import 'package:gixt_worker/services/Express/Send_Propuesta_service.dart';
 import 'package:gixt_worker/services/Express/Update_Express_service.dart';
 import 'package:gixt_worker/services/Job/Update_Job_service.dart';
+import 'package:gixt_worker/services/Job/payment_model.dart';
 import 'package:gixt_worker/services/Location/Geolocation_service.dart';
 import 'package:gixt_worker/services/Location/geocoding_helper.dart';
 
@@ -350,11 +353,14 @@ class _ExpressPageState extends State<ExpressPage>
       return;
     }
 
-    if(express.express[0].job_status == 'canceled' || express.express[0].job_status == 'completed' || express.express[0].job_status == 'finalized' || express.express[0].job_status == 'rejected') {
+    if (express.express[0].job_status == 'canceled' ||
+        express.express[0].job_status == 'completed' ||
+        express.express[0].job_status == 'finalized' ||
+        express.express[0].job_status == 'rejected') {
       print('❌ El trabajo ya no está activo, no se calcula distancia');
       return;
     }
-    if(express.express[0].job_status == 'in_progress') {
+    if (express.express[0].job_status == 'in_progress') {
       print('❌ El trabajo ya está en progreso, no se calcula distancia');
       return;
     }
@@ -368,8 +374,7 @@ class _ExpressPageState extends State<ExpressPage>
         headers: {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': _mapsKey,
-          'X-Goog-FieldMask':
-              'routes.distanceMeters,routes.duration',
+          'X-Goog-FieldMask': 'routes.distanceMeters,routes.duration',
         },
         body: jsonEncode({
           'origin': {
@@ -428,18 +433,15 @@ class _ExpressPageState extends State<ExpressPage>
         return;
       }
 
-      final double distanceMeters =
-          (distanceValue as num).toDouble();
+      final double distanceMeters = (distanceValue as num).toDouble();
 
-      final double distanceKm =
-          distanceMeters / 1000.0;
+      final double distanceKm = distanceMeters / 1000.0;
 
       // ─────────────────────────────
       // DURACIÓN
       // ─────────────────────────────
 
-      final String? durationString =
-          route['duration']?.toString();
+      final String? durationString = route['duration']?.toString();
 
       if (durationString == null) {
         print('❌ duration llegó null');
@@ -447,13 +449,9 @@ class _ExpressPageState extends State<ExpressPage>
       }
 
       final double durationSeconds =
-          double.tryParse(
-                durationString.replaceAll('s', ''),
-              ) ??
-              0;
+          double.tryParse(durationString.replaceAll('s', '')) ?? 0;
 
-      final int durationMinutes =
-          (durationSeconds / 60).ceil();
+      final int durationMinutes = (durationSeconds / 60).ceil();
 
       // ─────────────────────────────
       // UI
@@ -462,11 +460,9 @@ class _ExpressPageState extends State<ExpressPage>
       if (!mounted) return;
 
       setState(() {
-        distanceText =
-            '${distanceKm.toStringAsFixed(1)} km';
+        distanceText = '${distanceKm.toStringAsFixed(1)} km';
 
-        durationText =
-            '$durationMinutes min';
+        durationText = '$durationMinutes min';
         durationMinutess = durationMinutes;
       });
 
@@ -477,7 +473,7 @@ class _ExpressPageState extends State<ExpressPage>
       print(stackTrace);
     }
   }
-    
+
   Future<void> GetRute() async {
     if (express.express.isEmpty) return;
 
@@ -941,7 +937,7 @@ class _ExpressPageState extends State<ExpressPage>
     }
   }
 
-   Future<void> InitCountCancel() async {
+  Future<void> InitCountCancel() async {
     // ⚠️ ANTES: `express.express[0].created_at` sin validar la lista, y un
     // `else { Send(); }` que reenviaba la alerta cada vez que se volvía a
     // llamar con el mismo express (al reabrir la pantalla, por ejemplo).
@@ -953,14 +949,12 @@ class _ExpressPageState extends State<ExpressPage>
     }
 
     final createdAt = DateTime.parse(express.express[0].created_at);
-    final expiresAt = createdAt.add(
-      Duration(minutes: durationMinutess + 40),
-    );
+    final expiresAt = createdAt.add(Duration(minutes: durationMinutess + 40));
     _timercancel?.cancel();
     _countdownExpiresAtCancel = expiresAt;
     if (mounted) {
       setState(() {
-      _remainingCancel = expiresAt.difference(DateTime.now());
+        _remainingCancel = expiresAt.difference(DateTime.now());
       });
     }
 
@@ -983,7 +977,8 @@ class _ExpressPageState extends State<ExpressPage>
         Toast(
           context,
           title: "Tiempo de Express excedido",
-          message: "El tiempo límite ha finalizado Y NO AS LLEGADO AL DOMICILIO. Cancelando el trabajo.",
+          message:
+              "El tiempo límite ha finalizado Y NO AS LLEGADO AL DOMICILIO. Cancelando el trabajo.",
           type: alert_type.advertencia,
         );
         _CancelarOftime();
@@ -1039,8 +1034,8 @@ class _ExpressPageState extends State<ExpressPage>
     if (mounted) Navigator.pop(context);
     if (result['success'] == true) {
       if (!mounted) return;
-        await _stopTracking();
-        await _positionStreamSubscription?.cancel();
+      await _stopTracking();
+      await _positionStreamSubscription?.cancel();
 
       homeNotifier.refresh();
       setState(() {
@@ -1060,7 +1055,6 @@ class _ExpressPageState extends State<ExpressPage>
       );
     }
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -1122,8 +1116,6 @@ class _ExpressPageState extends State<ExpressPage>
       ),
     );
   }
-
- 
 
   Widget _buildMap() {
     final theme = Theme.of(context);
@@ -1199,8 +1191,7 @@ class _ExpressPageState extends State<ExpressPage>
 
               // ── Tarjeta "Ubicación seleccionada" ──────────────
               Expanded(
-                child:  
-                                                   Container(
+                child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 12,
                     vertical: 8,
@@ -1265,9 +1256,6 @@ class _ExpressPageState extends State<ExpressPage>
                     ],
                   ),
                 ),
-
-
-              
               ),
               const SizedBox(width: 8),
 
@@ -1459,7 +1447,7 @@ class _ExpressPageState extends State<ExpressPage>
           ArrivalTimer(
             timeRemaining: _remainingCancel,
             expiresAt: _countdownExpiresAtCancel,
-            times: durationMinutess + 40
+            times: durationMinutess + 40,
           ).animate().fade(duration: 450.ms, delay: 60.ms).slideX(begin: -0.2),
           const SizedBox(height: 16),
         ],
@@ -1516,6 +1504,7 @@ class _ExpressPageState extends State<ExpressPage>
 
   Widget _buildEvidence() {
     final evidence = express.express[0].images_evicence;
+    final extraevidence = express.express[0].extra;
     final total = 1 + evidence.length;
     return SectionCard(
       title: 'Imágenes de evidencia',
@@ -1555,6 +1544,14 @@ class _ExpressPageState extends State<ExpressPage>
               ),
               const SizedBox(width: 20),
             ],
+            for (final img in extraevidence) ...[
+              Imagen(
+                imagen: img.image_url!,
+                type: 'Extra',
+                icon: Icons.handyman_rounded,
+              ),
+              const SizedBox(width: 20),
+            ],
           ],
         ),
       ),
@@ -1565,6 +1562,7 @@ class _ExpressPageState extends State<ExpressPage>
     final problem = express.express[0].problem;
     final description = express.express[0].description;
     final expressdetails = express.express[0].listdetails;
+    final extra = express.express[0].extra;
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1580,6 +1578,27 @@ class _ExpressPageState extends State<ExpressPage>
             ],
           ),
         ),
+        if (extra.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SectionCard(
+            title: 'Trabajos extra',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < extra.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 10),
+                  ExtraJobCard(
+                    index: i + 1,
+                    problem: extra[i].problem,
+                    description: extra[i].description,
+                    price: extra[i].labor_cost,
+                    imageUrl: extra[i].image_url,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         if (expressdetails.isNotEmpty) ...[
           const SizedBox(height: 10),
           SectionCard(
@@ -1611,18 +1630,64 @@ class _ExpressPageState extends State<ExpressPage>
   }
 
   Widget _buildPriceBreakdown() {
-    final labor = express.express[0].labor_cost;
+    final tarifa = express.express[0].tarifa;
     final diagnostic = express.express[0].diagnostic_cost;
-    final materials = express.express[0].materials;
-    final iva = express.express[0].labor;
+    final garantia = express.express[0].garantia;
+    final iva = express.express[0].iva;
+    final List<double> extra = express.express[0].extra
+        .map((e) => e.labor_cost)
+        .toList();
     final total = express.express[0].total;
-
+    final List<PaymentModel> details = express.express[0].paymentdetails;
     return PriceBreakdown(
-      labor: labor,
-      diagnostic: diagnostic,
-      materials: materials,
-      iva: iva,
+      details: details,
       total: total,
+      extra: extra,
+      tarifa: tarifa,
+      iva : iva,
+      garantia: garantia
+    );
+  }
+
+  Future<void> _finishJob() async {
+    bool? ok = await ActionAlert(
+      context,
+      title: 'Evidencia',
+      message:
+          'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
+      type: action_type.advertencia,
+    );
+    if (ok!) {
+      if (!mounted) return;
+      Navigator.pop(context); // cerrar loader
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Evidencejobpage(
+            isExpress: true,
+            job_id: express.express[0].express_id,
+          ),
+        ),
+      );
+
+      return;
+    }
+  }
+
+  Future<void> _otherJob() async {
+    if (!mounted) return;
+    Navigator.pop(context); // cerrar loader
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddExtraJobPage(
+          isExpress: true,
+          job_id: express.express[0].express_id,
+          methodpayment: express.express[0].payment_method,
+        ),
+      ),
     );
   }
 
@@ -1640,32 +1705,14 @@ class _ExpressPageState extends State<ExpressPage>
         // _Send();
         _showofferSheet();
         return;
-      }
-      else if (express.express[0].job_status != 'in_progress') {
+      } else if (express.express[0].job_status != 'in_progress') {
         await _Update(express.express[0].job_status);
         _startTracking();
       } else if (express.express[0].job_status == 'in_progress') {
         if (express.express[0].images_evicence.isEmpty) {
-          bool? ok = await ActionAlert(
-            context,
-            title: 'Evidencia',
-            message:
-                'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
-            type: action_type.advertencia,
-          );
-          if (ok!) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Evidencejobpage(
-                  isExpress: true,
-                  job_id: express.express[0].express_id,
-                ),
-              ),
-            );
+          _showOtherWorkSheet();
 
-            return;
-          }
+          return;
         }
       }
     };
@@ -1729,8 +1776,8 @@ class _ExpressPageState extends State<ExpressPage>
                 builder: (context) => PayJobPage(
                   isExpress: true,
                   job_id: express.express[0].express_id,
-                  price: express.express[0].labor,
-                  km_priece: express.express[0].diagnostic_cost,
+                  price: express.express[0].paymentdetails[1].cost,
+                  km_priece: express.express[0].paymentdetails[0].cost,
                   methodpayment: express.express[0].payment_method,
                   latitude: positionActual.latitude,
                   longitude: positionActual.longitude,
@@ -1742,6 +1789,7 @@ class _ExpressPageState extends State<ExpressPage>
         break;
 
       case 'diagnosing':
+      case 'pending_extra':
         icon = Icons.hourglass_top;
         text = 'Esperando aprobación';
         bgColor = Theme.of(context).colorScheme.surface.withOpacity(0.6);
@@ -2108,5 +2156,86 @@ class _ExpressPageState extends State<ExpressPage>
     );
   }
 
+  void _showOtherWorkSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final surface = Theme.of(context).colorScheme.surface;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const FieldLabelDescription(
+                          label: '¿Deseas agregar otro trabajo?',
+                          value:
+                              'Antes de finalizar el servicio, indica si realizaste o necesitas realizar algún trabajo adicional.',
+                        ),
+                        const SizedBox(height: 24),
 
+                        Button(
+                          text: 'Agregar otro trabajo',
+                          icon: Icons.add_circle_outline_rounded,
+                          bgColor: colorsecundario,
+                          action: _otherJob,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Finalizar servicio
+                        Button(
+                          text: 'Continuar con evidencias',
+                          icon: Icons.arrow_forward_rounded,
+                          bgColor: surface.withValues(alpha: 0.08),
+                          action: _finishJob,
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }

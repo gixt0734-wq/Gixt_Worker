@@ -1,14 +1,34 @@
 import 'dart:async';
 import 'dart:io';
-
+import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
 import 'package:gixt_worker/services/Details/DetailsModel.dart';
 import 'package:gixt_worker/services/Express/Express_Id_service.dart';
 import 'package:gixt_worker/services/Job/jobs_proposal.dart';
+import 'package:gixt_worker/services/Job/payment_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http; // Importar el paquete http
 import 'dart:convert'; // Para trabajar con JSON
+
+String formatDate(String? date) {
+  if (date == null || date.isEmpty) return '';
+
+  final parsed = DateTime.parse(date);
+
+  return DateFormat('dd-MM-yyyy').format(parsed);
+}
+
+String formatTime(String? time) {
+  if (time == null || time.isEmpty) return '';
+
+  try {
+    final parsed = DateFormat('HH:mm:ss').parse(time);
+     return DateFormat('hh:mm a').format(parsed);
+  } catch (_) {
+    return '';
+  }
+}
 
 class Job {
   // IDs
@@ -33,7 +53,7 @@ class Job {
   String job_time;
   String description;
   String problem;
-  double labor_cost;
+  double iva;
   double worker_price;
   String payment_method;
   bool is_active;
@@ -42,12 +62,14 @@ class Job {
   double diagnostic_cost;
   double materials;
   double total;
-  double labor;
+  double garantia;
+  double tarifa;
   // images
   String? image;
   List<String> images_evicence;
   List<Jobs_proposal> jobs_proposal;
   List<DetailsModel> listdetails;
+  List<PaymentModel> paymentdetails;
   
   Job({
     required this.job_id,
@@ -66,10 +88,11 @@ class Job {
     required this.description,
     required this.problem,
     required this.diagnostic_cost,
-    required this.labor_cost,
+    required this.iva,
     required this.materials,
     required this.total,
-    required this.labor,
+    required this.garantia,
+    required this.tarifa,
     required this.worker_price,
     required this.payment_method,
     required this.is_active,
@@ -78,7 +101,8 @@ class Job {
     this.image,
     required this.images_evicence,
     required this.jobs_proposal,
-    required this.listdetails
+    required this.listdetails,
+    required this.paymentdetails,
   });
 
   factory Job.fromJson(Map<String, dynamic> json) {
@@ -105,15 +129,16 @@ class Job {
       worker_price: (json['worker']?['diagnostic_cost']) ?? 0.0,
 
       // job
-      job_date: json['job_date'] ?? '',
-      job_time: json['job_time'] ?? '',
+      job_date: formatDate( json['job_date'] ?? ''),
+      job_time: formatTime( json['job_time'] ?? ''),
       description: json['description'] ?? '',
       problem: json['problem'] ?? '',
       diagnostic_cost: (json['payment']?['diagnostic_cost']) ?? 0.0,
       payment_method: (json['payment']?['payment_method']) ?? 0.0,
-      labor_cost: (json['payment']?['labor_cost']) ?? 0.0,
+      iva: (json['payment']?['iva']) ?? 0.0,
       materials: (json['payment']?['materials']) ?? 0.0,
-      labor: (json['payment'] ? ['labor_cost']) ?? 0.0,
+      garantia: (json['payment'] ? ['garantia_total']) ?? 0.0,
+      tarifa: (json['payment'] ? ['tarifa_total']) ?? 0.0,
       total : (json['payment'] ? ['total']) ?? 0.0,
       is_active: json['is_active'] ?? false,
       job_status: json['job_status'] ?? '',
@@ -125,6 +150,9 @@ class Job {
           .toList(),
       listdetails: (json['details'] as List<dynamic>? ?? [])
               .map((e) => DetailsModel.fromJson(e))
+              .toList(),
+      paymentdetails: (json['payment_det'] as List<dynamic>? ?? [])
+              .map((e) => PaymentModel.fromJson(e))
               .toList(),
     );
   }

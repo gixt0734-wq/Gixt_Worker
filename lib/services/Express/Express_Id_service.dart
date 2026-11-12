@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:gixt_worker/services/Details/DetailsModel.dart';
+import 'package:gixt_worker/services/Express/Job_extra.dart';
+import 'package:gixt_worker/services/Job/payment_model.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
@@ -56,16 +58,19 @@ class Express {
   String payment_status;
   double worker_price;
   double diagnostic_cost;
-  double labor_cost;
+  double iva;
   double materials;
+  double tarifa;
   double total;
-  double labor;
+  double garantia;
   List<String> images_evicence;
   List<Express_proposal> express_proposal;
   // images
   String? image;
   List<DetailsModel> listdetails;
+  List<Job_extra> extra;
   String created_at;
+  List<PaymentModel>paymentdetails;
 
   Express({
     required this.express_id,
@@ -84,21 +89,24 @@ class Express {
     required this.description,
     required this.problem,
     required this.price,
-    required this.total,
-    required this.labor,
+    required this.tarifa,
+    required this.garantia,
     required this.payment_method,
     required this.is_active,
     required this.job_status,
     required this.payment_status,
     required this.worker_price,
     required this.diagnostic_cost,
-    required this.labor_cost,
+    required this.iva,
     required this.materials,
+    required this.total,
     required this.images_evicence,
     this.image,
     required this.express_proposal,
     required this.listdetails,
+    required this.extra,
     required this.created_at,
+    required this.paymentdetails
   });
 
   factory Express.fromJson(Map<String, dynamic> json) {
@@ -121,9 +129,10 @@ class Express {
 
       diagnostic_cost : (json['payment'] ? ['diagnostic_cost']) ?? 0.0,
       payment_method: (json['payment'] ? ['payment_method']) ?? 0.0,
-      labor_cost: (json['payment'] ? ['labor_cost']) ?? 0.0,
+      iva: (json['payment'] ? ['iva']) ?? 0.0,
       materials: (json['payment'] ? ['materials']) ?? 0.0,
-      labor: (json['payment'] ? ['labor_cost']) ?? 0.0,
+      tarifa: (json['payment'] ? ['tarifa_total']) ?? 0.0,
+      garantia : (json['payment'] ? ['garantia_total']) ?? 0.0,
       total : (json['payment'] ? ['total']) ?? 0.0,
       // job
       job_date: formatDate(json['job_date'] ?? ''),
@@ -141,6 +150,12 @@ class Express {
       listdetails: (json['details'] as List<dynamic>? ?? [])
         .map((e) => DetailsModel.fromJson(e))
         .toList(),
+      extra: (json['extra'] as List<dynamic>? ?? [])
+        .map((e) => Job_extra.fromJson(e))
+        .toList(),
+      paymentdetails: (json['payment_det'] as List<dynamic>? ?? [])
+              .map((e) => PaymentModel.fromJson(e))
+              .toList(),
       image: json['image'],
       created_at: json['created_at'] ?? '',
 
