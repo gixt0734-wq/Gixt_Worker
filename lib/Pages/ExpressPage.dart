@@ -1505,7 +1505,7 @@ class _ExpressPageState extends State<ExpressPage>
   Widget _buildEvidence() {
     final evidence = express.express[0].images_evicence;
     final extraevidence = express.express[0].extra;
-    final total = 1 + evidence.length;
+    final total = 1 + evidence.length + extraevidence.length;
     return SectionCard(
       title: 'Imágenes de evidencia',
       trailing: Container(
@@ -1634,15 +1634,11 @@ class _ExpressPageState extends State<ExpressPage>
     final diagnostic = express.express[0].diagnostic_cost;
     final garantia = express.express[0].garantia;
     final iva = express.express[0].iva;
-    final List<double> extra = express.express[0].extra
-        .map((e) => e.labor_cost)
-        .toList();
     final total = express.express[0].total;
     final List<PaymentModel> details = express.express[0].paymentdetails;
     return PriceBreakdown(
       details: details,
       total: total,
-      extra: extra,
       tarifa: tarifa,
       iva : iva,
       garantia: garantia
@@ -1667,6 +1663,7 @@ class _ExpressPageState extends State<ExpressPage>
           builder: (context) => Evidencejobpage(
             isExpress: true,
             job_id: express.express[0].express_id,
+            hasExtra: express.express[0].extra.isNotEmpty,
           ),
         ),
       );
@@ -2238,4 +2235,5 @@ class _ExpressPageState extends State<ExpressPage>
       },
     );
   }
+
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:gixt_worker/services/Express/Job_extra.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:gixt_worker/services/Auth/RefreshTokenAccess.dart';
@@ -70,6 +71,7 @@ class Job {
   List<Jobs_proposal> jobs_proposal;
   List<DetailsModel> listdetails;
   List<PaymentModel> paymentdetails;
+  List<Job_extra> extra;
   
   Job({
     required this.job_id,
@@ -102,6 +104,7 @@ class Job {
     required this.images_evicence,
     required this.jobs_proposal,
     required this.listdetails,
+    required this.extra,
     required this.paymentdetails,
   });
 
@@ -154,6 +157,9 @@ class Job {
       paymentdetails: (json['payment_det'] as List<dynamic>? ?? [])
               .map((e) => PaymentModel.fromJson(e))
               .toList(),
+      extra: (json['extra'] as List<dynamic>? ?? [])
+        .map((e) => Job_extra.fromJson(e))
+        .toList(),
     );
   }
 }

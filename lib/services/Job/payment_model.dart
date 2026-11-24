@@ -5,8 +5,8 @@ String formatType(String? type) {
         return 'Diagnóstico y visita';
       case 'labor':
         return 'Mano de obra';
-      case '3':
-        return 'Mantenimiento';
+      case 'additional_works':
+        return 'Extra';
       default:
         return '';
     }

@@ -39,19 +39,18 @@ class PriceBreakdown extends StatelessWidget {
             _priceLine(context, '${detail.concept_type}', detail.cost),
             const SizedBox(height: 12),
           ],
+          Divider(
+            height: 1,
+            thickness: 0.7,
+            color: surface.withValues(alpha: 0.1),
+          ),
+          const SizedBox(height: 16),
           _priceLine(context, 'Tarifa GIXT', tarifa),
           const SizedBox(height: 12),
           _priceLine(context, 'Garantia ', garantia),
           const SizedBox(height: 12),
           _priceLine(context, 'IVA ', iva),
           const SizedBox(height: 12),
-          if(extra.isNotEmpty)
-          for (int i = 0; i < extra.length; i++) ...[
-            _priceLine(context, 'Extra ${i + 1}', extra[i]),
-            const SizedBox(height: 12),
-          ],
-          
-
           Divider(
             height: 1,
             thickness: 0.7,
@@ -101,7 +100,7 @@ class PriceBreakdown extends StatelessWidget {
         const SizedBox(width: 6),
         Expanded(
        child: Text(
-  'Los precios mostrados no incluyen IVA. El total final ya incluye el IVA correspondiente a todos los conceptos.',
+            'La Tarifa GIXT, la Garantía y el IVA se cobran sobre cada concepto: mano de obra, diagnóstico y extras.',
             style: GoogleFonts.poppins(
               fontSize: 11.5,
               fontWeight: FontWeight.w400,

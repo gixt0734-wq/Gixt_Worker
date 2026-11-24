@@ -43,7 +43,7 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // final Servicios_service api = Servicios_service();
   final Agenda_service jobs = Agenda_service();
   final Categorias_service categorias = Categorias_service();
@@ -81,12 +81,29 @@ class _HomePageState extends State<HomePage> {
     });
     // 👇 SE EJECUTA AL ENTRAR A LA PÁGINA
     print("Entré a Home");
+    WidgetsBinding.instance.addObserver(this);
     homeNotifier.addListener(_Refresh);
     _loadUserId();
     _Initial();
     _GoMyLocation();
     //  expressNotifier.addListener(_reload);
     // cancelexpressNotifier.addListener(_reload);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    homeNotifier.removeListener(_Refresh);
+    super.dispose();
+  }
+
+  // Al volver del segundo plano los datos en memoria pueden estar viejos
+  // (y SignalR pudo perder eventos), así que recargamos.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _Refresh();
+    }
   }
 
   Future<void> _loadUserId() async {
@@ -136,11 +153,12 @@ class _HomePageState extends State<HomePage> {
     bool okData = await categorias.fetchCategoriasData();
     bool okEx = await express.fetchFromApi();
     bool okjob = await api.fetchFromApi();
+    bool okAgenda = await jobs.fetchFromApi(1);
     if (!mounted) return;
     setState(() {
       isLoading = false;
     });
-    if (!okData || !okEx || !okjob) {
+    if (!okData || !okEx || !okjob || !okAgenda) {
       Toast(
         context,
         title: "Error",

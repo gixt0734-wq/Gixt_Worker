@@ -71,7 +71,6 @@ class SignalRService {
     _conectando = true;
 
     final prefs = await SharedPreferences.getInstance();
-    final String token = prefs.getString('token') ?? '';
     int intentos = 0; // fallos consecutivos
 
     while (true) {
@@ -89,7 +88,12 @@ class SignalRService {
               "${dotenv.env['API_URL']}/notificationHub",
               options: HttpConnectionOptions(
                 requestTimeout: 30000,
-                accessTokenFactory: () async => token,
+                // Se lee en cada intento: si el JWT se refrescó mientras
+                // estábamos desconectados, usamos el nuevo y no el viejo.
+                accessTokenFactory: () async {
+                  await prefs.reload();
+                  return prefs.getString('token') ?? '';
+                },
               ),
             )
             .build();

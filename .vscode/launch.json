@@ -15,7 +15,8 @@
             "request": "launch",
             "type": "dart",
             "deviceId": "RF8W90R1L8T",
-            //  "flutterMode": "release"
+            // "flutterMode": "release"
+            
             
         },
         {

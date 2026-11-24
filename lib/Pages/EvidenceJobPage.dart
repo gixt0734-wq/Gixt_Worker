@@ -22,9 +22,12 @@ class Evidencejobpage extends StatefulWidget {
     super.key,
     required this.job_id,
     required this.isExpress,
+    this.hasExtra = false,
   });
   final String job_id;
   final bool isExpress;
+  /// Si el servicio tuvo trabajos extra se pide una foto más de evidencia.
+  final bool hasExtra;
   @override
   State<Evidencejobpage> createState() => _EvidencejobpageState();
 }
@@ -36,9 +39,10 @@ class _Material {
 }
 
 class _EvidencejobpageState extends State<Evidencejobpage> {
-  List<File?> _images = List.generate(2, (_) => null);
+  int get _required => widget.hasExtra ? 3 : 2;
+  late final List<File?> _images = List.generate(_required, (_) => null);
   int get _filledCount => _images.where((image) => image != null).length;
-  bool get _isComplete => _filledCount >= 2;
+  bool get _isComplete => _filledCount >= _required;
 
   @override
   void dispose() {
@@ -62,11 +66,13 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
 
   void sendevidence() async {
     FocusScope.of(context).unfocus();
-    if (_images.where((image) => image != null).length < 2) {
+    if (!_isComplete) {
       Toast(
         context,
         title: 'Imagen requerida',
-        message: 'Por favor llena los 2 campos de imagen',
+        message: widget.hasExtra
+            ? 'Por favor llena los $_required campos de imagen (incluye la del trabajo extra)'
+            : 'Por favor llena los $_required campos de imagen',
         type: alert_type.advertencia,
       );
       return;
@@ -151,7 +157,9 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
       children: [
         _PageHeader(
               'Imágenes de evidencia',
-              'Agrega 2 fotos del trabajo realizado para que el cliente pueda verificarlo',
+              widget.hasExtra
+                  ? 'Agrega 2 fotos del trabajo realizado y 1 del trabajo extra para que el cliente pueda verificarlo'
+                  : 'Agrega 2 fotos del trabajo realizado para que el cliente pueda verificarlo',
             )
             .animate()
             .fadeIn(duration: 400.ms)
@@ -163,19 +171,29 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
             .slideY(begin: 0.12, curve: Curves.easeOut),
         const SizedBox(height: 16),
         SizedBox(height: 20),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(children: [imageBox(0), SizedBox(width: 20), imageBox(1)]),
+        // Cuadrícula de 2 columnas: las fotos van en pares y bajan de fila.
+        LayoutBuilder(
+          builder: (context, constraints) {
+            const spacing = 16.0;
+            final boxWidth = (constraints.maxWidth - spacing) / 2;
+            return Wrap(
+              spacing: spacing,
+              runSpacing: spacing,
+              children: [
+                for (var i = 0; i < _required; i++) imageBox(i, boxWidth),
+              ],
+            );
+          },
         ),
       ],
     );
   }
 
-  Widget imageBox(int index) {
+  Widget imageBox(int index, double width) {
     return GestureDetector(
       onTap: () => _pickImage(index),
       child: SizedBox(
-        width: 150,
+        width: width,
         height: 170,
         child: Stack(
           alignment: Alignment.center,
@@ -209,7 +227,9 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
                         
                         const SizedBox(height: 12),
                         Text(
-                          'Foto ${index + 1}',
+                          widget.hasExtra && index == 2
+                              ? 'Trabajo extra'
+                              : 'Foto ${index + 1}',
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
@@ -277,7 +297,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
     return Row(
       children: [
         Text(
-          '$_filledCount de 2 fotos',
+          '$_filledCount de $_required fotos',
           style: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w600,
@@ -286,7 +306,7 @@ class _EvidencejobpageState extends State<Evidencejobpage> {
         ),
         const Spacer(),
         Row(
-          children: List.generate(2, (i) {
+          children: List.generate(_required, (i) {
             final active = i < _filledCount;
             return AnimatedContainer(
               duration: const Duration(milliseconds: 300),

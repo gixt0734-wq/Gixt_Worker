@@ -23,6 +23,7 @@ import 'package:gixt_worker/Components/Job/Button.dart';
 import 'package:gixt_worker/Components/Job/Client.dart';
 import 'package:gixt_worker/Components/Job/DetailField.dart';
 import 'package:gixt_worker/Components/Job/Extra.dart';
+import 'package:gixt_worker/Components/Job/ExtraJobCard.dart';
 import 'package:gixt_worker/Components/Job/FieldLabelDescription.dart';
 import 'package:gixt_worker/Components/Job/Image.dart';
 import 'package:gixt_worker/Components/Job/InfoCard.dart';
@@ -40,6 +41,7 @@ import 'package:gixt_worker/Config/Notifiers/jobs_notifiers.dart';
 import 'package:gixt_worker/Config/cache.dart';
 import 'package:gixt_worker/Config/colors.dart';
 import 'package:gixt_worker/Config/location_cache_service.dart';
+import 'package:gixt_worker/Pages/AddExtraJobPage.dart';
 import 'package:gixt_worker/Pages/EvidenceJobPage.dart';
 import 'package:gixt_worker/Pages/PayjobPage.dart';
 import 'package:gixt_worker/Pages/Reports/AddReportPage.dart';
@@ -1355,6 +1357,7 @@ if (job.job.isEmpty) return;
     final problem = job.job[0].problem;
     final description = job.job[0].description;
     final expressdetails = job.job[0].listdetails;
+    final extra = job.job[0].extra;
     return Column(
       mainAxisAlignment: MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1370,6 +1373,27 @@ if (job.job.isEmpty) return;
             ],
           ),
         ),
+        if (extra.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          SectionCard(
+            title: 'Trabajos extra',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < extra.length; i++) ...[
+                  if (i > 0) const SizedBox(height: 10),
+                  ExtraJobCard(
+                    index: i + 1,
+                    problem: extra[i].problem,
+                    description: extra[i].description,
+                    price: extra[i].labor_cost,
+                    imageUrl: extra[i].image_url,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
         if (expressdetails.isNotEmpty) ...[
           const SizedBox(height: 10),
           SectionCard(
@@ -1418,7 +1442,8 @@ if (job.job.isEmpty) return;
 
   Widget _buildEvidence() {
     final evidence = job.job[0].images_evicence;
-    final total = 1 + evidence.length;
+    final extraevidence = job.job[0].extra;
+    final total = 1 + evidence.length + extraevidence.length;
     return SectionCard(
       title: 'Imágenes de evidencia',
       trailing: Container(
@@ -1457,6 +1482,14 @@ if (job.job.isEmpty) return;
               ),
               const SizedBox(width: 20),
             ],
+            for (final img in extraevidence) ...[
+              Imagen(
+                imagen: img.image_url,
+                type: 'Extra',
+                icon: Icons.handyman_rounded,
+              ),
+              const SizedBox(width: 20),
+            ],
           ],
         ),
       ),
@@ -1465,6 +1498,49 @@ if (job.job.isEmpty) return;
 
   Widget _buildPaymentMethodCard() {
     return PaymentMethod(payment_method: job.job[0].payment_method);
+  }
+
+    Future<void> _finishJob() async {
+    bool? ok = await ActionAlert(
+      context,
+      title: 'Evidencia',
+      message:
+          'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
+      type: action_type.advertencia,
+    );
+    if (ok!) {
+      if (!mounted) return;
+      Navigator.pop(context); // cerrar loader
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => Evidencejobpage(
+            isExpress: false,
+           job_id: job.job[0].job_id,
+            hasExtra: job.job[0].extra.isNotEmpty,
+          ),
+        ),
+      );
+
+      return;
+    }
+  }
+
+  Future<void> _otherJob() async {
+    if (!mounted) return;
+    Navigator.pop(context); // cerrar loader
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddExtraJobPage(
+          isExpress: false,
+          job_id: job.job[0].job_id,
+          methodpayment: job.job[0].payment_method,
+        ),
+      ),
+    );
   }
 
   Widget _bottomBar(BuildContext context) {
@@ -1485,26 +1561,9 @@ if (job.job.isEmpty) return;
         _startTracking();
       } else if (job.job[0].job_status == 'in_progress') {
         if (job.job[0].images_evicence.isEmpty) {
-          bool? ok = await ActionAlert(
-            context,
-            title: 'Evidencia',
-            message:
-                'Antes de finalizar manda tu evidencia que ya se termino el trabajo',
-            type: action_type.advertencia,
-          );
-          if (ok!) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => Evidencejobpage(
-                  isExpress: false,
-                  job_id: job.job[0].job_id,
-                ),
-              ),
-            );
+          _showOtherWorkSheet();
 
-            return;
-          }
+          return;
         }
       }
     };
@@ -1772,6 +1831,88 @@ if (job.job.isEmpty) return;
                           bgColor: colorsecundario,
                           action: _Send,
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+  void _showOtherWorkSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            final surface = Theme.of(context).colorScheme.surface;
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: KeyboardDismisser(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 28),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 24,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40,
+                            height: 4,
+                            margin: const EdgeInsets.only(bottom: 8),
+                            decoration: BoxDecoration(
+                              color: surface.withValues(alpha: 0.18),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        const FieldLabelDescription(
+                          label: '¿Deseas agregar otro trabajo?',
+                          value:
+                              'Antes de finalizar el servicio, indica si realizaste o necesitas realizar algún trabajo adicional.',
+                        ),
+                        const SizedBox(height: 24),
+
+                        Button(
+                          text: 'Agregar otro trabajo',
+                          icon: Icons.add_circle_outline_rounded,
+                          bgColor: colorsecundario,
+                          action: _otherJob,
+                        ),
+
+                        const SizedBox(height: 12),
+
+                        // Finalizar servicio
+                        Button(
+                          text: 'Continuar con evidencias',
+                          icon: Icons.arrow_forward_rounded,
+                          bgColor: surface.withValues(alpha: 0.08),
+                          action: _finishJob,
+                        ),
+                        const SizedBox(height: 10),
                       ],
                     ),
                   ),
